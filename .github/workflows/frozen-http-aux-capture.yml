@@ -1,27 +1,25 @@
-name: Frozen native HTTP auxiliary replay
+name: Native dependency refresh capture
+run-name: Native dependency capture ${{ github.ref_name }}
 
 on:
-  pull_request:
-    paths:
-      - crates/symeraseme-cli/tests/mcp_http_process.rs
-      - crates/symeraseme-cli/tests/mcp_http_native_contract.rs
-      - crates/symeraseme-cli/tests/support/mcp_http_port.rs
-      - crates/symeraseme-cli/tests/support/capture_http_aux.rs
-      - .github/workflows/frozen-http-aux-capture.yml
-      - scripts/prepare-frozen-history.py
-      - tests/test_prepare_frozen_history.py
   workflow_dispatch: {}
 
 permissions:
   contents: read
 
 concurrency:
-  group: frozen-http-aux-${{ github.ref }}
-  cancel-in-progress: true
+  group: dependency-capture-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_INCREMENTAL: '0'
+  GOTOOLCHAIN: go1.26.6
+  PYTHONOPTIMIZE: '0'
+  SYMERASEME_PARITY_LIVE_GO: '1'
 
 jobs:
   capture:
-    name: Recorded Go HTTP auxiliary / ${{ matrix.os }}
+    name: Actual native dependency capture / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     strategy:
@@ -31,31 +29,91 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Prepare immutable frozen producer history
         shell: bash
         run: python3 scripts/prepare-frozen-history.py --fetch
+      - name: Isolate compiled capture outputs
+        shell: bash
+        run: printf 'CARGO_TARGET_DIR=%s/dependency-capture-target\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Install pinned Rust toolchain
         shell: bash
         run: rustup toolchain install 1.98.0 --profile minimal
+      - name: Install the immutable Go producer toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.6'
+          cache: true
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-            target
-          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - name: Verify clean source
+          key: dependency-capture-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Fetch candidate dependencies before offline comparators
         shell: bash
         run: |
-          test -z "$(git status --porcelain --untracked-files=normal)"
-      - name: Replay every auxiliary comparison against authenticated native Go records
+          cargo +1.98.0 fetch --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" --locked
+          go mod download
+      - name: Verify exact standalone source and native execution identity
         shell: bash
         env:
-          SYMERASEME_PARITY_LIVE_GO: '0'
+          EXPECTED_CAPTURE_REVISION: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          root = pathlib.Path.cwd().resolve()
+          candidate = '644b34b63d6a7440fb65d1b5b36535a42b9cc315'
+          retirement = '22615ae67325c581fbe60cb0f2d3d2b2139cf900'
+          def git(*args):
+              return subprocess.check_output(['git', *args], cwd=root)
+          assert (root / '.git').is_dir()
+          assert not git('status', '--porcelain')
+          revision = git('rev-parse', 'HEAD').decode().strip()
+          assert revision == os.environ['EXPECTED_CAPTURE_REVISION']
+          subprocess.run(['git', 'merge-base', '--is-ancestor', candidate, revision], check=True)
+          changed = git('diff', '--name-only', candidate, revision).decode().splitlines()
+          exceptions = {'.github/workflows/frozen-http-aux-capture.yml', 'scripts/capture-native-process-references.py'}
+          for name in changed:
+              if name in exceptions:
+                  continue
+              allowed = name.endswith(('.go', '.go.in', '.gotmpl')) or name in {'go.mod', 'go.sum'} or (
+                  name.startswith(('crates/symeraseme-cli/tests/', 'crates/symeraseme-core/tests/')) and name.endswith('.rs'))
+              assert allowed, 'unexpected candidate change: ' + name
+              original = git('cat-file', '--filters', retirement + ':' + name)
+              assert (root / name).read_bytes() == original, 'retired input altered: ' + name
+          for name in ['Cargo.toml', 'Cargo.lock', 'fuzz/Cargo.lock', 'crates/symeraseme-cli/tests/support/native_host_agent.rs']:
+              assert (root / name).read_bytes() == git('cat-file', '--filters', candidate + ':' + name), name
+          metadata = json.loads(subprocess.check_output(['cargo', '+1.98.0', 'metadata', '--manifest-path', str(root / 'Cargo.toml'), '--no-deps', '--format-version', '1', '--locked', '--offline']))
+          assert pathlib.Path(metadata['workspace_root']).resolve() == root
+          assert pathlib.Path(metadata['target_directory']).resolve() == pathlib.Path(os.environ['CARGO_TARGET_DIR']).resolve()
+          for package in metadata['packages']:
+              assert pathlib.Path(package['manifest_path']).resolve().is_relative_to(root)
+              assert all(pathlib.Path(target['src_path']).resolve().is_relative_to(root) for target in package['targets'])
+          go = json.loads(subprocess.check_output(['go', 'env', '-json', 'GOVERSION', 'GOMOD', 'GOHOSTOS', 'GOHOSTARCH', 'GOOS', 'GOARCH']))
+          assert go['GOVERSION'] == 'go1.26.6'
+          assert pathlib.Path(go['GOMOD']).resolve() == root / 'go.mod'
+          assert (go['GOOS'], go['GOARCH']) == (go['GOHOSTOS'], go['GOHOSTARCH'])
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'native-dependency-captures'
+          output.mkdir(mode=0o700)
+          identity = {'capture_revision': revision, 'product_candidate_revision': candidate, 'retirement_revision': retirement,
+                      'go': go, 'workspace_root': str(root), 'cargo_target_directory': metadata['target_directory'],
+                      'checkout_autocrlf': subprocess.run(['git', 'config', '--get', 'core.autocrlf'], capture_output=True, text=True).stdout.strip(),
+                      'native_host_agent_sha256': hashlib.sha256((root / 'crates/symeraseme-cli/tests/support/native_host_agent.rs').read_bytes()).hexdigest(),
+                      'scope': 'Actual Go captures only; no frozen-reader, product-native or release acceptance.'}
+          (output / 'capture-identity.json').write_text(json.dumps(identity, indent=2))
+          print(json.dumps(identity, indent=2))
+          PY
+      - name: Capture original six process families
+        shell: bash
+        run: python3 scripts/capture-native-process-references.py --output-root "$RUNNER_TEMP/native-dependency-captures"
+      - name: Capture original auxiliary comparisons
+        shell: bash
+        env:
+          SYMERASEME_CAPTURE_HTTP_AUX: ${{ runner.temp }}/native-dependency-captures/frozen-go-http-aux
         run: |
           set -euo pipefail
           # The six process comparators are Unix-only; the bind differential is native everywhere.
@@ -70,14 +128,41 @@ jobs:
                     obs_text_origin_rejection_matches_go_and_rust_processes)
             targets+=(--test mcp_http_process)
           fi
-          cargo +1.98.0 test -p symeraseme-cli "${targets[@]}" --locked -- "${tests[@]}" --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/http-aux.log"
-          passed=$(awk '/^test result: ok\. [0-9]+ passed; 0 failed; 0 ignored;/ { sum += $4 } END { print sum + 0 }' "$RUNNER_TEMP/http-aux.log")
+          cargo +1.98.0 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" -p symeraseme-cli "${targets[@]}" --locked --offline -- "${tests[@]}" --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/native-dependency-captures/http-aux.log"
+          passed=$(awk '/^test result: ok\. [0-9]+ passed; 0 failed; 0 ignored;/ { sum += $4 } END { print sum + 0 }' "$RUNNER_TEMP/native-dependency-captures/http-aux.log")
           test "$passed" -eq "${#tests[@]}"
-      - name: Retain native replay diagnostics
+      - name: Validate complete native record inventory
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'native-dependency-captures'
+          identity = json.loads((root / 'capture-identity.json').read_text())
+          expected = {'plan-processes': {'web-form', 'senderless-email'}, 'http-headers': {'headers'},
+                      'smtp': {'campaign', 'transport'}, 'agent-error': {'agent-error'}, 'native-triage': {'cli', 'mcp'}}
+          aux = {'native_bind_failures_match_checked_out_go'}
+          if os.name != 'nt':
+              expected['http-wire'] = {'wire'}
+              aux.update({'live_http_disconnect_cancels_and_reaps_host_agent_like_go', 'live_http_disconnect_cancels_provider_request_like_go',
+                          'startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness', 'occupied_bind_error_matches_go_for_ipv4_and_ipv6',
+                          'unavailable_local_address_error_matches_go', 'obs_text_origin_rejection_matches_go_and_rust_processes'})
+          expected['http-aux'] = aux
+          actual = {p.name.removeprefix('frozen-go-'): {f.stem for f in p.glob('*.json')} for p in root.glob('frozen-go-*') if p.is_dir()}
+          assert actual == expected, (actual, expected)
+          records = list(root.glob('frozen-go-*/*.json'))
+          target = identity['go']['GOOS'] + '/' + identity['go']['GOARCH']
+          for path in records:
+              record = json.loads(path.read_text())
+              assert record['source_revision'] == identity['capture_revision'], path
+              assert record['native_target'] == target and record['go_version'] == 'go1.26.6', path
+              assert 'vcs.modified=false' in record['embedded_build_info'], path
+          print('COMPLETE ACTUAL RECORDS', target, len(records))
+          PY
+      - name: Retain raw native captures and diagnostics
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: frozen-http-aux-replay-${{ runner.os }}-${{ runner.arch }}
-          path: ${{ runner.temp }}/http-aux.log
+          name: native-dependency-captures-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ runner.temp }}/native-dependency-captures
           if-no-files-found: error
           retention-days: 30
