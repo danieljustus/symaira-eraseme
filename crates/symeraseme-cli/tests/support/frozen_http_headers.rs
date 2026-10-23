@@ -13,50 +13,50 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
         "darwin/amd64",
-        "e61132f85b89580c96d95d098289f7238e810255",
-        "199a0c0ed6b1afaa9a05340dd32f60ffc4af3b64b95a969914cb5257cd08799c",
+        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
+        "cb1e16218992c3b5dea66afc52b998277f37f30c958143a244044643824228ee",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e61132f8/http-headers/darwin-amd64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/darwin-amd64/headers.json"
         ),
     ),
     (
         "darwin/arm64",
-        "e61132f85b89580c96d95d098289f7238e810255",
-        "62b22a93ec95ba3ad94a10a275576128f13a6ceef511596527b5c286903e516f",
+        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
+        "3174148062186619fa149fb716dbd24b0bd8ec12b8e76774c505e1d1260fa46c",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e61132f8/http-headers/darwin-arm64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/darwin-arm64/headers.json"
         ),
     ),
     (
         "linux/amd64",
-        "e61132f85b89580c96d95d098289f7238e810255",
-        "df58294584dbe79974e622fb5e2b84056001e42d1592bb6a3df25ba8c4029539",
+        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
+        "f6a6283272673e87c412cffbea20cb8bcbeff9fb0132de87440baa59ae21e6fe",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e61132f8/http-headers/linux-amd64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/linux-amd64/headers.json"
         ),
     ),
     (
         "linux/arm64",
-        "e61132f85b89580c96d95d098289f7238e810255",
-        "59654ad5ccccdd4ee6b40e6659fbcbbe16aaafacd403806273f2db22aba1badc",
+        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
+        "86f7ab6b6f59ea8b4469e64ab92c6d4875b1b2216e92cc155fbce192f579d335",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e61132f8/http-headers/linux-arm64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/linux-arm64/headers.json"
         ),
     ),
     (
         "windows/amd64",
-        "e61132f85b89580c96d95d098289f7238e810255",
-        "49082b1b1220fc4ff750263813e73cdf5f2e3a4bc409aa33f5efabb44bebceee",
+        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
+        "a871e99f64e891f77478ea16b9669da06a2b5b62d88cf93567871c4b9f14bc41",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e61132f8/http-headers/windows-amd64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/windows-amd64/headers.json"
         ),
     ),
     (
         "windows/arm64",
-        "e61132f85b89580c96d95d098289f7238e810255",
-        "a0fa1b605a8a32236e704b5ba434ced195dfe8f2313dddbe64fdf0a59cb67aa6",
+        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
+        "cfa0c2a1d55d18891bafcc7e16653502041147e17cf57b9cdb702cee494b9bb4",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e61132f8/http-headers/windows-arm64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/windows-arm64/headers.json"
         ),
     ),
 ];
