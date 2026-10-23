@@ -1,9 +1,7 @@
 //! Actual Go/Rust bind failures and Windows token DACLs in disposable roots.
 use std::fs;
 use std::net::TcpListener;
-use std::path::Path;
-#[cfg(windows)]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
@@ -11,18 +9,15 @@ use std::time::{Duration, Instant};
 #[allow(dead_code)] // Windows-only controls use additional shared process helpers.
 mod mcp_http_port;
 use mcp_http_port::StartedChild;
-
+#[path = "support/capture_http_aux.rs"]
+#[allow(dead_code)] // Only the Unix process comparators retain raw HTTP bodies.
+mod capture_http_aux;
 #[path = "support/frozen_http_aux.rs"]
 #[allow(dead_code)]
 mod frozen_http_aux;
 
-#[path = "support/frozen_token_acl.rs"]
-#[allow(dead_code)] // Windows-only replay consumes the rest; other hosts run the reader unit tests.
-mod frozen_token_acl;
-
 const THIS_FILE: &str = "crates/symeraseme-cli/tests/mcp_http_native_contract.rs";
 
-#[cfg(windows)]
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
@@ -67,7 +62,12 @@ fn capture(mut command: Command, logs: &Path, label: &str, budget: Duration) -> 
         if Instant::now() >= deadline {
             child.kill().unwrap();
             child.wait().unwrap();
-            panic!("native helper deadline; private diagnostics retained");
+            let diagnostic = if fs::metadata(&stderr).unwrap().len() <= 4096 {
+                fs::read_to_string(&stderr).unwrap_or_default()
+            } else {
+                "diagnostic exceeds limit".into()
+            };
+            panic!("{label} deadline: {diagnostic}");
         }
         std::thread::sleep(Duration::from_millis(20));
     };
@@ -80,6 +80,26 @@ fn capture(mut command: Command, logs: &Path, label: &str, budget: Duration) -> 
         stdout: fs::read(stdout).unwrap(),
         stderr: fs::read(stderr).unwrap(),
     }
+}
+
+fn oracle(logs: &Path) -> PathBuf {
+    let binary = logs.join("go-mcp.exe");
+    let mut command = Command::new("go");
+    command
+        .args(["build", "-o"])
+        .arg(&binary)
+        .arg("./cmd/symeraseme")
+        .current_dir(repo())
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off");
+    let result = capture(command, logs, "go-build", Duration::from_secs(180));
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    binary
 }
 
 fn failed_start(
@@ -109,24 +129,48 @@ fn failed_start(
     result
 }
 
-/// Recorded native Go startup failure with this run's port.
-fn go_failed_start(recorded: &serde_json::Value, port: u16, case: &str) -> (Option<i32>, Vec<u8>) {
+/// Actual Go startup failure, or the recorded one with this run's port.
+fn go_failed_start(
+    recorded: Option<&serde_json::Value>,
+    go: Option<&Path>,
+    measured: &mut Vec<serde_json::Value>,
+    root: &Path,
+    host: &str,
+    port: u16,
+    case: &str,
+) -> (Option<i32>, Vec<u8>) {
     let label = format!("go-{case}");
-    assert_eq!(recorded["stdout_bytes"], 0);
-    assert_eq!(recorded["token_bytes"], 43);
-    let (code, stderr) = frozen_http_aux::startup_failure(recorded, case, port);
-    assert_ne!(code, Some(0), "{label} unexpectedly listened");
-    (code, stderr)
+    if let Some(recorded) = recorded {
+        // failed_start's actual-Go side effects, as measured.
+        assert_eq!(recorded["stdout_bytes"], 0);
+        assert_eq!(recorded["token_bytes"], 43);
+        let (code, stderr) = frozen_http_aux::startup_failure(recorded, case, port);
+        assert_ne!(code, Some(0), "{label} unexpectedly listened");
+        return (code, stderr);
+    }
+    let result = failed_start(go.unwrap(), &root.join(&label), host, port, root, &label);
+    let mut observation =
+        capture_http_aux::startup_failure(case, port, result.status.code(), &result.stderr);
+    observation["stdout_bytes"] = result.stdout.len().into();
+    observation["token_bytes"] = fs::read(root.join(&label).join("data/mcp_token"))
+        .unwrap()
+        .len()
+        .into();
+    measured.push(observation);
+    (result.status.code(), result.stderr)
 }
 
 #[test]
 fn native_bind_failures_match_checked_out_go() {
     const TEST: &str = "native_bind_failures_match_checked_out_go";
     let root = tempfile::tempdir().unwrap();
-    let frozen = frozen_http_aux::observation(THIS_FILE, TEST)
-        .expect("live Go is retired; recorded native bind failures are required");
-    assert_eq!(frozen["cases"].as_array().unwrap().len(), 3);
-    let recorded = |index: usize| &frozen["cases"][index];
+    let frozen = frozen_http_aux::observation(THIS_FILE, TEST);
+    if let Some(record) = &frozen {
+        assert_eq!(record["cases"].as_array().unwrap().len(), 3);
+    }
+    let recorded = |index: usize| frozen.as_ref().map(|record| &record["cases"][index]);
+    let go = frozen.is_none().then(|| oracle(root.path()));
+    let mut measured = Vec::new();
     let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
     // IPv6 is a required native control, never an optional zero-case skip.
     for (index, (case, host)) in [("ipv4", "127.0.0.1"), ("ipv6", "::1")]
@@ -135,7 +179,15 @@ fn native_bind_failures_match_checked_out_go() {
     {
         let listener = TcpListener::bind((host, 0)).expect("native loopback listener");
         let port = listener.local_addr().unwrap().port();
-        let (go_code, go_stderr) = go_failed_start(recorded(index), port, case);
+        let (go_code, go_stderr) = go_failed_start(
+            recorded(index),
+            go.as_deref(),
+            &mut measured,
+            root.path(),
+            host,
+            port,
+            case,
+        );
         let rust_result = failed_start(
             rust,
             &root.path().join(format!("rust-{case}")),
@@ -160,7 +212,15 @@ fn native_bind_failures_match_checked_out_go() {
     let probe = TcpListener::bind((host, 0)).unwrap_err();
     assert_eq!(probe.kind(), std::io::ErrorKind::AddrNotAvailable);
     let port = mcp_http_port::free_port();
-    let (go_code, go_stderr) = go_failed_start(recorded(2), port, "unavailable");
+    let (go_code, go_stderr) = go_failed_start(
+        recorded(2),
+        go.as_deref(),
+        &mut measured,
+        root.path(),
+        host,
+        port,
+        "unavailable",
+    );
     let rust_result = failed_start(
         rust,
         &root.path().join("rust-unavailable"),
@@ -179,6 +239,9 @@ fn native_bind_failures_match_checked_out_go() {
             .unwrap()
             .contains(&format!("listen tcp {host}:{port}: bind: "))
     );
+    if let Some(go) = &go {
+        capture_http_aux::record(go, THIS_FILE, TEST, serde_json::json!({"cases": measured}));
+    }
     eprintln!("native bind differential executed IPv4, IPv6 and TEST-NET controls");
 }
 
@@ -186,7 +249,6 @@ fn native_bind_failures_match_checked_out_go() {
 mod windows_acl {
     use super::*;
     use base64::Engine;
-    use frozen_token_acl::{Acl, Observation};
     use mcp_http_port::{accepts_token, spawn_with_handoff};
     use serde_json::Value;
 
@@ -212,14 +274,10 @@ mod windows_acl {
         let result = capture(command, logs, label, Duration::from_secs(30));
         assert!(
             result.status.success(),
-            "native token ACL observation failed"
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
         );
-        assert!(result.stderr == format!("MCP token ACL script started: {mode}\r\nMCP token ACL script completed: {mode}\r\n").as_bytes());
         serde_json::from_slice(&result.stdout).unwrap()
-    }
-
-    fn observed(value: &Value) -> Acl {
-        Acl::from_json(value).unwrap()
     }
 
     fn start(binary: &Path, root: &Path) -> (StartedChild, u16, String) {
@@ -251,195 +309,119 @@ mod windows_acl {
         (child, port, token)
     }
 
-    /// Fresh same-run identity: the bounded pwsh 7 Verify run re-observes this process token
-    /// (inherited by the child) against the baseline. Only then is G:<PRIMARY_GROUP> expanded.
-    fn verified_primary_group(root: &Path, target: &str) -> String {
-        let baseline = std::env::var_os("SYMERASEME_WINDOWS_IDENTITY_BASELINE")
-            .map(PathBuf::from)
-            .expect(
-                "SYMERASEME_WINDOWS_IDENTITY_BASELINE must name the same-run identity baseline",
-            );
-        assert!(
-            baseline.is_absolute(),
-            "identity baseline path must be absolute"
-        );
-        let arch = match target {
-            "windows/amd64" => "X64",
-            "windows/arm64" => "ARM64",
-            _ => panic!("no Windows identity architecture for this target"),
-        };
-        assert!(
-            fs::metadata(&baseline).unwrap().len() <= 16 * 1024,
-            "identity baseline is too large"
-        );
-        let raw = fs::read(&baseline).expect("identity baseline is readable");
-        assert!(raw.len() <= 16 * 1024, "identity baseline is too large");
-        let value: Value = serde_json::from_slice(&raw).expect("identity baseline is JSON");
-        let programs =
-            PathBuf::from(std::env::var_os("ProgramFiles").expect("native ProgramFiles"));
-        let pwsh = programs.join("PowerShell/7/pwsh.exe");
-        let git = programs.join("Git/cmd/git.exe");
-        assert!(
-            pwsh.is_file() && git.is_file(),
-            "native identity executables unavailable"
-        );
-        let mut revision_command = Command::new(git);
-        private(&mut revision_command, root);
-        revision_command
-            .arg("-C")
-            .arg(repo())
-            .args(["rev-parse", "HEAD"]);
-        let revision_output = capture(
-            revision_command,
-            root,
-            "identity-source",
-            Duration::from_secs(30),
-        );
-        assert!(revision_output.status.success());
-        let revision = std::str::from_utf8(&revision_output.stdout).unwrap().trim();
-        let script = repo().join("scripts/capture-windows-identity.ps1");
-        let script_bytes = fs::read(&script).unwrap();
-        let mut command = Command::new(pwsh);
-        private(&mut command, root);
-        // PowerShell needs PATHEXT to resolve the verifier's bare `git` command.
-        command.env("PATHEXT", ".EXE");
-        for key in ["PATH", "PSModulePath", "ProgramFiles"] {
-            if let Some(path) = std::env::var_os(key) {
-                command.env(key, path);
-            }
-        }
-        command
-            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-File"])
-            .arg(&script)
-            .args([
-                "-Mode",
-                "Verify",
-                "-ExpectedArch",
-                arch,
-                "-ExpectedRevision",
-                revision,
-                "-ArtifactPath",
-            ])
-            .arg(&baseline);
-        let result = capture(command, root, "identity-verify", Duration::from_secs(120));
-        assert!(
-            result.status.success(),
-            "fresh identity verification failed (exit {:?})",
-            result.status.code()
-        );
-        assert!(
-            fs::read(&baseline).unwrap() == raw,
-            "identity baseline changed during verification"
-        );
-        assert!(
-            fs::read(&script).unwrap() == script_bytes,
-            "identity verifier changed"
-        );
-        let script_hash = frozen_token_acl::digest(&script_bytes);
-        frozen_token_acl::check_identity_baseline(&value, arch, revision, &script_hash)
-            .expect("independently verified current identity relationships")
-    }
-
-    /// One actual Rust run of an inherited or owner-only parent; returns every compared field.
-    fn rust_case(rust: &Path, root: &Path, case: &str, protected: bool) -> Observation {
-        let parent = root.join(case);
-        fs::create_dir(&parent).unwrap();
-        if protected {
-            assert_eq!(acl(&parent, "protect", root, case)["protected"], true);
-        }
-        let directory = parent.join("rust");
-        fs::create_dir(&directory).unwrap();
-        fs::write(directory.join("sentinel"), frozen_token_acl::SENTINEL).unwrap();
-
-        let (mut child, _, old) = start(rust, &directory);
-        child.kill().unwrap();
-        child.wait().unwrap();
-        drop(child);
-        let token_file = directory.join("data/mcp_token");
-        let before = acl(&token_file, "read", root, &format!("{case}-before"));
-        let (mut restarted, port, new) = start(rust, &directory);
-        let rotated = old != new;
-        let old_accepted = accepts_token(port, &old, Instant::now() + Duration::from_secs(2));
-        let new_accepted = accepts_token(port, &new, Instant::now() + Duration::from_secs(2));
-        restarted.kill().unwrap();
-        restarted.wait().unwrap();
-        drop(restarted);
-        let after = acl(&token_file, "read", root, &format!("{case}-after"));
-        let directory_acl = acl(
-            &directory.join("data"),
-            "read",
-            root,
-            &format!("{case}-dir"),
-        );
-
-        // A read-only existing file rejects replacement, retaining both the
-        // old token bytes and its complete security descriptor.
-        let token_permissions = fs::metadata(&token_file).unwrap().permissions();
-        let mut readonly = token_permissions.clone();
-        readonly.set_readonly(true);
-        fs::set_permissions(&token_file, readonly).unwrap();
-        let readonly_acl = acl(&token_file, "read", root, &format!("{case}-readonly"));
-        let failed = failed_start(
-            rust,
-            &directory,
-            "127.0.0.1",
-            mcp_http_port::free_port(),
-            root,
-            &format!("{case}-failed"),
-        );
-        let retained_acl = acl(&token_file, "read", root, &format!("{case}-retained"));
-        let retained_token = fs::read_to_string(&token_file).unwrap() == new;
-        let observation = Observation {
-            name: case.to_owned(),
-            parent_protected: protected,
-            token_before_bytes: old.len(),
-            token_after_bytes: new.len(),
-            rotated,
-            old_accepted,
-            new_accepted,
-            before: observed(&before),
-            after: observed(&after),
-            directory: observed(&directory_acl),
-            readonly: observed(&readonly_acl),
-            retained: observed(&retained_acl),
-            failed_exit_code: failed.status.code(),
-            failed_stdout: failed.stdout.clone(),
-            failed_stderr: frozen_token_acl::normalize_runtime_root(&failed.stderr, &directory),
-            retained_token,
-            sentinel: fs::read(directory.join("sentinel")).unwrap(),
-        };
-        fs::set_permissions(&token_file, token_permissions).unwrap();
-        observation
-    }
-
     #[test]
     fn native_windows_token_dacl_and_rotation_match_go() {
-        frozen_token_acl::reject_retired_env().unwrap();
         let root = tempfile::tempdir().unwrap();
-        let target = frozen_http_aux::native_target().expect("native Windows target");
-        let retained = frozen_token_acl::load(target)
-            .expect("authenticated token ACL expectations for this target");
-        assert_eq!(retained.len(), 2);
-        let group = verified_primary_group(root.path(), target);
+        let go = oracle(root.path());
         let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
-        for (expected, protected) in retained.iter().zip([false, true]) {
-            assert_eq!(expected.parent_protected, protected);
-            let expected = expected
-                .expand_group(&group)
-                .expect("identity-bound ACL expansion");
-            let actual = rust_case(rust, root.path(), &expected.name, protected);
-            if let Err(reason) = frozen_token_acl::compare(&expected, &actual) {
-                panic!("{reason}");
+        for (case, protected) in [("inherited", false), ("owner-only-parent", true)] {
+            let parent = root.path().join(case);
+            fs::create_dir(&parent).unwrap();
+            if protected {
+                assert_eq!(
+                    acl(&parent, "protect", root.path(), case)["protected"],
+                    true
+                );
             }
+            let go_root = parent.join("go");
+            let rust_root = parent.join("rust");
+            for directory in [&go_root, &rust_root] {
+                fs::create_dir(directory).unwrap();
+                fs::write(directory.join("sentinel"), "unrelated private sentinel").unwrap();
+            }
+            let mut observations = Vec::new();
+            for (name, binary, directory) in
+                [("go", go.as_path(), &go_root), ("rust", rust, &rust_root)]
+            {
+                let (mut child, _, old) = start(binary, directory);
+                child.kill().unwrap();
+                child.wait().unwrap();
+                drop(child);
+                let token_file = directory.join("data/mcp_token");
+                let before = acl(
+                    &token_file,
+                    "read",
+                    root.path(),
+                    &format!("{case}-{name}-before"),
+                );
+                let (mut restarted, port, new) = start(binary, directory);
+                assert!(old != new, "{name} token did not rotate");
+                assert!(!accepts_token(
+                    port,
+                    &old,
+                    Instant::now() + Duration::from_secs(2)
+                ));
+                assert!(accepts_token(
+                    port,
+                    &new,
+                    Instant::now() + Duration::from_secs(2)
+                ));
+                restarted.kill().unwrap();
+                restarted.wait().unwrap();
+                drop(restarted);
+                let after = acl(
+                    &token_file,
+                    "read",
+                    root.path(),
+                    &format!("{case}-{name}-after"),
+                );
+                assert_eq!(before, after, "{name} rotation changed the file ACL");
+                assert_eq!(after["readonly"], false);
+                assert_eq!(
+                    fs::read(directory.join("sentinel")).unwrap(),
+                    b"unrelated private sentinel"
+                );
+                let directory_acl = acl(
+                    &directory.join("data"),
+                    "read",
+                    root.path(),
+                    &format!("{case}-{name}-dir"),
+                );
+                // A read-only existing file rejects replacement, retaining
+                // both the old token bytes and its complete security descriptor.
+                let original_permissions = fs::metadata(&token_file).unwrap().permissions();
+                let mut permissions = original_permissions.clone();
+                permissions.set_readonly(true);
+                fs::set_permissions(&token_file, permissions).unwrap();
+                let readonly_acl = acl(
+                    &token_file,
+                    "read",
+                    root.path(),
+                    &format!("{case}-{name}-readonly"),
+                );
+                let failed = failed_start(
+                    binary,
+                    directory,
+                    "127.0.0.1",
+                    mcp_http_port::free_port(),
+                    root.path(),
+                    &format!("{case}-{name}-failed"),
+                );
+                assert!(
+                    String::from_utf8(failed.stderr)
+                        .unwrap()
+                        .starts_with("write MCP auth token: ")
+                );
+                assert_eq!(fs::read_to_string(&token_file).unwrap(), new);
+                assert_eq!(
+                    acl(
+                        &token_file,
+                        "read",
+                        root.path(),
+                        &format!("{case}-{name}-retained")
+                    ),
+                    readonly_acl
+                );
+                observations.push((before, directory_acl, readonly_acl));
+                fs::set_permissions(&token_file, original_permissions).unwrap();
+            }
+            assert_eq!(
+                observations[0], observations[1],
+                "{case}: actual Go/Rust owner/group/DACL/protection/readonly parity"
+            );
         }
         eprintln!(
-            "Windows token ACL replay executed inherited and owner-only-parent cases against actual Rust"
+            "Windows token ACL differential executed inherited and protected parents, rotation and read-only retention"
         );
     }
-}
-
-#[cfg(not(windows))]
-#[test]
-fn windows_token_capture_rejects_non_windows() {
-    frozen_token_acl::reject_retired_env().unwrap();
 }

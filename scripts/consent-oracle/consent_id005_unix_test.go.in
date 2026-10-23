@@ -1,0 +1,31 @@
+//go:build darwin || linux
+
+package identity
+
+import (
+	"os/signal"
+	"syscall"
+	"testing"
+)
+
+// A real partial Write failure, scoped to the one-case test process. No
+// production helper is replaced, and the old target already exists on disk.
+func id005LimitWrites(t *testing.T) func() {
+	t.Helper()
+	var original syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_FSIZE, &original); err != nil {
+		t.Fatal(err)
+	}
+	limited := original
+	limited.Cur = 1
+	signal.Ignore(syscall.SIGXFSZ)
+	if err := syscall.Setrlimit(syscall.RLIMIT_FSIZE, &limited); err != nil {
+		t.Fatal(err)
+	}
+	return func() {
+		if err := syscall.Setrlimit(syscall.RLIMIT_FSIZE, &original); err != nil {
+			t.Fatal(err)
+		}
+		signal.Reset(syscall.SIGXFSZ)
+	}
+}

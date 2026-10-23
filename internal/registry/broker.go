@@ -1,0 +1,563 @@
+package registry
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"math"
+	"net/mail"
+	"regexp"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
+
+// ValidationError distinguishes contract violations from I/O errors.
+type ValidationError struct{ msg string }
+
+func (e *ValidationError) Error() string { return e.msg }
+
+func verr(format string, args ...any) error {
+	return &ValidationError{msg: fmt.Sprintf(format, args...)}
+}
+
+// Closed enums from the contract (docs/registry-contract.md §3–§6).
+var (
+	categories     = set("people-search", "marketing", "credit", "analytics", "background-check", "social-media", "other")
+	jurisdictions  = set("AT", "CH", "DE", "DK", "EU", "FI", "FR", "GB", "IE", "IL", "LU", "NL", "NO", "SE", "UK", "US")
+	lawsEnum       = set("GDPR", "CCPA", "CPRA", "LGPD", "PIPEDA")
+	priorities     = set("high", "medium", "low")
+	statuses       = set("active", "deprecated", "merged", "out-of-business")
+	channelTypes   = set("email", "web_form")
+	templates      = set("ccpa-deletion", "gdpr-art17")
+	captchaTypes   = set("recaptcha-v2", "recaptcha-v3", "hcaptcha", "turnstile")
+	captchaProv    = set("capsolver", "2captcha", "anticaptcha")
+	requiredFields = set("full_name", "email", "address", "date_of_birth", "state")
+)
+
+var (
+	idPattern     = regexp.MustCompile(`^[a-z0-9-]+$`)
+	localePattern = regexp.MustCompile(`^[a-z]{2}(-[A-Z]{2})?$`)
+	// selectorPrefix: contract §6 says keys must "look like CSS selectors".
+	// Real data uses attribute selectors like input[name=x], so accept any
+	// selector-ish token: must contain a tag/attr/id/class marker.
+	datePattern    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	selectorPrefix = regexp.MustCompile(`^[a-zA-Z\[#.*][a-zA-Z0-9\[\]=.'"_:#.\- *>,~+]*$`)
+)
+
+func set(items ...string) map[string]bool {
+	m := make(map[string]bool, len(items))
+	for _, s := range items {
+		m[s] = true
+	}
+	return m
+}
+
+// Broker mirrors the Registry Data Contract §3. YAML keys are the contract
+// keys; unknown top-level fields are rejected (decoding via strict map first).
+type Broker struct {
+	ID              string        `yaml:"id" json:"id"`
+	Name            string        `yaml:"name" json:"name"`
+	Website         string        `yaml:"website" json:"website"`
+	Category        string        `yaml:"category" json:"category"`
+	Jurisdictions   []string      `yaml:"jurisdictions" json:"jurisdictions"`
+	Laws            []string      `yaml:"laws" json:"laws"`
+	DataSensitivity *int          `yaml:"data_sensitivity" json:"data_sensitivity,omitempty"`
+	Priority        string        `yaml:"priority" json:"priority"`
+	OptOut          []Channel     `yaml:"opt_out" json:"opt_out"`
+	Verification    *Verification `yaml:"verification" json:"verification,omitempty"`
+	Disabled        *bool         `yaml:"disabled" json:"disabled,omitempty"`
+	AddedDate       string        `yaml:"added_date" json:"added_date,omitempty"`
+	Source          string        `yaml:"source" json:"source,omitempty"`
+	Status          string        `yaml:"status" json:"status,omitempty"`
+	Notes           string        `yaml:"notes" json:"notes,omitempty"`
+
+	// Defaults applied after validation (authoritative per §9).
+	DataSensitivityDefault int    `yaml:"-" json:"-"`
+	StatusDefault          string `yaml:"-" json:"-"`
+}
+
+// Channel is one opt-out channel (contract §4).
+type Channel struct {
+	Type                 string    `yaml:"type" json:"type"`
+	Endpoint             string    `yaml:"endpoint" json:"endpoint,omitempty"`
+	URL                  string    `yaml:"url" json:"url,omitempty"`
+	FormSpec             *FormSpec `yaml:"form_spec" json:"form_spec,omitempty"`
+	Template             string    `yaml:"template" json:"template,omitempty"`
+	Locale               string    `yaml:"locale" json:"locale,omitempty"`
+	RequiredFields       []string  `yaml:"required_fields" json:"required_fields,omitempty"`
+	SupportsSuppression  *bool     `yaml:"supports_suppression" json:"supports_suppression,omitempty"`
+	ExpectedResponseDays *int      `yaml:"expected_response_days" json:"expected_response_days,omitempty"`
+	Disabled             *bool     `yaml:"disabled" json:"disabled,omitempty"`
+}
+
+// Verification is the optional keyword block (contract §5).
+type Verification struct {
+	AckKeywords           []string `yaml:"ack_keywords" json:"ack_keywords,omitempty"`
+	RejectionKeywords     []string `yaml:"rejection_keywords" json:"rejection_keywords,omitempty"`
+	HumanRequiredKeywords []string `yaml:"human_required_keywords" json:"human_required_keywords,omitempty"`
+}
+
+// FormSpec is the web-form step DSL (contract §6).
+type FormSpec struct {
+	Steps          []FormStep `yaml:"steps" json:"steps"`
+	TimeoutSeconds *float64   `yaml:"timeout_seconds" json:"timeout_seconds,omitempty"`
+	RateLimitDelay *float64   `yaml:"rate_limit_delay" json:"rate_limit_delay,omitempty"`
+	Headless       *bool      `yaml:"headless" json:"headless,omitempty"`
+}
+
+// FormStep is one step of the step DSL; all keys optional, at least one
+// must be present.
+type FormStep struct {
+	Goto         string            `yaml:"goto" json:"goto,omitempty"`
+	Fill         map[string]string `yaml:"fill" json:"fill,omitempty"`
+	Select       map[string]string `yaml:"select" json:"select,omitempty"`
+	Click        string            `yaml:"click" json:"click,omitempty"`
+	WaitFor      string            `yaml:"wait_for" json:"wait_for,omitempty"`
+	WaitSeconds  *float64          `yaml:"wait_seconds" json:"wait_seconds,omitempty"`
+	Screenshot   string            `yaml:"screenshot" json:"screenshot,omitempty"`
+	AssertText   string            `yaml:"assert_text" json:"assert_text,omitempty"`
+	SolveCaptcha *SolveCaptcha     `yaml:"solve_captcha" json:"solve_captcha,omitempty"`
+}
+
+// SolveCaptcha describes a captcha-solving step (contract §6).
+type SolveCaptcha struct {
+	Type        string   `yaml:"type" json:"type"`
+	SiteKey     string   `yaml:"site_key" json:"site_key"`
+	Provider    string   `yaml:"provider" json:"provider,omitempty"`
+	Action      string   `yaml:"action" json:"action,omitempty"`
+	MinScore    *float64 `yaml:"min_score" json:"min_score,omitempty"`
+	IsInvisible *bool    `yaml:"is_invisible" json:"is_invisible,omitempty"`
+}
+
+// brokerKeys is the closed top-level key whitelist (contract §3,
+// additionalProperties: false).
+var brokerKeys = set(
+	"id", "name", "website", "category", "jurisdictions", "laws",
+	"data_sensitivity", "priority", "opt_out", "verification", "disabled",
+	"added_date", "source", "status", "notes",
+)
+
+// decodeAndValidate decodes a raw broker document and validates it against
+// the contract. Returns ValidationError for contract violations. Unknown
+// top-level, channel, verification, and form-spec fields are rejected.
+func decodeAndValidate(d *doc) (Broker, error) {
+	broker, _, err := decodeAndValidateMetrics(d)
+	return broker, err
+}
+
+func decodeAndValidateMetrics(d *doc) (Broker, int, error) {
+	if _, err := preflightYAML(d.content); err != nil {
+		return Broker{}, 0, err
+	}
+	var document yaml.Node
+	dec := yaml.NewDecoder(strings.NewReader(string(d.content)))
+	if err := dec.Decode(&document); err != nil {
+		return Broker{}, 0, verr("yaml decode: %v", err)
+	}
+	nodes, err := exactYAMLNodeBudget(&document)
+	if err != nil {
+		return Broker{}, 0, err
+	}
+	if err := rejectYAMLNodeContracts(&document); err != nil {
+		return Broker{}, 0, err
+	}
+	var raw map[string]yaml.Node
+	if err := document.Decode(&raw); err != nil {
+		return Broker{}, 0, verr("yaml decode: %v", err)
+	}
+	var extra yaml.Node
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return Broker{}, 0, verr("yaml: exactly one document is required")
+		}
+		return Broker{}, 0, verr("yaml trailing document: %v", err)
+	}
+	var unknown []string
+	for k := range raw {
+		if !brokerKeys[k] {
+			unknown = append(unknown, k)
+		}
+	}
+	if len(unknown) > 0 {
+		sortStrings(unknown)
+		return Broker{}, 0, verr("unknown top-level field(s): %s", strings.Join(unknown, ", "))
+	}
+	// Strict re-decode: KnownFields(true) rejects unknown fields at every
+	// nesting level (channels, verification, form_spec, solve_captcha).
+	strict := yaml.NewDecoder(strings.NewReader(string(d.content)))
+	strict.KnownFields(true)
+	var b Broker
+	if err := strict.Decode(&b); err != nil {
+		return Broker{}, 0, verr("schema: %v", err)
+	}
+
+	// id: pattern + must equal file stem (§3).
+	if b.ID != d.id {
+		return Broker{}, 0, verr("id %q does not equal file stem %q", b.ID, d.id)
+	}
+	if !idPattern.MatchString(b.ID) {
+		return Broker{}, 0, verr("id %q does not match ^[a-z0-9-]+$", b.ID)
+	}
+	if strings.TrimSpace(b.Name) == "" {
+		return Broker{}, 0, verr("name is required")
+	}
+	if err := validURI(b.Website); err != nil {
+		return Broker{}, 0, verr("website: %v", err)
+	}
+	if !categories[b.Category] {
+		return Broker{}, 0, verr("category %q is not in the closed enum", b.Category)
+	}
+	if len(b.Jurisdictions) == 0 {
+		return Broker{}, 0, verr("jurisdictions must have at least 1 entry")
+	}
+	for _, j := range b.Jurisdictions {
+		if !jurisdictions[j] {
+			return Broker{}, 0, verr("jurisdiction %q is not in the closed enum", j)
+		}
+	}
+	if len(b.Laws) == 0 {
+		return Broker{}, 0, verr("laws must have at least 1 entry")
+	}
+	for _, l := range b.Laws {
+		if !lawsEnum[l] {
+			return Broker{}, 0, verr("law %q is not in the closed enum", l)
+		}
+	}
+	if b.DataSensitivity != nil && (*b.DataSensitivity < 1 || *b.DataSensitivity > 5) {
+		return Broker{}, 0, verr("data_sensitivity %d out of range 1..5", *b.DataSensitivity)
+	}
+	if !priorities[b.Priority] {
+		return Broker{}, 0, verr("priority %q is not in the closed enum", b.Priority)
+	}
+	if len(b.OptOut) == 0 {
+		return Broker{}, 0, verr("opt_out must have at least 1 channel")
+	}
+	for i := range b.OptOut {
+		if err := validateChannel(&b.OptOut[i]); err != nil {
+			return Broker{}, 0, verr("opt_out[%d]: %v", i, err)
+		}
+	}
+	if b.Status != "" && !statuses[b.Status] {
+		return Broker{}, 0, verr("status %q is not in the closed enum", b.Status)
+	}
+	if b.AddedDate != "" && !isISODate(b.AddedDate) {
+		return Broker{}, 0, verr("added_date %q is not ISO 8601 date", b.AddedDate)
+	}
+
+	// Defaults (§9): authoritative default values.
+	if b.DataSensitivity == nil {
+		three := 3
+		b.DataSensitivity = &three
+	}
+	if b.Status == "" {
+		b.Status = "active"
+	}
+	return b, nodes, nil
+}
+
+func rejectYAMLNodeContracts(root *yaml.Node) error {
+	var walk func(*yaml.Node, string) error
+	walk = func(node *yaml.Node, path string) error {
+		if node.Kind == yaml.AliasNode {
+			return verr("yaml: aliases are not allowed at %s", path)
+		}
+		if node.Anchor != "" {
+			return verr("yaml: anchors are not allowed at %s", path)
+		}
+		if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
+			return verr("yaml: explicit null at %s is not allowed; omit the field instead", path)
+		}
+		switch node.Kind {
+		case yaml.DocumentNode:
+			for _, child := range node.Content {
+				if err := walk(child, path); err != nil {
+					return err
+				}
+			}
+		case yaml.MappingNode:
+			for index := 0; index+1 < len(node.Content); index += 2 {
+				key, value := node.Content[index], node.Content[index+1]
+				fieldPath := path + "[key]"
+				if key.Kind == yaml.ScalarNode && key.Value != "" {
+					fieldPath = path + "." + key.Value
+				}
+				if isFormStepPath(path) && key.Kind == yaml.ScalarNode && isStringAction(key.Value) && value.Kind == yaml.ScalarNode && value.Value == "" {
+					return verr("yaml: %s must not be empty when present", fieldPath)
+				}
+				if err := walk(key, fieldPath+"[name]"); err != nil {
+					return err
+				}
+				if err := walk(value, fieldPath); err != nil {
+					return err
+				}
+			}
+		case yaml.SequenceNode:
+			for index, child := range node.Content {
+				if err := walk(child, fmt.Sprintf("%s[%d]", path, index)); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	return walk(root, "$")
+}
+
+func isFormStepPath(path string) bool {
+	return strings.Contains(path, ".form_spec.steps[") && strings.HasSuffix(path, "]")
+}
+
+func isStringAction(field string) bool {
+	switch field {
+	case "goto", "click", "wait_for", "screenshot", "assert_text":
+		return true
+	default:
+		return false
+	}
+}
+
+func exactYAMLNodeBudget(root *yaml.Node) (int, error) {
+	var walk func(*yaml.Node, int) (int, int)
+	walk = func(node *yaml.Node, depth int) (int, int) {
+		if node.Kind == yaml.DocumentNode {
+			count, maxDepth := 0, 0
+			for _, child := range node.Content {
+				childCount, childDepth := walk(child, depth)
+				count += childCount
+				if childDepth > maxDepth {
+					maxDepth = childDepth
+				}
+			}
+			return count, maxDepth
+		}
+		count, maxDepth := 1, depth
+		for _, child := range node.Content {
+			childCount, childDepth := walk(child, depth+1)
+			count += childCount
+			if childDepth > maxDepth {
+				maxDepth = childDepth
+			}
+		}
+		return count, maxDepth
+	}
+
+	nodes, depth := walk(root, 1)
+	if nodes > maxYAMLNodes {
+		return 0, verr("yaml: node budget exceeded (%d > %d)", nodes, maxYAMLNodes)
+	}
+	if depth > maxYAMLDepth {
+		return 0, verr("yaml: depth budget exceeded (%d > %d)", depth, maxYAMLDepth)
+	}
+	return nodes, nil
+}
+
+func isISODate(value string) bool {
+	if !datePattern.MatchString(value) {
+		return false
+	}
+	year := (int(value[0]-'0') * 1000) + (int(value[1]-'0') * 100) + (int(value[2]-'0') * 10) + int(value[3]-'0')
+	month := (int(value[5]-'0') * 10) + int(value[6]-'0')
+	day := (int(value[8]-'0') * 10) + int(value[9]-'0')
+	if month < 1 || month > 12 {
+		return false
+	}
+	leap := year%4 == 0 && (year%100 != 0 || year%400 == 0)
+	days := [...]int{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	if leap {
+		days[2] = 29
+	}
+	return day >= 1 && day <= days[month]
+}
+
+// validateChannel enforces contract §4: exactly one variant, closed enums,
+// unknown channel fields rejected.
+func validateChannel(c *Channel) error {
+	if !channelTypes[c.Type] {
+		return verr("channel type %q is not in the closed enum", c.Type)
+	}
+	switch c.Type {
+	case "email":
+		if c.Endpoint == "" {
+			return verr("email channel requires endpoint")
+		}
+		if _, err := mail.ParseAddress(c.Endpoint); err != nil {
+			return verr("endpoint %q is not a valid email", c.Endpoint)
+		}
+		if c.URL != "" || c.FormSpec != nil {
+			return verr("email channel must not carry web_form fields (url/form_spec)")
+		}
+	case "web_form":
+		if c.URL == "" {
+			return verr("web_form channel requires url")
+		}
+		if err := validURI(c.URL); err != nil {
+			return verr("url: %v", err)
+		}
+		if c.FormSpec == nil {
+			return verr("web_form channel requires form_spec")
+		}
+		if c.Endpoint != "" {
+			return verr("web_form channel must not carry email fields (endpoint)")
+		}
+		if err := validateFormSpec(c.FormSpec); err != nil {
+			return err
+		}
+	}
+	if c.Template != "" && !templates[c.Template] {
+		return verr("template %q is not in the closed enum", c.Template)
+	}
+	if c.Locale != "" && !localePattern.MatchString(c.Locale) {
+		return verr("locale %q does not match RFC 5646 pattern", c.Locale)
+	}
+	for _, f := range c.RequiredFields {
+		if !requiredFields[f] {
+			return verr("required_fields item %q is not in the closed enum", f)
+		}
+	}
+	if c.ExpectedResponseDays != nil && *c.ExpectedResponseDays < 1 {
+		return verr("expected_response_days must be >= 1")
+	}
+	return nil
+}
+
+// validateFormSpec enforces contract §6.
+func validateFormSpec(f *FormSpec) error {
+	if len(f.Steps) == 0 {
+		return verr("form_spec requires at least 1 step")
+	}
+	if f.TimeoutSeconds != nil && (math.IsNaN(*f.TimeoutSeconds) || math.IsInf(*f.TimeoutSeconds, 0) || *f.TimeoutSeconds < 1) {
+		return verr("timeout_seconds must be finite and >= 1")
+	}
+	if f.RateLimitDelay != nil && (math.IsNaN(*f.RateLimitDelay) || math.IsInf(*f.RateLimitDelay, 0) || *f.RateLimitDelay < 0) {
+		return verr("rate_limit_delay must be finite and >= 0")
+	}
+	for i := range f.Steps {
+		if err := validateFormStep(&f.Steps[i]); err != nil {
+			return verr("steps[%d]: %v", i, err)
+		}
+	}
+	return nil
+}
+
+// validateFormStep enforces the step DSL rules: at least one key present,
+// selector-shaped keys for fill/select, captcha constraints.
+func validateFormStep(s *FormStep) error {
+	present := 0
+	if s.Goto != "" {
+		present++
+	}
+	if len(s.Fill) > 0 {
+		present++
+	}
+	if len(s.Select) > 0 {
+		present++
+	}
+	if s.Click != "" {
+		present++
+	}
+	if s.WaitFor != "" {
+		present++
+	}
+	if s.WaitSeconds != nil {
+		present++
+		if math.IsNaN(*s.WaitSeconds) || math.IsInf(*s.WaitSeconds, 0) || *s.WaitSeconds < 0 {
+			return verr("wait_seconds must be finite and >= 0")
+		}
+	}
+	if s.Screenshot != "" {
+		present++
+	}
+	if s.AssertText != "" {
+		present++
+	}
+	if s.SolveCaptcha != nil {
+		present++
+		if !captchaTypes[s.SolveCaptcha.Type] {
+			return verr("solve_captcha.type %q is not in the closed enum", s.SolveCaptcha.Type)
+		}
+		if len(s.SolveCaptcha.SiteKey) < 8 {
+			return verr("solve_captcha.site_key must be at least 8 chars")
+		}
+		if s.SolveCaptcha.Provider != "" && !captchaProv[s.SolveCaptcha.Provider] {
+			return verr("solve_captcha.provider %q is not in the closed enum", s.SolveCaptcha.Provider)
+		}
+		if s.SolveCaptcha.MinScore != nil && (math.IsNaN(*s.SolveCaptcha.MinScore) || math.IsInf(*s.SolveCaptcha.MinScore, 0) || *s.SolveCaptcha.MinScore < 0 || *s.SolveCaptcha.MinScore > 1) {
+			return verr("solve_captcha.min_score must be finite and in range 0..1")
+		}
+	}
+	if present == 0 {
+		return verr("step must contain at least 1 action")
+	}
+	for sel := range s.Fill {
+		if !selectorPrefix.MatchString(sel) {
+			return verr("fill key %q does not look like a CSS selector", sel)
+		}
+	}
+	for sel := range s.Select {
+		if !selectorPrefix.MatchString(sel) {
+			return verr("select key %q does not look like a CSS selector", sel)
+		}
+	}
+	return nil
+}
+
+// validURI enforces the schema's `format: uri` for uri-format fields.
+//
+// It used to accept any non-empty string, because 46 registry entries carried
+// an email address in a `web_form` `url`. Those entries were channels of the
+// wrong type, and they are now `email` channels with the address in `endpoint`
+// (#843), so the permissive rule no longer has a subject. Requiring a real
+// scheme is what keeps the class from returning: a value that is not a URI is
+// now rejected at load time instead of reaching the browser runner.
+//
+// The scheme set is deliberately narrow. The registry only ever ships http(s)
+// destinations; accepting an arbitrary RFC 3986 scheme would let `javascript:`
+// or `file:` through to a browser navigation.
+func validURI(s string) error {
+	if s == "" {
+		return verr("is required")
+	}
+	if err := checkURI(s); err != nil {
+		return verr("%v", err)
+	}
+	return nil
+}
+
+// checkURI validates an absolute http(s) URI without pulling in a second URL
+// parser: scheme, authority, and no whitespace or control characters.
+func checkURI(s string) error {
+	if strings.ContainsAny(s, " 	\r\n") {
+		return fmt.Errorf("%q contains whitespace", s)
+	}
+	for _, r := range s {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("%q contains a control character", s)
+		}
+	}
+	rest, ok := strings.CutPrefix(s, "https://")
+	if !ok {
+		if rest, ok = strings.CutPrefix(s, "http://"); !ok {
+			return fmt.Errorf("%q is not an absolute http(s) URI", s)
+		}
+	}
+	host, _, _ := strings.Cut(rest, "/")
+	host = strings.SplitN(host, "?", 2)[0]
+	host = strings.SplitN(host, "#", 2)[0]
+	if host == "" {
+		return fmt.Errorf("%q has no host", s)
+	}
+	return nil
+}
+
+// sortStrings is a tiny local sort to avoid importing sort twice in one file.
+func sortStrings(s []string) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0 && s[j] < s[j-1]; j-- {
+			s[j], s[j-1] = s[j-1], s[j]
+		}
+	}
+}
+
+// ensure json import is used (contract fields may be marshalled for tests).
+var _ = json.Marshal
