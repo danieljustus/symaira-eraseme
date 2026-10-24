@@ -14,8 +14,10 @@ RESOURCES="$APP_PATH/Contents/Resources"
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
 
 [[ -d "$APP_PATH" ]] || { printf 'App bundle not found: %s\n' "$APP_PATH" >&2; exit 1; }
-for path in "$ICON_SOURCE/icon.json" "$ICON_SOURCE/Assets/S.png" \
-           "$ICON_SOURCE/Assets/signet.png" "$ICNS_SOURCE" "$CHECKSUMS" \
+for path in "$ICON_SOURCE/icon.json" "$ICON_SOURCE/Assets/signet.png" \
+           "$ICON_SOURCE/Assets/top.png" "$ICON_SOURCE/Assets/bot.png" \
+           "$ICON_SOURCE/Assets/lines.png" "$ICON_SOURCE/Assets/index.png" \
+           "$ICNS_SOURCE" "$CHECKSUMS" \
            "$INFO_PLIST"; do
   [[ -f "$path" ]] || { printf 'Missing app icon input: %s\n' "$path" >&2; exit 1; }
 done
