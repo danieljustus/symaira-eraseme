@@ -323,6 +323,16 @@ To add support for a new agent:
   (local builds need `DEVELOPER_DIR` pointing at a full Xcode installation).
 - Depends on the shared **symaira-appkit** package, pinned exact in
   `Package.swift`: SymairaTheme and SymairaToolKit.
+- GUI work follows the Symaira Interface Guidelines shipped with
+  `symaira-appkit`: read its `GUIDELINES.md`, then `DESIGN.md` and
+  `docs/workspace-foundation.md` (sibling checkout, or
+  `.build/checkouts/symaira-appkit` at a pin that ships them). Review a UI
+  change with `python3 <symaira-appkit>/scripts/gui-review.py
+  app/SymairaEraseMe/Sources/SymairaEraseMe` plus the manual checklist in
+  GUIDELINES.md section 13. `Page`, `PageState`, `PageEmpty` and
+  `SheetScaffold` in `Theme/Glassmorphism.swift` are the reference page and
+  sheet scaffolds that GUIDELINES.md section 15 lists as a pending shared
+  component; extend them here until AppKit ships them.
 - `ServerManager` launches the bundled or development `symeraseme mcp` Rust
   binary over HTTP; Homebrew/configured Binary Path is the fallback.
 - Migration context: see `docs/go-test-port-classification.md` and

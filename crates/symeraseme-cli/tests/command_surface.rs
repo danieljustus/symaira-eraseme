@@ -30,7 +30,22 @@ const SURFACE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../rust-tests/parity/cases/cli/surface.json"
 ));
-const PROCESS_TIMEOUT: Duration = Duration::from_secs(10);
+/// Hang guard for one CLI subprocess, not a performance budget.
+///
+/// A healthy case finishes in tens of milliseconds on Linux/macOS and in
+/// 0.8–2.1 s per whole `plan_populated_paths_match_the_go_bodies` run on a
+/// hosted Windows runner (nine green native runs). In the one observed failure
+/// (issue #1269) process creation and file I/O on the runner stalled for about
+/// a minute: every spawn-heavy test slowed 20–40x (`manual_task_*` 10–24 s
+/// against under 1 s, the plan test 14 s) while the CPU-bound frozen-fixture
+/// tests ran at normal speed. No CLI work was slower, so the guard stays tight
+/// where it already has two orders of magnitude of headroom and only widens on
+/// Windows, where Defender and the hosted disk can stall a spawn.
+const PROCESS_TIMEOUT: Duration = if cfg!(windows) {
+    Duration::from_secs(60)
+} else {
+    Duration::from_secs(10)
+};
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_OUTPUT_BYTES: u64 = 4 * 1024 * 1024;
 
@@ -270,7 +285,7 @@ fn run_program_inner(
         }
         if started.elapsed() >= PROCESS_TIMEOUT {
             terminate_bounded(&mut child).expect("timed-out CLI process cleanup");
-            panic!("CLI process exceeded the bounded timeout for {argv:?}");
+            panic!("CLI process exceeded the bounded timeout ({PROCESS_TIMEOUT:?}) for {argv:?}");
         }
         thread::sleep(Duration::from_millis(5));
     };
@@ -366,8 +381,12 @@ fn kill_process_tree(child: &Child) -> std::io::Result<()> {
 
 #[cfg(windows)]
 fn kill_process_tree(child: &Child) -> std::io::Result<()> {
+    // `taskkill` prints "process not found" (exit 128) when the child already
+    // exited; that is the expected race, so its text is not test output.
     let status = Command::new("taskkill")
         .args(["/PID", &child.id().to_string(), "/T", "/F"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()?;
     if status.success() || status.code() == Some(128) {
         Ok(())
@@ -465,7 +484,7 @@ fn run_with_data_dir(
         }
         if started.elapsed() >= PROCESS_TIMEOUT {
             terminate_bounded(&mut child).expect("timed-out CLI process cleanup");
-            panic!("CLI process exceeded the bounded timeout for {argv:?}");
+            panic!("CLI process exceeded the bounded timeout ({PROCESS_TIMEOUT:?}) for {argv:?}");
         }
         thread::sleep(Duration::from_millis(5));
     };

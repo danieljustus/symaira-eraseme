@@ -32,9 +32,10 @@ class FrozenHistoryPreparation(unittest.TestCase):
             '13ddc6a43036d6b34706db2b82bbb5a13c40d6de',
             '968e1a2dda9c621ba880e7b618dc49daa31970b3',
             'ac0b3b4b5c5729c9cbcf1ffbd5c7efce59440a33',
+            'e61132f85b89580c96d95d098289f7238e810255',
         }
         self.assertEqual(set(HISTORY.REVISIONS), required | set(stdio) | historical)
-        self.assertEqual(len(HISTORY.REVISIONS), 7)
+        self.assertEqual(len(HISTORY.REVISIONS), 8)
         self.assertEqual(len(HISTORY.REVISIONS), len(set(HISTORY.REVISIONS)))
         for revision in HISTORY.REVISIONS:
             self.assertRegex(revision, r'^[0-9a-f]{40}$')
