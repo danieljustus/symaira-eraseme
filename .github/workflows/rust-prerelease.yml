@@ -32,7 +32,7 @@ on:
   workflow_call:
     inputs:
       store_gate:
-        description: 'Set by the native store gate. Direct pull_request runs skip the six-target build because the gate already runs it for the same commit.'
+        description: 'Set by the native store gate. Direct pull_request runs skip the three-target build because the gate already runs it for the same commit.'
         type: boolean
         required: false
         default: false
@@ -66,13 +66,6 @@ jobs:
             target: aarch64-apple-darwin
             host: aarch64-apple-darwin
             rustflags: ''
-          - name: macOS amd64
-            runner: macos-15-intel
-            os: darwin
-            arch: amd64
-            target: x86_64-apple-darwin
-            host: x86_64-apple-darwin
-            rustflags: ''
           - name: Linux arm64
             runner: ubuntu-24.04-arm
             os: linux
@@ -87,20 +80,6 @@ jobs:
             target: x86_64-unknown-linux-musl
             host: x86_64-unknown-linux-gnu
             rustflags: ''
-          - name: Windows arm64
-            runner: windows-11-arm
-            os: windows
-            arch: arm64
-            target: aarch64-pc-windows-msvc
-            host: aarch64-pc-windows-msvc
-            rustflags: -C target-feature=+crt-static
-          - name: Windows amd64
-            runner: windows-2025
-            os: windows
-            arch: amd64
-            target: x86_64-pc-windows-msvc
-            host: x86_64-pc-windows-msvc
-            rustflags: -C target-feature=+crt-static
 
     steps:
       - name: Checkout
@@ -163,11 +142,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo +"$RUST_TOOLCHAIN" auditable build --release -p symeraseme-cli --bin symeraseme-rust --target "$TARGET" --locked
-          if [[ "$RUNNER_OS" == Windows ]]; then
-            binary="target/$TARGET/release/symeraseme-rust.exe"
-          else
-            binary="target/$TARGET/release/symeraseme-rust"
-          fi
+          binary="target/$TARGET/release/symeraseme-rust"
           test -f "$binary"
           test "$("$binary" --version)" = "symeraseme version $RELEASE_VERSION"
           "$binary" --help >/dev/null
@@ -189,33 +164,6 @@ jobs:
                   *) echo "non-system macOS dependency: $dependency" >&2; exit 1 ;;
                 esac
               done < <(otool -L "$binary" | tail -n +2 | awk '{print $1}')
-              ;;
-            Windows)
-              # shellcheck disable=SC2016
-              BINARY_PATH="$(cygpath -aw "$binary")" powershell.exe -NoProfile -NonInteractive -Command '
-                $ErrorActionPreference = "Stop"
-                $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
-                $vs = & $vswhere -latest -products * -property installationPath
-                if (-not $vs) { throw "Visual C++ tools were not found" }
-                $hosts = if ("${{ matrix.arch }}" -eq "arm64") { @("Hostarm64\arm64", "Hostx64\x64") } else { @("Hostx64\x64", "Hostarm64\arm64") }
-                $dumpbin = $null
-                foreach ($hostPath in $hosts) {
-                  $candidate = Get-ChildItem (Join-Path $vs "VC\Tools\MSVC") -Directory |
-                    Sort-Object Name -Descending |
-                    ForEach-Object { Join-Path $_.FullName ("bin\" + $hostPath + "\dumpbin.exe") } |
-                    Where-Object { Test-Path $_ } |
-                    Select-Object -First 1
-                  if ($candidate) { $dumpbin = $candidate; break }
-                }
-                if (-not $dumpbin) { throw "dumpbin.exe was not found" }
-                $imports = & $dumpbin /DEPENDENTS "$env:BINARY_PATH"
-                if ($LASTEXITCODE -ne 0) { throw "dumpbin /DEPENDENTS failed" }
-                $importsPath = Join-Path $env:RUNNER_TEMP "symeraseme-rust-dependencies.txt"
-                [System.IO.File]::WriteAllLines($importsPath, [string[]]$imports)
-                python "$env:GITHUB_WORKSPACE\scripts\verify_windows_dll_dependencies.py" `
-                  "$importsPath" "$env:WINDIR\System32"
-                if ($LASTEXITCODE -ne 0) { throw "Windows DLL dependency verification failed" }
-              '
               ;;
             *)
               echo "unsupported native runner OS: $RUNNER_OS" >&2
@@ -249,7 +197,7 @@ jobs:
           retention-days: 1
 
   verify-archives:
-    name: Stage and verify the six archives
+    name: Stage and verify the three archives
     needs: native-release-binary
     if: github.event_name != 'pull_request' || inputs.store_gate
     runs-on: ubuntu-24.04

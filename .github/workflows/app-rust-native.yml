@@ -48,11 +48,11 @@ jobs:
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      # Pull requests run the arm64 leg only (account cap of 5 concurrent hosted
-      # macOS jobs). Intel evidence runs on push to main (Intel only; arm64 was
-      # already proven on the PR) and workflow_dispatch (both legs).
-      # Check names stay stable: Swift Rust bundle / macos-26 and / macos-15-intel.
-      matrix: ${{ fromJSON(github.event_name == 'pull_request' && '{"include":[{"os":"macos-26","xcode":"26.4.1"}]}' || (github.event_name == 'push' && '{"include":[{"os":"macos-15-intel","xcode":"26.3.0"}]}' || '{"include":[{"os":"macos-26","xcode":"26.4.1"},{"os":"macos-15-intel","xcode":"26.3.0"}]}')) }}
+      # Apple Silicon acceptance remains on pull requests and main.
+      matrix:
+        include:
+          - os: macos-26
+            xcode: "26.4.1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:

@@ -18,7 +18,7 @@ class ReleaseWorkflowControls(unittest.TestCase):
                             'GOTOOLCHAIN:', "'--go-tool'"):
                 self.assertNotIn(retired, workflow)
             self.assertNotRegex(workflow, r'\bgo (?:build|mod)\b')
-            self.assertIn('--locked -p parity --bin store_sandbox_control', workflow)
+            self.assertNotIn("if: runner.os == 'Windows'", workflow)
             self.assertIn("'--published-go-release'", workflow)
             self.assertIn("'--sandbox-control'", workflow)
             self.assertIn('if: always()', workflow)
@@ -64,9 +64,8 @@ class ReleaseWorkflowControls(unittest.TestCase):
         self.assertIn('          ref: ${{ github.sha }}\n', stores)
         self.assertIn('name: symeraseme-rust-prerelease-archives', stores)
         self.assertNotIn('run-id:', stores)
-        for target in ('darwin, arch: arm64', 'darwin, arch: amd64',
-                       'linux, arch: arm64', 'linux, arch: amd64',
-                       'windows, arch: arm64', 'windows, arch: amd64'):
+        for target in ('darwin, arch: arm64',
+                       'linux, arch: arm64', 'linux, arch: amd64'):
             self.assertIn(target, stores)
         for guard in ("sums[archive.name] == digest", "hashlib.sha256((out / t).read_bytes())",
                       "plain['status'] == 'passed'", "encrypted['status'] == 'passed'"):
@@ -95,7 +94,7 @@ class ReleaseWorkflowControls(unittest.TestCase):
         self.assertNotIn('--clobber', step('Upload GUI DMG to release'))
         preflight = step('Refuse to replace an existing GUI asset')
         self.assertLess(workflow.index(preflight), workflow.index('      - name: Import Developer ID certificate'))
-        attestation = step('Attest the twelve SBOM sidecar digests')
+        attestation = step('Attest the six SBOM sidecar digests')
         self.assertIn('subject-path: ${{ runner.temp }}/dist/sbom-checksums.txt', attestation)
         self.assertLess(workflow.index(attestation), workflow.index('      - name: Stage the prerelease'))
         publication = step('Stage the prerelease and read every asset back')

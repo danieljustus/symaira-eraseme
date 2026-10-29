@@ -12,7 +12,7 @@ NIGHTLY := nightly-2026-09-20
 RELEASE_BINARIES ?= $(RUST_TARGET_DIR)/release-binaries
 RELEASE_DIST ?= $(RUST_TARGET_DIR)/release-dist
 RELEASE_VERSION ?=
-RELEASE_TARGETS := darwin-amd64 darwin-arm64 linux-amd64 linux-arm64 windows-amd64 windows-arm64
+RELEASE_TARGETS := darwin-arm64 linux-amd64 linux-arm64
 RELEASE_STAGER_ARGS = $(foreach target,$(RELEASE_TARGETS),--$(target) $(call shell_quote,$(RELEASE_BINARIES)/rust-binary-$(target)))
 
 # Quote a make-expanded value as one literal POSIX shell word.
@@ -64,7 +64,7 @@ app-test:
 # Never cleans or overwrites RELEASE_DIST: the stager refuses a non-empty destination.
 release-dry-run:
 	@printf '%s\n' 'release-dry-run: LOCAL packaging proof only. Native build, SBOM, static-link and smoke gates stay in rust-prerelease.yml.'
-	@test -d $(call shell_quote,$(RELEASE_BINARIES)) || { printf '%s\n' 'release-dry-run requires RELEASE_BINARIES=<dir> with rust-binary-<os>-<arch> for all six targets.' >&2; exit 2; }
+	@test -d $(call shell_quote,$(RELEASE_BINARIES)) || { printf '%s\n' 'release-dry-run requires RELEASE_BINARIES=<dir> with rust-binary-<os>-<arch> for all three supported targets.' >&2; exit 2; }
 	@set -eu; \
 	version=$(call shell_quote,$(RELEASE_VERSION)); \
 	if [ -z "$$version" ]; then \

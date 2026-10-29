@@ -145,7 +145,7 @@ verify the release assets and Homebrew Formula after publication.
 
 ### Local Rust archive dry-run
 
-With Python 3.11+ and already-built native Rust binaries for all six targets:
+With Python 3.11+ and already-built native Rust binaries for all three supported targets:
 
 ```bash
 make release-dry-run \
@@ -153,10 +153,10 @@ make release-dry-run \
   RELEASE_DIST=/path/to/empty-output
 ```
 
-The input directory must contain `rust-binary-<os>-<arch>` for every combination
-of `darwin`, `linux`, `windows` and `amd64`, `arm64`, matching the native
+The input directory must contain `rust-binary-<os>-<arch>` for each
+of `darwin-arm64`, `linux-amd64`, `linux-arm64`, matching the native
 `rust-prerelease.yml` artifacts. The target checks executable headers, stages
-six archives and verifies their root layout and SHA-256 checksums. It neither
+three archives and verifies their root layout and SHA-256 checksums. It neither
 builds binaries nor downloads or publishes anything. Missing or wrong-target
 inputs and non-empty output directories fail without cleaning existing output.
 
@@ -164,5 +164,5 @@ Defaults are `$(RUST_TARGET_DIR)/release-binaries` and
 `$(RUST_TARGET_DIR)/release-dist`. The archive version defaults to
 `Cargo.toml`'s workspace version. An explicit `RELEASE_VERSION` changes the
 archive label only; it does not verify the executable's version or provenance.
-This packaging check does not replace the six native builds, version/smoke,
+This packaging check does not replace the three native builds, version/smoke,
 static-dependency, SBOM, signing or release-acceptance gates.

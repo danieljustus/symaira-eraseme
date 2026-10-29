@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
 
-from stage_rust_release_archives import TARGETS, main as stage_main
+from stage_rust_release_archives import TARGETS, main as stage_main, _validate_target
 from verify_release_archives import main as verify_archives
 
 
@@ -135,6 +135,12 @@ class StageRustReleaseArchivesTests(unittest.TestCase):
         for target, payload in cases:
             with self.subTest(target=target, payload=payload[:4]), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
+                if target not in {(os_name, arch) for os_name, arch, _, _ in TARGETS}:
+                    binary = root / "legacy-header"
+                    binary.write_bytes(payload)
+                    with self.assertRaises(ValueError):
+                        _validate_target(binary, *target)
+                    continue
                 args, _ = self._inputs(root, {target: payload})
                 with contextlib.redirect_stderr(io.StringIO()):
                     self.assertEqual(stage_main(args), 1)
@@ -169,6 +175,12 @@ class StageRustReleaseArchivesTests(unittest.TestCase):
         for target, payload in cases:
             with self.subTest(target=target, payload=payload[:4]), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
+                if target not in {(os_name, arch) for os_name, arch, _, _ in TARGETS}:
+                    binary = root / "legacy-header"
+                    binary.write_bytes(payload)
+                    with self.assertRaises(ValueError):
+                        _validate_target(binary, *target)
+                    continue
                 args, _ = self._inputs(root, {target: payload})
                 with contextlib.redirect_stderr(io.StringIO()):
                     self.assertEqual(stage_main(args), 1)
