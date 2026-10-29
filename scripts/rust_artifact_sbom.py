@@ -87,7 +87,7 @@ def validate_inventory(value):
 
 
 def read_inventory(binary, extractor):
-    # Extraction runs on the POSIX archive assembler, for all six native formats.
+    # Extraction runs on the POSIX archive assembler, for all supported native formats.
     require(os.name == 'posix', 'inventory extraction requires POSIX owned process groups')
     command = [str(extractor), str(binary)]
     process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -246,7 +246,7 @@ def generate(dist, binaries, extractor, source_revision):
     checksums.write_text(''.join(digest(path) + '  ' + path.name + '\n'
                                  for path, _ in sorted(outputs, key=lambda item: item[0].name)),
                          encoding='ascii')
-    print('Generated six artifact-bound Rust CycloneDX inventories')
+    print('Generated three artifact-bound Rust CycloneDX inventories')
 
 
 if __name__ == '__main__':

@@ -17,7 +17,7 @@ sys.dont_write_bytecode = True
 from verify_release_archives import main
 
 
-def create_dist(root: Path, duplicate_suffix: str = "", symlink_suffix: str = "") -> None:
+def create_dist(root: Path, duplicate_suffix: str = "", symlink_suffix: str = "", *, legacy_targets: bool = False) -> None:
     version = "0.1.0"
     (root / "metadata.json").write_text(json.dumps({"version": version}))
     names = [
@@ -25,6 +25,8 @@ def create_dist(root: Path, duplicate_suffix: str = "", symlink_suffix: str = ""
         for os in ("darwin", "linux")
         for arch in ("amd64", "arm64")
     ] + [f"symeraseme_{version}_windows_{arch}.zip" for arch in ("amd64", "arm64")]
+    if not legacy_targets:
+        names = [name for name in names if "_windows_" not in name and "_darwin_amd64" not in name]
     lines = []
     for name in names:
         binary = "symeraseme.exe" if name.endswith(".zip") else "symeraseme"
@@ -60,35 +62,35 @@ class DuplicateArchiveMemberTests(unittest.TestCase):
     def test_duplicate_tar_member_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             dist = Path(directory)
-            create_dist(dist, ".tar.gz")
+            create_dist(dist, ".tar.gz", legacy_targets=True)
             with self.assertRaisesRegex(SystemExit, "duplicate archive members"):
-                main(dist)
+                main(dist, legacy_targets=True)
 
     def test_symlink_tar_member_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             dist = Path(directory)
-            create_dist(dist, symlink_suffix=".tar.gz")
+            create_dist(dist, symlink_suffix=".tar.gz", legacy_targets=True)
             with self.assertRaisesRegex(SystemExit, "expected members must be regular files"):
-                main(dist)
+                main(dist, legacy_targets=True)
 
     def test_symlink_zip_member_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             dist = Path(directory)
-            create_dist(dist, symlink_suffix=".zip")
+            create_dist(dist, symlink_suffix=".zip", legacy_targets=True)
             with self.assertRaisesRegex(SystemExit, "expected members must be regular files"):
-                main(dist)
+                main(dist, legacy_targets=True)
 
     def test_duplicate_zip_member_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             dist = Path(directory)
-            create_dist(dist, ".zip")
+            create_dist(dist, ".zip", legacy_targets=True)
             with self.assertRaisesRegex(SystemExit, "duplicate archive members"):
-                main(dist)
+                main(dist, legacy_targets=True)
 
     def test_dual_backend_mode_rejects_archives_without_go_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             dist = Path(directory)
-            create_dist(dist)
+            create_dist(dist, legacy_targets=True)
             with self.assertRaisesRegex(SystemExit, "expected members must be regular files"):
                 main(dist, require_go_fallback=True)
 

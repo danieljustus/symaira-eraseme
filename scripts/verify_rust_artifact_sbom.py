@@ -74,7 +74,7 @@ def verify(dist, extractor, source_revision):
 
     sidecars = {path.name for path in dist.iterdir()
                 if path.name.endswith(SIDECAR_SUFFIXES)}
-    require(sidecars == expected, 'SBOM sidecar set differs from twelve expected Rust-only files')
+    require(sidecars == expected, 'SBOM sidecar set differs from six expected Rust-only files')
     manifest_path = dist / 'sbom-checksums.txt'
     require(manifest_path.is_file() and not manifest_path.is_symlink(),
             'SBOM checksum manifest must be a regular file')
@@ -85,13 +85,13 @@ def verify(dist, extractor, source_revision):
         value, name = match.groups()
         require(name not in manifest, 'duplicate SBOM checksum entry')
         manifest[name] = value
-    require(set(manifest) == expected, 'SBOM checksum member set differs from twelve expected sidecars')
+    require(set(manifest) == expected, 'SBOM checksum member set differs from six expected sidecars')
     require(all(digest(dist / name) == value for name, value in manifest.items()),
             'SBOM checksum mismatch')
     canonical = ''.join(digest(dist / name) + '  ' + name + '\n' for name in sorted(expected))
     require(manifest_path.read_text(encoding='ascii') == canonical,
             'SBOM checksum manifest is not in canonical order')
-    print('PASS: six packed Rust inventories, exact dependency graphs, source identities and twelve sidecar hashes')
+    print('PASS: three packed Rust inventories, exact dependency graphs, source identities and six sidecar hashes')
 
 
 if __name__ == '__main__':

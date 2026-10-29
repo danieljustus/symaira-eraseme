@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage target-checked local Rust binaries in the six-archive Go release shape."""
+"""Stage target-checked local Rust binaries in the three-archive supported release shape."""
 
 from __future__ import annotations
 
@@ -18,12 +18,9 @@ from pathlib import Path
 
 
 TARGETS = (
-    ("darwin", "amd64", "tar.gz", "symeraseme"),
     ("darwin", "arm64", "tar.gz", "symeraseme"),
     ("linux", "amd64", "tar.gz", "symeraseme"),
     ("linux", "arm64", "tar.gz", "symeraseme"),
-    ("windows", "amd64", "zip", "symeraseme.exe"),
-    ("windows", "arm64", "zip", "symeraseme.exe"),
 )
 
 
@@ -233,7 +230,7 @@ def stage(
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+-]*", version):
         raise ValueError("version must be a non-empty filename-safe release version")
     if set(binaries) != {(os_name, arch) for os_name, arch, _, _ in TARGETS}:
-        raise ValueError("exactly the six darwin/linux/windows amd64/arm64 binaries are required")
+        raise ValueError("exactly darwin-arm64, linux-amd64 and linux-arm64 binaries are required")
     inputs = {
         target: _regular_input(path, f"{target[0]}-{target[1]} binary")
         for target, path in binaries.items()
@@ -291,7 +288,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile) as error:
         print(f"stage-rust-release-archives: {error}", file=sys.stderr)
         return 1
-    print(f"Staged six local Rust release archives at {args.output}")
+    print(f"Staged three local Rust release archives at {args.output}")
     return 0
 
 
