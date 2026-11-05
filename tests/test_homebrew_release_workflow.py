@@ -235,7 +235,7 @@ class HomebrewReleaseWorkflow(unittest.TestCase):
                       self.validation_step)
         self.assertNotIn("secrets.HOMEBREW_TAP_GITHUB_TOKEN", publication.split("    steps:\n", 1)[0])
         self.assertIn("    needs: install-check\n", publication)
-        self.assertIn("        os: [macos-14, ubuntu-24.04, ubuntu-24.04-arm]", prepare)
+        self.assertIn("        os: [macos-15, ubuntu-24.04, ubuntu-24.04-arm]", prepare)
         self.assertIn("    if: ${{ !inputs.dry_run }}\n", publication)
         self.assertIn("          DRY_RUN: 'false'\n        run: *verify_release\n", publication)
         self.assertLess(publication.index("run: *verify_release"), publication.index("Checkout tap"))
