@@ -85,7 +85,7 @@ jobs:
           VERSION="${RELEASE_TAG#v}"
           BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
           mkdir -p "$RUNNER_TEMP/symeraseme-assets"
-          for target in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64; do
+          for target in darwin_arm64 linux_amd64 linux_arm64; do
             archive="$RUNNER_TEMP/symeraseme-assets/symeraseme_${VERSION}_${target}.tar.gz"
             curl --fail --silent --show-error --location \
               "$BASE_URL/symeraseme_${VERSION}_${target}.tar.gz" \
@@ -102,7 +102,6 @@ jobs:
           BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"
           ASSET_DIR="$RUNNER_TEMP/symeraseme-assets"
           ARM_DARWIN_SHA=$(sha256sum "$ASSET_DIR/symeraseme_${VERSION}_darwin_arm64.tar.gz" | cut -d' ' -f1)
-          AMD_DARWIN_SHA=$(sha256sum "$ASSET_DIR/symeraseme_${VERSION}_darwin_amd64.tar.gz" | cut -d' ' -f1)
           ARM_LINUX_SHA=$(sha256sum "$ASSET_DIR/symeraseme_${VERSION}_linux_arm64.tar.gz" | cut -d' ' -f1)
           AMD_LINUX_SHA=$(sha256sum "$ASSET_DIR/symeraseme_${VERSION}_linux_amd64.tar.gz" | cut -d' ' -f1)
           FORMULA="tap/Formula/symeraseme.rb"
@@ -117,12 +116,10 @@ jobs:
             license "Apache-2.0"
 
             on_macos do
+              depends_on arch: :arm64
               if Hardware::CPU.arm?
                 url "$BASE_URL/symeraseme_${VERSION}_darwin_arm64.tar.gz"
                 sha256 "$ARM_DARWIN_SHA"
-              else
-                url "$BASE_URL/symeraseme_${VERSION}_darwin_amd64.tar.gz"
-                sha256 "$AMD_DARWIN_SHA"
               end
             end
 
@@ -162,7 +159,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]
+        os: [macos-14, ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Set up Homebrew
@@ -239,5 +236,5 @@ jobs:
           HEAD_SHA="$(git -C tap rev-parse HEAD)"
           PR_URL="$(gh pr create --repo "$TAP_REPOSITORY" --base main --head "$BRANCH" \
             --title "Update symeraseme to $RELEASE_TAG" \
-            --body "Update the CLI Formula to the stable immutable release $RELEASE_TAG. All four native Homebrew install and runtime checks passed for these exact URLs and SHA-256 values.")"
+            --body "Update the CLI Formula to the stable immutable release $RELEASE_TAG. All three native Homebrew install and runtime checks passed for these exact URLs and SHA-256 values.")"
           gh pr merge "$PR_URL" --repo "$TAP_REPOSITORY" --squash --auto --match-head-commit "$HEAD_SHA"

@@ -130,7 +130,7 @@ class ArtifactSbomControls(unittest.TestCase):
         self.assertEqual(root['name'], 'symeraseme-cli')
         self.assertTrue(inventory['packages'])
 
-    def test_generate_then_independently_read_back_six_rust_only_archives(self):
+    def test_generate_then_independently_read_back_three_rust_only_archives(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             dist, binaries = root / 'dist', root / 'binaries'
@@ -185,7 +185,7 @@ class ArtifactSbomControls(unittest.TestCase):
             actual_sidecars = {path.name for path in dist.iterdir()
                                if path.name.endswith(('.rust-audit.json', '.cdx.json'))}
             self.assertEqual(actual_sidecars, expected_sidecars)
-            self.assertEqual(len((dist / 'sbom-checksums.txt').read_text().splitlines()), 12)
+            self.assertEqual(len((dist / 'sbom-checksums.txt').read_text().splitlines()), 6)
             for sidecar in dist.glob('*.cdx.json'):
                 value = json.loads(sidecar.read_text())
                 self.assertEqual(value['metadata']['properties'][0]['value'], SOURCE_REVISION)

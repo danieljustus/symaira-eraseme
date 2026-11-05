@@ -1,5 +1,16 @@
 # Go → Rust executable contract matrix
 
+## Current platform scope (2026-10-29, #1274)
+
+Apple + Web is the product scope: native Apple surfaces target macOS arm64
+(and iOS/Web where applicable). Linux remains a CI/server platform and a CLI
+artifact target as applicable. Windows and macOS Intel are unsupported; their
+former port-matrix parity and release requirements are no longer required under
+the platform scope decision. The implementation/frozen-evidence cleanup is
+tracked separately in #1276. Historical rows below preserve what was measured
+and must not be edited to erase those observations. Remove a Windows-only
+fixture only after checking its replay and provenance consumers.
+
 ## Post-cutover contract change: HTML exports (2026-10-20, #1259)
 
 The dashboard and HTML report exports use the Symaira Liquid Topography

@@ -44,9 +44,27 @@ Some broker-specific web flows still require manual review.
 - AES-256-GCM encrypted identity profile, standard Fernet encrypted database at rest, and explicit destructive-operation consent.
 - Native SwiftUI dashboard for macOS. Rust-only release DMGs bundle the Rust CLI/MCP server.
 
+## Platform support
+
+Product scope is Apple (macOS on Apple Silicon, iOS) plus Web. The current
+implementation ships the macOS app and CLI; this scope does not claim an
+existing iOS app or Web client. Linux remains supported for CLI/server use and CI.
+
+| Platform | Current support |
+| --- | --- |
+| macOS arm64 (Apple Silicon) | Native app, CLI, PR parity and release gates |
+| Linux amd64 / arm64 | CLI/server, native CI and release archives |
+| iOS / Web | In product scope; no installable client shipped here |
+| Windows, including ARM64 | Unsupported; no native CI or new release artifacts |
+| macOS Intel | Unsupported; no native CI or new release artifacts |
+
+Historical release assets and frozen platform observations stay immutable.
+Windows-only source and fixtures are retained as unsupported historical code;
+their later removal is separate from this CI/release change. See [#1274](https://github.com/danieljustus/symaira-eraseme/issues/1274).
+
 ## Install
 
-### macOS and Linux
+### macOS Apple Silicon and Linux
 
 ```bash
 brew tap danieljustus/tap
@@ -54,9 +72,9 @@ brew install symeraseme
 symeraseme version
 ```
 
-### Windows and other platforms
+### Release archives
 
-Download the archive for the published version you choose from
+Download the macOS arm64 or Linux amd64/arm64 archive for your chosen version from
 [GitHub releases](https://github.com/danieljustus/symaira-eraseme/releases).
 Rust-only archives contain only the Rust CLI; no Go rollback binary
 or legacy backend selector is distributed. The historical `v0.13.0` prerelease
@@ -224,10 +242,10 @@ scripts/                 Build, packaging, and verification tools
 
 Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/release.yml):
 
-1. The Rust prerelease workflow builds natively on Linux, macOS, and Windows
-   for amd64 and arm64, packages six static Rust CLI archives, and verifies the
+1. The Rust prerelease workflow builds natively on macOS arm64 and Linux
+   amd64/arm64, packages three static Rust CLI archives, and verifies the
    archives, `checksums.txt` and the per-archive CycloneDX SBOMs.
-2. The staging job attests build provenance for the six archives and creates
+2. The staging job attests build provenance for the three archives and creates
    a draft prerelease, then reads every asset back without publishing it.
 3. The macOS job builds the SwiftUI app with the Rust CLI/MCP server and uploads
    the versioned DMG to that draft. It is signed, notarized, stapled and attested.

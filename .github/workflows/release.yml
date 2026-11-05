@@ -61,16 +61,16 @@ jobs:
           set -euo pipefail
           cd "$RUNNER_TEMP/dist"
           test "$(python3 -c 'import json;print(json.load(open("metadata.json"))["version"])')" = "$VERSION"
-          test "$(grep -c . checksums.txt)" = 6
+          test "$(grep -c . checksums.txt)" = 3
           sha256sum --check --strict checksums.txt
           sha256sum --check --strict sbom-checksums.txt
 
-      - name: Attest build provenance for the six archives
+      - name: Attest build provenance for the three archives
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-checksums: ${{ runner.temp }}/dist/checksums.txt
 
-      - name: Attest the twelve SBOM sidecar digests
+      - name: Attest the six SBOM sidecar digests
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: ${{ runner.temp }}/dist/sbom-checksums.txt
@@ -91,7 +91,7 @@ jobs:
           - No Go backend is bundled; the former backend selector is retired.
           - Each archive has a CycloneDX SBOM (\`*.cdx.json\`) built from the dependency graph
             embedded in the Rust binary; \`sbom-checksums.txt\` lists their digests.
-          - Build provenance for the six archives is attested by GitHub; verify with
+          - Build provenance for the three archives is attested by GitHub; verify with
             \`gh attestation verify <archive> --repo $GITHUB_REPOSITORY\`.
 
           Use a copy of your data while evaluating this canary.

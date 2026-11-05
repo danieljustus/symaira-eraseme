@@ -28,16 +28,7 @@ on:
       - Cargo.toml
       - Cargo.lock
       - .github/workflows/mcp-http-native.yml
-  workflow_dispatch:
-    inputs:
-      replay_token_acl:
-        description: Replay retained Windows token ACL observations using Rust only
-        type: boolean
-        default: false
-      replay_windows_http:
-        description: Replay retained Windows HTTP process observations with Go unavailable
-        type: boolean
-        default: false
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -48,7 +39,6 @@ concurrency:
 
 jobs:
   official-core:
-    if: github.event_name != 'workflow_dispatch' || !(inputs.replay_token_acl || inputs.replay_windows_http)
     name: Official MCP core / Rust
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -107,7 +97,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ (inputs.replay_token_acl || inputs.replay_windows_http) && fromJSON('["windows-2025","windows-11-arm"]') || fromJSON('["ubuntu-24.04","ubuntu-24.04-arm","macos-14","macos-15-intel","windows-2025","windows-11-arm"]') }}
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -128,104 +118,12 @@ jobs:
             target
           key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - name: Complete response headers, raw bodies and native bind failures
-        if: github.event_name != 'workflow_dispatch' || !(inputs.replay_token_acl || inputs.replay_windows_http)
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked \
             --test mcp_http_headers_process --test mcp_http_native_contract --test frozen_http_aux \
             -- --nocapture --skip windows_acl::native_windows_token_dacl_and_rotation_match_go
-      - name: Native Windows console, auth, rotation, timeout and disconnect contracts
-        if: runner.os == 'Windows' && (!inputs.replay_token_acl || inputs.replay_windows_http)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $env:PATH = ($env:PATH.Split([IO.Path]::PathSeparator) | Where-Object {
-            $_ -and -not (Test-Path -LiteralPath (Join-Path $_ 'go.exe'))
-          }) -join [IO.Path]::PathSeparator
-          if (Get-Command go,go.exe -CommandType Application -ErrorAction SilentlyContinue) {
-            throw 'Go must be unavailable during the Rust-only replay'
-          }
-          $replayScript = @'
-          set -euo pipefail
-          test "$RUNNER_OS" = Windows
-          test -z "$(git status --porcelain)"
-          if command -v go >/dev/null 2>&1; then
-            printf 'Go unexpectedly resolves in the replay shell\n' >&2
-            exit 1
-          fi
-          cargo +1.98.0 test -p symeraseme-cli --locked --test windows_http_capture_contract \
-            2>&1 | tee "$RUNNER_TEMP/windows-http-reader.log"
-          grep -Eq '^running [1-9][0-9]* tests?$' "$RUNNER_TEMP/windows-http-reader.log"
-          tests=(
-            native_windows_http_matches_checked_out_go
-            native_windows_disconnect_reaps_host_agent_like_go
-            native_windows_pathext_availability_matches_live_go
-            native_windows_disconnect_cancels_provider_request_like_go
-            native_windows_slow_header_timeout_matches_go
-            native_windows_ctrl_break_shutdown_matches_go
-            native_windows_ctrl_c_shutdown_matches_go
-          )
-          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_windows_process \
-            -- "${tests[@]}" --exact --nocapture --test-threads=1 \
-            2>&1 | tee "$RUNNER_TEMP/windows-http-replay.log"
-          grep -Eq '^running 7 tests$' "$RUNNER_TEMP/windows-http-replay.log"
-          grep -Eq 'test result: ok\. 7 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/windows-http-replay.log"
-          test -z "$(git status --porcelain)"
-          '@
-          & bash --noprofile --norc -c $replayScript
-          exit $LASTEXITCODE
-      - name: Retain Windows HTTP replay diagnostics
-        if: always() && runner.os == 'Windows' && (!inputs.replay_token_acl || inputs.replay_windows_http)
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-http-replay-${{ runner.os }}-${{ runner.arch }}
-          path: |
-            ${{ runner.temp }}/windows-http-reader.log
-            ${{ runner.temp }}/windows-http-replay.log
-          if-no-files-found: error
-          retention-days: 7
       - name: Native Unix process and signal contracts
-        if: runner.os != 'Windows'
         shell: bash
         run: |
           cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_process -- --nocapture
-      - name: Capture trusted Windows identity baseline
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          EXPECTED_ARCH: ${{ runner.arch }}
-          EXPECTED_REVISION: ${{ github.sha }}
-        run: |
-          $artifact = Join-Path $env:RUNNER_TEMP 'identity-baseline/windows-identity-baseline.json'
-          ./scripts/capture-windows-identity.ps1 -Mode Capture -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
-      - name: Rust-only native token ACL and rotation replay
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          EXPECTED_ARCH: ${{ runner.arch }}
-          EXPECTED_REVISION: ${{ github.sha }}
-        run: |
-          $artifact = Join-Path $env:RUNNER_TEMP 'identity-baseline/windows-identity-baseline.json'
-          $env:SYMERASEME_WINDOWS_IDENTITY_BASELINE = $artifact
-          $replayScript = @'
-          set -euo pipefail
-          test "$RUNNER_OS" = Windows
-          test -z "$(git status --porcelain)"
-          cargo +1.98.0 test -p symeraseme-cli --locked --test mcp_http_native_contract \
-            -- --exact windows_acl::native_windows_token_dacl_and_rotation_match_go --nocapture \
-            2>&1 | tee "$RUNNER_TEMP/token-acl-replay.log"
-          grep -Eq '^running 1 test$' "$RUNNER_TEMP/token-acl-replay.log"
-          grep -Eq '^test windows_acl::native_windows_token_dacl_and_rotation_match_go \.\.\.' "$RUNNER_TEMP/token-acl-replay.log"
-          grep -Eq 'test result: ok\. 1 passed; 0 failed; 0 ignored;' "$RUNNER_TEMP/token-acl-replay.log"
-          grep -Fq 'Windows token ACL replay executed inherited and owner-only-parent cases against actual Rust' "$RUNNER_TEMP/token-acl-replay.log"
-          '@
-          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $replayScript
-          exit $LASTEXITCODE
-      - name: Retain token replay diagnostics
-        if: always() && runner.os == 'Windows'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: token-acl-replay-${{ runner.os }}-${{ runner.arch }}
-          path: ${{ runner.temp }}/token-acl-replay.log
-          if-no-files-found: error
-          retention-days: 7

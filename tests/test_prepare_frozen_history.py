@@ -95,13 +95,10 @@ class FrozenHistoryPreparation(unittest.TestCase):
             'go-ci.yml': {'go-test': 'make test'},
             'rust-ci.yml': {
                 'rust-pr': 'nextest run --workspace',
-                'rust-pr-windows-clippy': 'test -p parity',
                 'rust-native': 'tests/test_mcp_stdio_oracle_check.py',
             },
             'rust-no-go.yml': {'frozen-neutral': 'Execute default suite with Go absent'},
             'mcp-http-native.yml': {'native-mcp': 'Complete response headers'},
-            'consent-windows.yml': {'native-consent': 'Capture independent native identity'},
-            'host-agent-windows.yml': {'native-agent': 'Rust host-agent reaping'},
             'campaign-smtp-native.yml': {'native-smtp': 'Actual SMTP transport'},
             'triage-native.yml': {'native-triage': 'Every retained CLI triage input'},
             'mcp-tools-native.yml': {'native-tools': 'Compiled native agent'},

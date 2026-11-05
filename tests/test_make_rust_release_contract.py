@@ -18,7 +18,7 @@ sys.dont_write_bytecode = True
 
 from test_stage_rust_release_archives import executable_header  # noqa: E402
 
-TARGETS = ("darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64", "windows-amd64", "windows-arm64")
+TARGETS = ("darwin-arm64", "linux-amd64", "linux-arm64")
 VERSION = "9.8.7-test.1"
 
 
@@ -54,22 +54,20 @@ class RustReleaseDryRunContract(unittest.TestCase):
             command.append(f"RELEASE_VERSION={version}")
         return subprocess.run(command, cwd=self.root, env=env, text=True, capture_output=True, timeout=120)
 
-    def test_default_version_comes_from_cargo_and_all_six_archives_verify(self):
+    def test_default_version_comes_from_cargo_and_all_supported_archives_verify(self):
         result = self.run_make()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("LOCAL packaging proof only", result.stdout)
-        self.assertIn(f"PASS: 6 release archives and SHA-256 entries match {VERSION}", result.stdout)
+        self.assertIn(f"PASS: 3 release archives and SHA-256 entries match {VERSION}", result.stdout)
         self.assertEqual(json.loads((self.dist / "metadata.json").read_text()), {"version": VERSION})
         archives = sorted(p.name for p in self.dist.iterdir() if p.name.endswith((".tar.gz", ".zip")))
-        self.assertEqual(len(archives), 6)
+        self.assertEqual(len(archives), 3)
         checksums = (self.dist / "checksums.txt").read_text().splitlines()
-        self.assertEqual(len(checksums), 6)
+        self.assertEqual(len(checksums), 3)
         for name in archives:
             self.assertIn(name, (self.dist / "checksums.txt").read_text())
         with tarfile.open(self.dist / f"symeraseme_{VERSION}_linux_amd64.tar.gz") as bundle:
             self.assertEqual(set(bundle.getnames()), {"symeraseme", "LICENSE", "README.md"})
-        with zipfile.ZipFile(self.dist / f"symeraseme_{VERSION}_windows_arm64.zip") as bundle:
-            self.assertEqual(set(bundle.namelist()), {"symeraseme.exe", "LICENSE", "README.md"})
 
     def test_native_workflow_runs_this_target_and_discovers_its_controls(self):
         workflow = (ROOT / '.github/workflows/rust-prerelease.yml').read_text()

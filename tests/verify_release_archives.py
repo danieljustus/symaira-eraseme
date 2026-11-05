@@ -15,7 +15,7 @@ def fail(message: str) -> None:
     raise SystemExit(message)
 
 
-def main(dist: Path, require_go_fallback: bool = False) -> None:
+def main(dist: Path, require_go_fallback: bool = False, *, legacy_targets: bool = False) -> None:
     metadata = json.loads((dist / "metadata.json").read_text())
     version = metadata.get("version")
     if not isinstance(version, str) or not version:
@@ -30,6 +30,8 @@ def main(dist: Path, require_go_fallback: bool = False) -> None:
     expected.update(
         f"symeraseme_{version}_windows_{arch}.zip" for arch in ("amd64", "arm64")
     )
+    if not (legacy_targets or require_go_fallback):
+        expected = {name for name in expected if "_windows_" not in name and "_darwin_amd64" not in name}
     archives = {path.name: path for path in dist.iterdir() if path.name.endswith((".tar.gz", ".zip"))}
     if set(archives) != expected:
         fail(f"archive set mismatch: expected {sorted(expected)}, got {sorted(archives)}")

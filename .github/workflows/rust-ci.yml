@@ -135,43 +135,6 @@ jobs:
         shell: bash
         run: make parity
 
-  rust-pr-windows-clippy:
-    name: Rust / PR Windows parity and clippy
-    if: github.event_name == 'pull_request'
-    runs-on: windows-2025
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0 # Frozen readers authenticate immutable producer blobs.
-      - name: Cache Cargo dependencies and target
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            target
-          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - name: Install pinned Rust toolchain
-        shell: bash
-        run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component clippy
-      - name: Check and lint Windows code
-        shell: bash
-        run: |
-          cargo +"$RUST_TOOLCHAIN" check --workspace --all-targets --all-features --locked
-          cargo +"$RUST_TOOLCHAIN" clippy --workspace --all-targets --all-features --locked -- -D warnings
-      - name: Prepare immutable frozen producer history
-        shell: bash
-        run: python3 scripts/prepare-frozen-history.py --fetch
-      - name: Run Windows neutral parity tests
-        shell: bash
-        run: cargo +"$RUST_TOOLCHAIN" test -p parity --all-features --locked --no-fail-fast
-      - name: Replay native Windows MCP HTTP against frozen Go observations
-        shell: bash
-        run: cargo +"$RUST_TOOLCHAIN" test -p symeraseme-cli --test mcp_http_windows_process --locked -- --test-threads=1
-
   rust-tools-cache:
     name: Rust / verification tools cache
     # The five verification tools are only needed on the pull_request path, but a
@@ -214,7 +177,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-15-intel, windows-2025, windows-11-arm]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -287,64 +250,15 @@ jobs:
           retention-days: 7
 
       - name: Test and doctest
-        if: runner.os != 'Windows'
         shell: bash
         run: |
           cargo +"$RUST_TOOLCHAIN" test --workspace --all-features --locked
           cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
 
-      - name: Capture independent Windows identity for workspace tests
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          EXPECTED_ARCH: ${{ runner.arch }}
-          EXPECTED_REVISION: ${{ github.sha }}
-        run: |
-          $artifact = Join-Path $env:RUNNER_TEMP 'rust-native-identity/baseline.json'
-          ./scripts/capture-windows-identity.ps1 -Mode Capture -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact
-
-      - name: Windows test and doctest with verified native identity
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          EXPECTED_ARCH: ${{ runner.arch }}
-          EXPECTED_REVISION: ${{ github.sha }}
-        run: |
-          $artifact = Join-Path $env:RUNNER_TEMP 'rust-native-identity/baseline.json'
-          $env:SYMERASEME_WINDOWS_IDENTITY_BASELINE = $artifact
-          $raw = & cargo "+$env:RUST_TOOLCHAIN" metadata --locked --no-deps --format-version 1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $metadata = $raw | ConvertFrom-Json
-          $packages = @($metadata.packages | Where-Object { $_.id -in $metadata.workspace_members })
-          if ($packages.Count -eq 0 -or $packages.Count -ne $metadata.workspace_members.Count) {
-            throw 'Workspace test package inventory is incomplete'
-          }
-          # Each package retains the identity check and unchanged 24-minute bound.
-          # The complete ARM64 workspace exceeds that bound as a single child.
-          $tests = @'
-          set -euo pipefail
-          cargo +"$RUST_TOOLCHAIN" test -p "$SYMERASEME_CI_TEST_PACKAGE" --all-features --locked --no-fail-fast
-          '@
-          $failed = $false
-          foreach ($package in $packages) {
-            $env:SYMERASEME_CI_TEST_PACKAGE = $package.name
-            Write-Output "Native workspace package: $($package.name)"
-            ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $tests
-            if ($LASTEXITCODE -ne 0) { $failed = $true }
-          }
-          $docs = @'
-          set -euo pipefail
-          cargo +"$RUST_TOOLCHAIN" test --workspace --doc --all-features --locked
-          '@
-          ./scripts/capture-windows-identity.ps1 -Mode Verify -ExpectedArch $env:EXPECTED_ARCH -ExpectedRevision $env:EXPECTED_REVISION -ArtifactPath $artifact -BashScript $docs
-          if ($LASTEXITCODE -ne 0) { $failed = $true }
-          if ($failed) { exit 1 }
-
-      - name: Verify recorded whole plan and Unix processes with Go absent on all six native hosts
+      - name: Verify recorded whole plan and Unix processes with Go absent on all supported native hosts
         shell: bash
         run: python3 scripts/verify-frozen-plan-without-go.py
 
       - name: Run neutral parity subset on Unix
-        if: runner.os != 'Windows'
         shell: bash
         run: make parity

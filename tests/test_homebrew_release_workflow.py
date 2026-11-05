@@ -178,7 +178,7 @@ class HomebrewReleaseWorkflow(unittest.TestCase):
         assets = self.root / "symeraseme-assets"
         assets.mkdir()
         expected = {}
-        for target in ("darwin_arm64", "darwin_amd64", "linux_arm64", "linux_amd64"):
+        for target in ("darwin_arm64", "linux_arm64", "linux_amd64"):
             name = f"symeraseme_0.14.1_{target}.tar.gz"
             data = f"labelled renderer fixture: {target}\n".encode()
             (assets / name).write_bytes(data)
@@ -205,7 +205,7 @@ class HomebrewReleaseWorkflow(unittest.TestCase):
         self.assertIn('system bin/"symeraseme", "version"', formula)
         pairs = re.findall(r'url "([^\"]+)"\s+sha256 "([0-9a-f]{64})"', formula)
         base = "https://github.com/danieljustus/symaira-eraseme/releases/download/v0.14.1/"
-        self.assertEqual(len(pairs), 4)
+        self.assertEqual(len(pairs), 3)
         self.assertEqual(set(pairs), {(base + name, digest) for name, digest in expected.items()})
         install = self.workflow.split("  install-check:\n", 1)[1].split("  publish-tap:\n", 1)[0]
         audit = "brew audit --strict --formula local/symeraseme-check/symeraseme"
@@ -235,7 +235,7 @@ class HomebrewReleaseWorkflow(unittest.TestCase):
                       self.validation_step)
         self.assertNotIn("secrets.HOMEBREW_TAP_GITHUB_TOKEN", publication.split("    steps:\n", 1)[0])
         self.assertIn("    needs: install-check\n", publication)
-        self.assertIn("        os: [macos-14, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]", prepare)
+        self.assertIn("        os: [macos-14, ubuntu-24.04, ubuntu-24.04-arm]", prepare)
         self.assertIn("    if: ${{ !inputs.dry_run }}\n", publication)
         self.assertIn("          DRY_RUN: 'false'\n        run: *verify_release\n", publication)
         self.assertLess(publication.index("run: *verify_release"), publication.index("Checkout tap"))
