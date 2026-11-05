@@ -115,8 +115,12 @@ final class NativeChromeTests: XCTestCase {
             var failure: NSAccessibilityElementProtocol?
             for _ in 0..<30 where failure == nil {
                 // `SymairaPageState` renders a failed load as a notice with the shared Retry action.
+                // The state frame's identifier can shadow the button's own, so the role and label match too.
                 failure = elements(window).compactMap { $0 as? NSAccessibilityElementProtocol }.first {
-                    text($0 as! NSObject, "accessibilityIdentifier") == "symaira.page.retry"
+                    let node = $0 as! NSObject
+                    return text(node, "accessibilityIdentifier") == "symaira.page.retry"
+                        || (text(node, "accessibilityRole") == NSAccessibility.Role.button.rawValue
+                            && [text(node, "accessibilityLabel"), text(node, "accessibilityTitle")].contains("Retry"))
                 }
                 if failure == nil { try await Task.sleep(for: .milliseconds(100)) }
             }
