@@ -64,7 +64,7 @@ main `89a0fbcdef745714950ca1994ceb11c0e8b832ab`. Original captures and historica
 | REL-007..010 | PASS for published v0.14.1 | Actual app/helper/DMG signatures, stapling/Gatekeeper, same-run packed SBOM verification, eight fresh exact-source/tag/workflow attestations and source-equivalent audit/deny evidence. |
 | CUT-001..003 | PASS within current contracts | Six-native retired-selector tests; original same-run public Rust binaries and separate Go development oracle: 72 copied-store/switchback cases, 144 raw streams. Not older published Go schema-v2 compatibility. |
 | CUT-004 | OPEN | Stable observation starts at `2026-10-10T17:38:53.187732+00:00`; earliest seven-day review `2026-10-17T17:38:53.187732+00:00`, with genuine observation evidence required. |
-| CUT-005 | OPEN | Go-source/module/toolchain removal merged by PR #1232 (`18a3d497bc7380836840a1b84eb72ad9f9ac536e`, 2026-10-14). Remains OPEN until a release cut through the release process after #1232 is verified Go-free and maintainer acceptance is recorded. No release containing the removal exists yet; v0.14.1 predates it. |
+| CUT-005 | OPEN | Go-source/module/toolchain removal merged by PR #1232 (`18a3d497bc7380836840a1b84eb72ad9f9ac536e`, 2026-10-14). Remains OPEN until maintainer acceptance is recorded. Canary prerelease `v0.15.0` (commit `9476b3d3`, 2026-11-05) is the first release containing the removal; its archives, sidecars and DMG are attested to that commit and verified Go-free (publication completed manually with the workflow's controls, #1286). |
 
 The detailed receipt preserves successful jobs separately from the original
 release workflow's failed final publication step. No release/CI rerun, production
