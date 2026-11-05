@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- The release publication step expects exactly the three supported archives;
+  its test now derives them from the staged release targets. `v0.15.0` was
+  published by running the same controls manually after the workflow stopped
+  on the stale Windows and macOS Intel expectation (#1286).
+
 ## [v0.15.0] - 2026-11-05
 
 Canary prerelease on the Rust-only line and the first release built from a
