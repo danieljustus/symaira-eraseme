@@ -1,0 +1,154 @@
+// Command llm-failures-next records one provider-failure case from the real
+// Go llmkit transport against a local-only HTTP server.
+package main
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sync/atomic"
+
+	"github.com/danieljustus/symaira-eraseme/internal/llm"
+)
+
+type observation struct {
+	Schema        string            `json:"schema"`
+	GoVersion     string            `json:"go_version"`
+	GoModule      string            `json:"go_module"`
+	SourcesSHA256 map[string]string `json:"sources_sha256"`
+	ID            string            `json:"id"`
+	Path          string            `json:"path"`
+	Status        int               `json:"status"`
+	Attempts      int               `json:"attempts"`
+	ErrorKind     string            `json:"error_kind"`
+	Message       string            `json:"message"`
+	Text          string            `json:"text"`
+	APIKey        string            `json:"api_key"`
+	Body          string            `json:"body"`
+}
+
+func main() {
+	status := flag.Int("status", http.StatusForbidden, "synthetic provider HTTP status (400, 401, 403, 404 or 500)")
+	malformedEnvelope := flag.Bool("malformed-envelope", false, "add an invalid choices field beside a valid structured OpenAI error")
+	malformedChoice := flag.Bool("malformed-choice", false, "add a choice with an invalid finish_reason type beside a valid structured OpenAI error")
+	flag.Parse()
+	var id, apiKey, body string
+	switch *status {
+	case http.StatusBadRequest:
+		id, apiKey, body = "openai-context-overflow-echoed-key", "synthetic-400-key", `maximum context length exceeded; key synthetic-400-key`
+	case http.StatusUnauthorized:
+		id, apiKey, body = "openai-structured-auth-error", "synthetic-401-key", `{"error":{"message":"authentication failed; key synthetic-401-key","type":"authentication_error","code":"invalid_api_key"}}`
+	case http.StatusForbidden:
+		id, apiKey, body = "openai-forbidden-echoed-key", "synthetic-403-key", `permission denied; key synthetic-403-key`
+	case http.StatusNotFound:
+		id, apiKey, body = "openai-model-not-found-echoed-key", "synthetic-404-key", `model not found; key synthetic-404-key`
+	case http.StatusInternalServerError:
+		id, apiKey, body = "openai-server-error-echoed-key", "synthetic-500-key", `provider temporarily unavailable; key synthetic-500-key`
+	default:
+		fatalIf(fmt.Errorf("unsupported synthetic status %d", *status))
+	}
+	if *malformedEnvelope {
+		if *status != http.StatusForbidden {
+			fatalIf(fmt.Errorf("--malformed-envelope requires --status 403"))
+		}
+		id = "openai-malformed-error-envelope"
+		apiKey = "synthetic-envelope-key"
+		body = `{"error":{"message":"authentication failed; key synthetic-envelope-key","type":"authentication_error","code":"invalid_api_key"},"choices":"malformed"}`
+	}
+	if *malformedChoice {
+		if *status != http.StatusForbidden || *malformedEnvelope {
+			fatalIf(fmt.Errorf("--malformed-choice requires --status 403 without --malformed-envelope"))
+		}
+		id = "openai-malformed-choice-field"
+		apiKey = "synthetic-choice-key"
+		body = `{"error":{"message":"authentication failed; key synthetic-choice-key","type":"authentication_error","code":"invalid_api_key"},"choices":[{"finish_reason":false}]}`
+	}
+	_, here, _, _ := runtime.Caller(0)
+	root := filepath.Clean(filepath.Join(filepath.Dir(here), "../../../.."))
+	obs := observation{
+		Schema:    "symeraseme.go-oracle.llm-failures-next.v1",
+		GoVersion: runtime.Version(),
+		GoModule:  "github.com/danieljustus/symaira-corekit v0.16.2",
+		ID:        id,
+		Status:    *status,
+		APIKey:    apiKey,
+		Body:      body,
+	}
+	obs.SourcesSHA256 = make(map[string]string)
+	for _, name := range []string{
+		"internal/llm/factory.go",
+		"internal/llm/llmkit.go",
+		"internal/llm/llm.go",
+		"go.mod",
+		"go.sum",
+		"rust-tests/parity/oracle/llm-failures-next/main.go",
+	} {
+		b, err := os.ReadFile(filepath.Join(root, name))
+		fatalIf(err)
+		sum := sha256.Sum256(b)
+		obs.SourcesSHA256[name] = hex.EncodeToString(sum[:])
+	}
+
+	var attempts atomic.Int64
+	var requestPath atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		requestPath.Store(r.URL.Path)
+		w.WriteHeader(*status)
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	for _, name := range []string{"SYMERASEME_LLM_PROVIDER", "SYMERASEME_LLM_MODEL", "SYMERASEME_LLM_BASE_URL", "OLLAMA_HOST", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"} {
+		fatalIf(os.Unsetenv(name))
+	}
+	fatalIf(os.Setenv("SYMERASEME_LLM_BASE_URL", srv.URL))
+	client, err := llm.Create(llm.CreateOptions{Provider: "openai", APIKey: apiKey})
+	fatalIf(err)
+	text, _, err := client.Classify(context.Background(), "system", "user", llm.ClassifyOptions{MaxTokens: 64, Temperature: 0.25})
+	obs.Attempts = int(attempts.Load())
+	obs.Path = requestPath.Load().(string)
+	obs.Text = text
+	if err == nil {
+		obs.ErrorKind = "none"
+	} else {
+		obs.Message = err.Error()
+		var rateLimit *llm.RateLimitError
+		var provider *llm.Error
+		switch {
+		case errors.As(err, &rateLimit):
+			obs.ErrorKind = "rate_limit"
+		case errors.As(err, &provider):
+			obs.ErrorKind = "provider"
+		default:
+			obs.ErrorKind = fmt.Sprintf("%T", err)
+		}
+	}
+
+	var dst io.Writer = os.Stdout
+	if path := os.Getenv("LLM_FAILURES_NEXT_FIXTURE"); path != "" {
+		file, err := os.Create(path)
+		fatalIf(err)
+		defer file.Close()
+		dst = file
+	}
+	enc := json.NewEncoder(dst)
+	enc.SetIndent("", "  ")
+	fatalIf(enc.Encode(obs))
+}
+
+func fatalIf(err error) {
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}

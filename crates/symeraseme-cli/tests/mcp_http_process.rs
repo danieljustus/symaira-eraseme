@@ -17,6 +17,10 @@ use symeraseme_core::storage::repository::Repository;
 mod mcp_http_port;
 use mcp_http_port::{StartedChild, accepts_token, free_port, spawn_with_handoff};
 
+#[path = "support/capture_http_aux.rs"]
+mod capture_http_aux;
+#[path = "support/capture_http_wire.rs"]
+mod capture_http_wire;
 #[path = "support/frozen_http_aux.rs"]
 mod frozen_http_aux;
 #[path = "support/frozen_http_wire.rs"]
@@ -24,6 +28,7 @@ mod frozen_http_wire;
 #[path = "support/interrupted_read.rs"]
 mod interrupted_read;
 
+const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const THIS_FILE: &str = "crates/symeraseme-cli/tests/mcp_http_process.rs";
 const GO_AGENT_CANCEL_FIXTURE: &str =
     include_str!("../../../tests/fixtures/agent-cancel/http.json");
@@ -252,6 +257,81 @@ fn startup_error(
     let status = child.wait().unwrap();
     let stderr = std::io::read_to_string(child.stderr.take().unwrap()).unwrap();
     (status, stderr)
+}
+
+fn build_go_oracle(root: &Path) -> PathBuf {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let oracle = root.join("symeraseme-go-oracle");
+    let build = Command::new("go")
+        .args(["build", "-o"])
+        .arg(&oracle)
+        .arg("./cmd/symeraseme")
+        .current_dir(repo)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .output()
+        .expect("Go toolchain is required to reproduce the HTTP oracle transcript");
+    assert!(
+        build.status.success(),
+        "Go oracle build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    oracle
+}
+
+fn assert_agent_cancel_oracle_matches(root: &Path) -> Vec<u8> {
+    let generated_fixture = root.join("agent-cancel.json");
+    let oracle = Command::new("go")
+        .args(["run", "./rust-tests/parity/oracle/agent-cancel", "-fixture"])
+        .arg(&generated_fixture)
+        .current_dir(ROOT)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .output()
+        .expect("run source-pinned Go cancellation oracle");
+    assert!(
+        oracle.status.success(),
+        "Go cancellation oracle failed: {}",
+        String::from_utf8_lossy(&oracle.stderr)
+    );
+    let generated = std::fs::read(generated_fixture).unwrap();
+    assert_eq!(
+        generated,
+        GO_AGENT_CANCEL_FIXTURE.as_bytes(),
+        "Go 1.26.6 cancellation oracle or pinned source hashes drifted"
+    );
+    generated
+}
+
+fn assert_provider_cancel_oracle_matches(root: &Path) -> Vec<u8> {
+    let generated_fixture = root.join("provider-cancel.json");
+    let oracle = Command::new("go")
+        .args([
+            "run",
+            "./rust-tests/parity/oracle/provider-cancel",
+            "-fixture",
+        ])
+        .arg(&generated_fixture)
+        .current_dir(ROOT)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .output()
+        .expect("run source-pinned Go provider cancellation oracle");
+    assert!(
+        oracle.status.success(),
+        "Go provider cancellation oracle failed: {}",
+        String::from_utf8_lossy(&oracle.stderr)
+    );
+    let generated = std::fs::read(generated_fixture).unwrap();
+    assert_eq!(
+        generated,
+        GO_PROVIDER_CANCEL_FIXTURE.as_bytes(),
+        "Go 1.26.6 provider cancellation oracle or pinned source hashes drifted"
+    );
+    generated
 }
 
 fn start_provider_server(
@@ -804,11 +884,34 @@ fn live_http_disconnect_cancels_and_reaps_host_agent_like_go() {
     assert_eq!(fixture["handler_error"], "context canceled");
     assert_eq!(fixture["child_exited"], true);
 
-    let frozen = frozen_http_aux::observation(THIS_FILE, TEST)
-        .expect("live Go is retired; a recorded native host-agent cancellation is required");
+    let root = TestDir::new();
+    let frozen = frozen_http_aux::observation(THIS_FILE, TEST);
+    let live = frozen.is_none().then(|| {
+        let generated = assert_agent_cancel_oracle_matches(root.path());
+        let go = root.path().join("symeraseme-go-oracle");
+        let build = Command::new("go")
+            .args(["build", "-o"])
+            .arg(&go)
+            .arg("./cmd/symeraseme")
+            .current_dir(ROOT)
+            .env("GOTOOLCHAIN", "go1.26.6")
+            .env("GOPROXY", "off")
+            .env("GOSUMDB", "off")
+            .output()
+            .expect("build Go 1.26.6 MCP process oracle");
+        assert!(
+            build.status.success(),
+            "Go MCP process build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        (generated, go)
+    });
     let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
     let mut observed = Vec::new();
-    let (name, binary) = ("rust", rust);
+    for (name, binary) in live
+        .iter()
+        .map(|(_, go)| ("go", go.as_path()))
+        .chain([("rust", rust)])
     {
         let case = TestDir::new();
         seed_agent_reply(case.path());
@@ -849,12 +952,30 @@ fn live_http_disconnect_cancels_and_reaps_host_agent_like_go() {
         send_signal(&mut server, "TERM");
     }
     let rust_observation = observed.pop().unwrap();
-    assert_eq!(
-        frozen_http_aux::bytes(&frozen["oracle_fixture"]),
-        GO_AGENT_CANCEL_FIXTURE.as_bytes(),
-        "Go 1.26.6 cancellation oracle or pinned source hashes drifted"
-    );
-    let go_observation = frozen["process"].clone();
+    let go_observation = match (&frozen, &live) {
+        (Some(record), _) => {
+            assert_eq!(
+                frozen_http_aux::bytes(&record["oracle_fixture"]),
+                GO_AGENT_CANCEL_FIXTURE.as_bytes(),
+                "Go 1.26.6 cancellation oracle or pinned source hashes drifted"
+            );
+            record["process"].clone()
+        }
+        (None, Some((generated, go))) => {
+            let process = observed.pop().unwrap();
+            capture_http_aux::record(
+                go,
+                THIS_FILE,
+                TEST,
+                serde_json::json!({
+                    "oracle_fixture": capture_http_aux::bytes(generated),
+                    "process": process,
+                }),
+            );
+            process
+        }
+        (None, None) => unreachable!(),
+    };
     assert_eq!(
         rust_observation, go_observation,
         "Rust differs from the actual Go host-agent cancellation"
@@ -865,13 +986,20 @@ fn live_http_disconnect_cancels_and_reaps_host_agent_like_go() {
 #[cfg(unix)]
 fn live_http_disconnect_cancels_provider_request_like_go() {
     const TEST: &str = "live_http_disconnect_cancels_provider_request_like_go";
-    let frozen = frozen_http_aux::observation(THIS_FILE, TEST)
-        .expect("live Go is retired; a recorded native provider cancellation is required");
-    assert_eq!(
-        frozen_http_aux::bytes(&frozen["oracle_fixture"]),
-        GO_PROVIDER_CANCEL_FIXTURE.as_bytes(),
-        "Go 1.26.6 provider cancellation oracle or pinned source hashes drifted"
-    );
+    let root = TestDir::new();
+    let frozen = frozen_http_aux::observation(THIS_FILE, TEST);
+    let generated = match &frozen {
+        Some(record) => {
+            let generated = frozen_http_aux::bytes(&record["oracle_fixture"]);
+            assert_eq!(
+                generated,
+                GO_PROVIDER_CANCEL_FIXTURE.as_bytes(),
+                "Go 1.26.6 provider cancellation oracle or pinned source hashes drifted"
+            );
+            generated
+        }
+        None => assert_provider_cancel_oracle_matches(root.path()),
+    };
     let provider_fixture: serde_json::Value =
         serde_json::from_str(GO_PROVIDER_CANCEL_FIXTURE).unwrap();
     assert_eq!(
@@ -880,11 +1008,15 @@ fn live_http_disconnect_cancels_provider_request_like_go() {
     );
     assert_eq!(provider_fixture["provider_canceled"], true);
     assert_eq!(provider_fixture["client_disconnected"], true);
+    let go = frozen.is_none().then(|| build_go_oracle(root.path()));
     let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
     let body = br#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"classify_reply","arguments":{"request_id":1,"provider":"openai","model":"oracle-model"}}}"#;
 
     let mut observed = Vec::new();
-    let (name, binary) = ("rust", rust);
+    for (name, binary) in go
+        .iter()
+        .map(|go| ("go", go.as_path()))
+        .chain([("rust", rust)])
     {
         let case = TestDir::new();
         seed_agent_reply(case.path());
@@ -948,7 +1080,23 @@ fn live_http_disconnect_cancels_provider_request_like_go() {
         send_signal(&mut server, "TERM");
     }
     let rust_observation = observed.pop().unwrap();
-    let go_observation = frozen["process"].clone();
+    let go_observation = match (&frozen, &go) {
+        (Some(record), _) => record["process"].clone(),
+        (None, Some(go)) => {
+            let process = observed.pop().unwrap();
+            capture_http_aux::record(
+                go,
+                THIS_FILE,
+                TEST,
+                serde_json::json!({
+                    "oracle_fixture": capture_http_aux::bytes(&generated),
+                    "process": process,
+                }),
+            );
+            process
+        }
+        (None, None) => unreachable!(),
+    };
     assert_eq!(
         rust_observation, go_observation,
         "Rust differs from the actual Go provider cancellation"
@@ -1107,15 +1255,30 @@ fn many_sequential_http_connections_complete_cleanly() {
 #[cfg(unix)]
 fn go_oracle_http_wire_transcripts_match() {
     // Reproduction: cargo test -p symeraseme-cli --test mcp_http_process go_oracle_http_wire_transcripts_match -- --exact
-    // Replay the authenticated native Go capture; never build the retired producer.
+    // Unrecorded hosts and explicit capture/live modes execute the checked-out Go CLI.
     let root = TestDir::new();
     let frozen = frozen_http_wire::observations();
+    let oracle = frozen.is_none().then(|| build_go_oracle(root.path()));
+
+    let mut go_port = free_port();
     let mut rust_port = free_port();
+    let go_root = root.path().join("go");
     let rust_root = root.path().join("rust");
+    std::fs::create_dir_all(&go_root).unwrap();
     std::fs::create_dir_all(&rust_root).unwrap();
+    let mut go = oracle
+        .as_ref()
+        .map(|binary| start_binary(binary, &go_root, &mut go_port, "127.0.0.1", false));
     let mut rust = start(&rust_root, &mut rust_port, "127.0.0.1", false);
+    if let Some(child) = go.as_mut() {
+        wait_ready(child, go_port, &go_root);
+    }
     wait_ready(&mut rust, rust_port, &rust_root);
-    let go_token = "recorded-private-native-bearer-token";
+    let go_token = if go.is_some() {
+        std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap()
+    } else {
+        "recorded-private-native-bearer-token".to_owned()
+    };
     let rust_token = token(&rust_root);
 
     let cases: [OracleCase<'_>; 10] = [
@@ -1171,9 +1334,20 @@ fn go_oracle_http_wire_transcripts_match() {
             vec![("Authorization", format!("Bearer {go_token}"))],
         ),
     ];
+    let mut measured = Vec::new();
     for (index, (method, body, headers)) in cases.into_iter().enumerate() {
-        let request = frozen_http_wire::request(method, body, &headers);
-        let go_reply = frozen.reply(index, &request);
+        let request = capture_http_wire::request(method, body, &headers);
+        let go_headers: Vec<_> = headers
+            .iter()
+            .map(|(name, value)| (*name, value.as_str()))
+            .collect();
+        let go_reply = if let Some(corpus) = &frozen {
+            corpus.reply(index, &request)
+        } else {
+            let reply = exchange(go_port, method, body, &go_headers);
+            measured.push(capture_http_wire::case(index, request, &reply));
+            reply
+        };
         let rust_headers: Vec<_> = headers
             .iter()
             .map(|(name, value)| {
@@ -1196,6 +1370,11 @@ fn go_oracle_http_wire_transcripts_match() {
             rust_reply, go_reply,
             "wire transcript differs for {method} {body:?}"
         );
+    }
+    if let Some(child) = go.as_mut() {
+        signal(child, "TERM");
+        let status = child.try_wait().unwrap().unwrap().code().unwrap();
+        capture_http_wire::record(oracle.as_ref().unwrap(), status, &measured);
     }
     signal(&mut rust, "TERM");
 }
@@ -1269,12 +1448,16 @@ fn start_stale_token_listener(listener: TcpListener) -> StaleTokenListener {
 #[cfg(unix)]
 fn startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness() {
     const TEST: &str = "startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness";
-    let frozen = frozen_http_aux::observation(THIS_FILE, TEST)
-        .expect("live Go is retired; a recorded native startup handoff is required");
+    let root = TestDir::new();
+    let frozen = frozen_http_aux::observation(THIS_FILE, TEST);
+    let oracle = frozen.is_none().then(|| build_go_oracle(root.path()));
     let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
 
     let mut observed = Vec::new();
-    let (name, binary) = ("rust", rust);
+    for (name, binary) in oracle
+        .iter()
+        .map(|go| ("go", go.as_path()))
+        .chain([("rust", rust)])
     {
         let case = TestDir::new();
         let data = case.path().join("data");
@@ -1314,7 +1497,15 @@ fn startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness() {
         drop(foreign);
     }
     let rust_observation = observed.pop().unwrap();
-    let go_observation = frozen;
+    let go_observation = match (frozen, &oracle) {
+        (Some(record), _) => record,
+        (None, Some(go)) => {
+            let go_observation = observed.pop().unwrap();
+            capture_http_aux::record(go, THIS_FILE, TEST, go_observation.clone());
+            go_observation
+        }
+        (None, None) => unreachable!(),
+    };
     assert_eq!(
         rust_observation, go_observation,
         "Rust differs from the actual Go startup handoff"
@@ -1326,19 +1517,22 @@ fn startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness() {
 fn occupied_bind_error_matches_go_for_ipv4_and_ipv6() {
     const TEST: &str = "occupied_bind_error_matches_go_for_ipv4_and_ipv6";
     let root = TestDir::new();
-    let frozen = frozen_http_aux::observation(THIS_FILE, TEST)
-        .expect("live Go is retired; recorded native occupied-bind failures are required");
+    let frozen = frozen_http_aux::observation(THIS_FILE, TEST);
+    let oracle = frozen.is_none().then(|| build_go_oracle(root.path()));
     let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
 
     let mut hosts = vec!["127.0.0.1"];
     if TcpListener::bind("[::1]:0").is_ok() {
         hosts.push("::1");
     }
-    assert_eq!(
-        frozen["cases"].as_array().unwrap().len(),
-        hosts.len(),
-        "recorded Go loopback families differ from this host"
-    );
+    if let Some(record) = &frozen {
+        assert_eq!(
+            record["cases"].as_array().unwrap().len(),
+            hosts.len(),
+            "recorded Go loopback families differ from this host"
+        );
+    }
+    let mut measured = Vec::new();
     for (index, host) in hosts.into_iter().enumerate() {
         let bind_address = if host.contains(':') {
             format!("[{host}]:0")
@@ -1347,9 +1541,18 @@ fn occupied_bind_error_matches_go_for_ipv4_and_ipv6() {
         };
         let occupied = TcpListener::bind(&bind_address).unwrap();
         let port = occupied.local_addr().unwrap().port();
+        let go_root = root.path().join(format!("go-{host}"));
         let rust_root = root.path().join(format!("rust-{host}"));
+        std::fs::create_dir_all(&go_root).unwrap();
         std::fs::create_dir_all(&rust_root).unwrap();
-        let (go_success, go_stderr) = go_startup_error(&frozen["cases"][index], port, host);
+        let (go_success, go_stderr) = go_startup_error(
+            frozen.as_ref().map(|record| &record["cases"][index]),
+            oracle.as_deref(),
+            &mut measured,
+            &go_root,
+            port,
+            host,
+        );
         let (rust_status, rust_stderr) = startup_error(rust, &rust_root, port, host, true);
         assert!(!go_success);
         assert!(!rust_status.success());
@@ -1368,12 +1571,32 @@ fn occupied_bind_error_matches_go_for_ipv4_and_ipv6() {
         );
         drop(occupied);
     }
+    if let Some(go) = &oracle {
+        capture_http_aux::record(go, THIS_FILE, TEST, serde_json::json!({"cases": measured}));
+    }
 }
 
-/// Authenticated recorded Go startup failure, with this run's port.
-fn go_startup_error(recorded: &serde_json::Value, port: u16, host: &str) -> (bool, String) {
-    let (code, stderr) = frozen_http_aux::startup_failure(recorded, host, port);
-    (code == Some(0), String::from_utf8(stderr).unwrap())
+/// Actual Go startup failure, or the recorded one with this run's port.
+fn go_startup_error(
+    recorded: Option<&serde_json::Value>,
+    oracle: Option<&Path>,
+    measured: &mut Vec<serde_json::Value>,
+    root: &Path,
+    port: u16,
+    host: &str,
+) -> (bool, String) {
+    if let Some(case) = recorded {
+        let (code, stderr) = frozen_http_aux::startup_failure(case, host, port);
+        return (code == Some(0), String::from_utf8(stderr).unwrap());
+    }
+    let (status, stderr) = startup_error(oracle.unwrap(), root, port, host, true);
+    measured.push(capture_http_aux::startup_failure(
+        host,
+        port,
+        status.code(),
+        stderr.as_bytes(),
+    ));
+    (status.success(), stderr)
 }
 
 #[test]
@@ -1389,13 +1612,23 @@ fn unavailable_local_address_error_matches_go() {
     );
 
     let root = TestDir::new();
-    let frozen = frozen_http_aux::observation(THIS_FILE, TEST)
-        .expect("live Go is retired; a recorded native unavailable-address failure is required");
+    let frozen = frozen_http_aux::observation(THIS_FILE, TEST);
+    let oracle = frozen.is_none().then(|| build_go_oracle(root.path()));
     let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
     let port = free_port();
+    let go_root = root.path().join("go-unavailable");
     let rust_root = root.path().join("rust-unavailable");
+    std::fs::create_dir_all(&go_root).unwrap();
     std::fs::create_dir_all(&rust_root).unwrap();
-    let (go_success, go_stderr) = go_startup_error(&frozen["cases"][0], port, host);
+    let mut measured = Vec::new();
+    let (go_success, go_stderr) = go_startup_error(
+        frozen.as_ref().map(|record| &record["cases"][0]),
+        oracle.as_deref(),
+        &mut measured,
+        &go_root,
+        port,
+        host,
+    );
     let (rust_status, rust_stderr) = startup_error(rust, &rust_root, port, host, true);
     assert!(!go_success);
     assert!(!rust_status.success());
@@ -1409,7 +1642,12 @@ fn unavailable_local_address_error_matches_go() {
         rust_stderr.trim(),
         format!("listen tcp {host}:{port}: bind: {native_message}")
     );
-    assert_eq!(frozen["cases"].as_array().unwrap().len(), 1);
+    if let Some(record) = &frozen {
+        assert_eq!(record["cases"].as_array().unwrap().len(), 1);
+    }
+    if let Some(go) = &oracle {
+        capture_http_aux::record(go, THIS_FILE, TEST, serde_json::json!({"cases": measured}));
+    }
 }
 
 #[test]
@@ -1417,21 +1655,49 @@ fn unavailable_local_address_error_matches_go() {
 fn obs_text_origin_rejection_matches_go_and_rust_processes() {
     const TEST: &str = "obs_text_origin_rejection_matches_go_and_rust_processes";
     let root = TestDir::new();
-    let frozen = frozen_http_aux::observation(THIS_FILE, TEST)
-        .expect("live Go is retired; a recorded native obs-text rejection is required");
+    let frozen = frozen_http_aux::observation(THIS_FILE, TEST);
+    let oracle = frozen.is_none().then(|| build_go_oracle(root.path()));
+    let mut go_port = free_port();
     let mut rust_port = free_port();
+    let go_root = root.path().join("go-obs-text");
     let rust_root = root.path().join("rust-obs-text");
+    std::fs::create_dir_all(&go_root).unwrap();
     std::fs::create_dir_all(&rust_root).unwrap();
+    let mut go = oracle
+        .as_ref()
+        .map(|binary| start_binary(binary, &go_root, &mut go_port, "127.0.0.1", false));
     let mut rust = start(&rust_root, &mut rust_port, "127.0.0.1", false);
+    if let Some(child) = go.as_mut() {
+        wait_ready(child, go_port, &go_root);
+    }
     wait_ready(&mut rust, rust_port, &rust_root);
     let rust_token = token(&rust_root);
-    let go_response = (
-        u16::try_from(frozen["status"].as_u64().unwrap()).unwrap(),
-        frozen["content_type"].as_str().unwrap().to_owned(),
-        frozen_http_aux::bytes(&frozen["body"]),
-    );
+    let go_response = match &frozen {
+        Some(record) => (
+            u16::try_from(record["status"].as_u64().unwrap()).unwrap(),
+            record["content_type"].as_str().unwrap().to_owned(),
+            frozen_http_aux::bytes(&record["body"]),
+        ),
+        None => {
+            let go_token = std::fs::read_to_string(go_root.join("data/mcp_token")).unwrap();
+            exchange_obs_text_origin(go_port, &go_token)
+        }
+    };
     let rust_response = exchange_obs_text_origin(rust_port, &rust_token);
     assert_eq!(go_response.0, 403, "Go rejected the raw obs-text Origin");
     assert_eq!(rust_response, go_response);
+    if let Some(child) = go.as_mut() {
+        signal(child, "TERM");
+        capture_http_aux::record(
+            oracle.as_ref().unwrap(),
+            THIS_FILE,
+            TEST,
+            serde_json::json!({
+                "status": go_response.0,
+                "content_type": go_response.1,
+                "body": capture_http_aux::bytes(&go_response.2),
+            }),
+        );
+    }
     signal(&mut rust, "TERM");
 }

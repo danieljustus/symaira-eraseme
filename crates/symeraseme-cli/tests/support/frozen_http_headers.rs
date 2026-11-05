@@ -13,50 +13,50 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
         "darwin/amd64",
-        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
-        "cb1e16218992c3b5dea66afc52b998277f37f30c958143a244044643824228ee",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "bc023c7f4918d0af629d4bdd686067a92e81c0a1ae44c459fc3f14c73bbd798d",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/darwin-amd64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/http-headers/darwin-amd64/headers.json"
         ),
     ),
     (
         "darwin/arm64",
-        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
-        "3174148062186619fa149fb716dbd24b0bd8ec12b8e76774c505e1d1260fa46c",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "0165c741ec62d9b4f3a4a5746d5d64bc3dbd71fb6295d5276d17193126b04637",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/darwin-arm64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/http-headers/darwin-arm64/headers.json"
         ),
     ),
     (
         "linux/amd64",
-        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
-        "f6a6283272673e87c412cffbea20cb8bcbeff9fb0132de87440baa59ae21e6fe",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "a5fa9553dd22590c3145ca611dbc394d5f109a9dd727a67c8c226e33bccbea2c",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/linux-amd64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/http-headers/linux-amd64/headers.json"
         ),
     ),
     (
         "linux/arm64",
-        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
-        "86f7ab6b6f59ea8b4469e64ab92c6d4875b1b2216e92cc155fbce192f579d335",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "2bb0d6ca7dea12aed15df78f85bbb625b6ed2cd1d91321277112702e5c391300",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/linux-arm64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/http-headers/linux-arm64/headers.json"
         ),
     ),
     (
         "windows/amd64",
-        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
-        "a871e99f64e891f77478ea16b9669da06a2b5b62d88cf93567871c4b9f14bc41",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "9570876cb08bd8eb727398c28606b2f0046f6a8b1b3fd88d4fd0f82e01a3bc86",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/windows-amd64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/http-headers/windows-amd64/headers.json"
         ),
     ),
     (
         "windows/arm64",
-        "e2cf176337f6f90e64f76b5f39d3a859e87774ea",
-        "cfa0c2a1d55d18891bafcc7e16653502041147e17cf57b9cdb702cee494b9bb4",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "2300b45e989db9141afe30a9f8731c812345eb4d263a4f63cd0adb72bd5a1110",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-e2cf1763/http-headers/windows-arm64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/http-headers/windows-arm64/headers.json"
         ),
     ),
 ];
@@ -103,20 +103,6 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
                 archive.status.success(),
                 "immutable HTTP producer must remain verifiable"
             );
-            // Retired producers remain bound to the independent Go-era pin.
-            let retired_producer = field == "archived_generators"
-                && matches!(
-                    name.as_str(),
-                    "crates/symeraseme-cli/tests/mcp_http_headers_process.rs"
-                        | "crates/symeraseme-cli/tests/support/capture_http_headers.rs"
-                );
-            if retired_producer {
-                go_source_pin::assert_retired_generator_matches_archive(
-                    ROOT,
-                    name,
-                    &archive.stdout,
-                );
-            }
             let archived_bytes = if field == "archived_generators" && target.starts_with("windows/")
             {
                 assert!(!archive.stdout.windows(2).any(|bytes| bytes == b"\r\n"));
@@ -133,8 +119,8 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
             };
             assert_eq!(recorded["bytes"], archived_bytes.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archived_bytes), "{name}");
-            if !retired_producer && go_source_pin::current_tree_bound(name) {
-                let current = go_source_pin::current_source(ROOT, name);
+            if go_source_pin::current_tree_bound(name) {
+                let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
                 go_source_pin::assert_current_matches_archive(name, &archived_bytes, &current);
             }
         }
@@ -173,14 +159,14 @@ impl Corpus {
     }
 }
 
-pub fn observations() -> Corpus {
-    assert!(
-        !std::env::var_os("SYMERASEME_CAPTURE_HTTP_HEADERS").is_some_and(|value| !value.is_empty()),
-        "live Go capture is retired; use the immutable historical capture producer"
-    );
+pub fn observations() -> Option<Corpus> {
+    if std::env::var_os("SYMERASEME_CAPTURE_HTTP_HEADERS").is_some_and(|value| !value.is_empty()) {
+        return None;
+    }
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("1") => return None,
         Ok("0") | Err(std::env::VarError::NotPresent) => {}
-        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
     }
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
@@ -189,12 +175,9 @@ pub fn observations() -> Corpus {
         ("windows", "aarch64") => "windows/arm64",
         ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
-        _ => panic!("no recorded native HTTP header capture for this target; live Go is retired"),
+        _ => return None,
     };
-    let (_, revision, pin, raw) = RECORDS
-        .iter()
-        .find(|record| record.0 == target)
-        .expect("no recorded HTTP headers for the native target");
+    let (_, revision, pin, raw) = RECORDS.iter().find(|record| record.0 == target)?;
     let record = verify(raw, pin, revision, target);
     let mut corrupt = raw.to_vec();
     corrupt.push(b'!');
@@ -213,20 +196,5 @@ pub fn observations() -> Corpus {
         ))
         .is_err()
     );
-    Corpus(record)
-}
-
-// Same request encoding as the historical capture producer, including token roles.
-pub fn request(method: &str, body: &[u8], headers: &[(&str, String)]) -> Value {
-    serde_json::json!({
-        "method": method,
-        "body_base64": base64::engine::general_purpose::STANDARD.encode(body),
-        "body": {"bytes": body.len(), "sha256": digest(body)},
-        "headers": headers.iter().map(|(name, value)| {
-            if name.eq_ignore_ascii_case("authorization") {
-                assert!(value.starts_with("Bearer "));
-                serde_json::json!({"name": name, "role": "private-native-bearer-token"})
-            } else { serde_json::json!({"name": name, "value": value}) }
-        }).collect::<Vec<_>>()
-    })
+    Some(Corpus(record))
 }

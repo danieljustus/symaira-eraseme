@@ -12,6 +12,8 @@ use std::time::{Duration, Instant};
 use base64::Engine;
 use serde::Deserialize;
 
+#[path = "support/capture_agent_error.rs"]
+mod capture_agent_error;
 #[path = "support/frozen_agent_error.rs"]
 mod frozen_agent_error;
 
@@ -114,6 +116,31 @@ fn capture(mut command: Command, root: &Path, name: &str, timeout: Duration) -> 
     }
 }
 
+fn helper(root: &Path) -> PathBuf {
+    let executable = root.join(if cfg!(windows) {
+        "mcp-agent-error-json-windows.exe"
+    } else {
+        "mcp-agent-error-json-windows"
+    });
+    let mut command = Command::new("go");
+    command
+        .args(["build", "-o"])
+        .arg(&executable)
+        .arg("./rust-tests/parity/oracle/mcp-agent-error-json-windows")
+        .current_dir(ROOT)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .env("GOCACHE", root.join("gocache"));
+    let output = capture(command, root, "go-build", Duration::from_secs(180));
+    assert!(
+        output.status.success(),
+        "Go helper build: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    executable
+}
+
 fn rust_fixture(root: &Path) -> PathBuf {
     let executable = root.join(if cfg!(windows) {
         "synthetic-agent-error.exe"
@@ -190,7 +217,33 @@ fn compare_bytes(actual: &[u8], expected: &[u8]) -> Result<(), String> {
 fn native_helper_and_go_contract_observation() {
     let root = tempfile::tempdir().expect("test root");
     let corpus = frozen_agent_error::observations();
-    let sanity = measured(&corpus, "helper_sanity");
+    let executable = corpus.is_none().then(|| helper(root.path()));
+    let agent = root.path().join(if cfg!(windows) {
+        "claude.exe"
+    } else {
+        "claude"
+    });
+    if let Some(executable) = &executable {
+        fs::copy(executable, &agent).expect("native Go fake agent copy");
+    }
+
+    let sanity = if let Some(corpus) = &corpus {
+        measured(corpus, "helper_sanity")
+    } else {
+        let mut sanity_command = Command::new(&agent);
+        isolated(
+            &mut sanity_command,
+            root.path(),
+            root.path(),
+            &root.path().join("sanity-data"),
+        );
+        capture(
+            sanity_command,
+            root.path(),
+            "fake-agent",
+            Duration::from_secs(5),
+        )
+    };
     assert_eq!(sanity.status.code(), Some(23));
     assert!(sanity.stdout.is_empty());
     assert_eq!(sanity.stderr, BAD_STDERR, "fake agent emitted raw bytes");
@@ -213,34 +266,61 @@ fn native_helper_and_go_contract_observation() {
     assert_eq!(fixture_sanity.stdout, sanity.stdout);
     assert_eq!(fixture_sanity.stderr, sanity.stderr);
 
-    for stream in ["stdout", "stderr"] {
-        let started = Instant::now();
-        let error = std::panic::catch_unwind(|| {
-            let mut flood = Command::new(&rust_fixture);
-            flood.args(["--flood", stream]);
-            isolated(
-                &mut flood,
-                root.path(),
-                root.path(),
-                &root.path().join("sanity-data"),
+    let mut go_limit_controls = Vec::new();
+    let mut fixtures = vec![("rust", &rust_fixture)];
+    if let Some(executable) = &executable {
+        fixtures.insert(0, ("go", executable));
+    }
+    for (fixture_name, fixture) in fixtures {
+        for stream in ["stdout", "stderr"] {
+            let started = Instant::now();
+            let error = std::panic::catch_unwind(|| {
+                let mut flood = Command::new(fixture);
+                flood.args(["--flood", stream]);
+                isolated(
+                    &mut flood,
+                    root.path(),
+                    root.path(),
+                    &root.path().join("sanity-data"),
+                );
+                capture(
+                    flood,
+                    root.path(),
+                    &format!("{fixture_name}-flood-{stream}"),
+                    Duration::from_secs(10),
+                );
+            })
+            .expect_err("live capture rejects oversized output");
+            let text = error.downcast_ref::<String>().expect("capture error text");
+            assert!(
+                text.contains("capture limit"),
+                "must fail on size, not timeout"
             );
-            capture(
-                flood,
-                root.path(),
-                &format!("rust-flood-{stream}"),
-                Duration::from_secs(10),
-            );
-        })
-        .expect_err("live capture rejects oversized output");
-        let text = error.downcast_ref::<String>().expect("capture error text");
-        assert!(
-            text.contains("capture limit"),
-            "must fail on size, not timeout"
-        );
-        assert!(started.elapsed() < Duration::from_secs(10));
+            assert!(started.elapsed() < Duration::from_secs(10));
+            if fixture_name == "go" {
+                go_limit_controls.push(serde_json::json!({
+                    "stream": stream, "rejected": true,
+                    "actual_reason": text, "elapsed_ms": started.elapsed().as_millis(),
+                    "capture_limit_bytes": MAX_CAPTURE,
+                }));
+            }
+        }
     }
 
-    let go = measured(&corpus, "oracle");
+    let go = if let Some(corpus) = &corpus {
+        measured(corpus, "oracle")
+    } else {
+        let go_root = root.path().join("go");
+        let go_bin = go_root.join("bin");
+        let go_data = go_root.join("data");
+        fs::create_dir_all(&go_bin).expect("Go bin");
+        fs::create_dir_all(&go_data).expect("Go data");
+        fs::copy(&agent, go_bin.join(agent.file_name().unwrap())).expect("Go fake agent");
+        let mut command = Command::new(executable.as_ref().unwrap());
+        command.arg("--oracle");
+        isolated(&mut command, &go_root, &go_bin, &go_data);
+        capture(command, root.path(), "go-oracle", Duration::from_secs(30))
+    };
     assert!(
         go.status.success(),
         "Go ContractHandler oracle: {}",
@@ -279,6 +359,27 @@ fn native_helper_and_go_contract_observation() {
     assert!(compare_bytes(&tampered, &expected).is_err());
     assert!(compare_bytes(&expected, &expected).is_ok());
 
+    let stream = |raw: &[u8]| {
+        serde_json::json!({
+            "bytes": raw.len(),
+            "base64": base64::engine::general_purpose::STANDARD.encode(raw),
+        })
+    };
+    if let Some(executable) = &executable {
+        capture_agent_error::record(
+            executable,
+            serde_json::json!({
+                "oracle": {"argv": ["--oracle"], "exit_status": go.status.code().unwrap(),
+                           "stdout": stream(&go.stdout), "stderr": stream(&go.stderr)},
+                "helper_sanity": {"argv": [], "exit_status": sanity.status.code().unwrap(),
+                                  "stdout": stream(&sanity.stdout), "stderr": stream(&sanity.stderr)},
+                "helper_limit_controls": go_limit_controls,
+                "Rust_fixture_matches_actual_Go_sanity": fixture_sanity.status == sanity.status
+                    && fixture_sanity.stdout == sanity.stdout && fixture_sanity.stderr == sanity.stderr,
+            }),
+        );
+    }
+
     #[cfg(windows)]
     {
         let rust_root = root.path().join("rust");
@@ -303,53 +404,6 @@ fn native_helper_and_go_contract_observation() {
         );
         assert!(rust.stderr.is_empty(), "MCP stdio stderr stays clean");
         compare_bytes(&rust.stdout, &expected).expect("native Go/Rust MCP byte parity");
-    }
-}
-
-#[test]
-fn retired_agent_error_capture_controls_fail_closed() {
-    let logs = tempfile::tempdir().unwrap();
-    for (index, (variable, value, message)) in [
-        (
-            "SYMERASEME_PARITY_LIVE_GO",
-            "1",
-            "live Go execution is retired",
-        ),
-        (
-            "SYMERASEME_CAPTURE_AGENT_ERROR",
-            "",
-            "live Go capture is retired",
-        ),
-        (
-            "SYMERASEME_CAPTURE_AGENT_ERROR",
-            "requested",
-            "live Go capture is retired",
-        ),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let mut command = Command::new(std::env::current_exe().unwrap());
-        command
-            .args([
-                "--exact",
-                "native_helper_and_go_contract_observation",
-                "--nocapture",
-            ])
-            .env_remove("SYMERASEME_PARITY_LIVE_GO")
-            .env_remove("SYMERASEME_CAPTURE_AGENT_ERROR")
-            .env(variable, value)
-            .env("PATH", logs.path())
-            .current_dir(logs.path())
-            .stdin(Stdio::null());
-        let output = capture(
-            command,
-            logs.path(),
-            &format!("retired-{index}"),
-            Duration::from_secs(30),
-        );
-        assert!(!output.status.success());
-        assert!(String::from_utf8_lossy(&output.stderr).contains(message));
     }
 }
 
