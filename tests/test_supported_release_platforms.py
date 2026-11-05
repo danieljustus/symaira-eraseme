@@ -38,7 +38,7 @@ class SupportedReleasePlatforms(unittest.TestCase):
             text = (ROOT / '.github/workflows' / (name + '.yml')).read_text()
             with self.subTest(workflow=name):
                 self.assertIn('  pull_request:', text.split('\njobs:', 1)[0])
-                self.assertIn('macos-26' if name == 'app-rust-native' else 'macos-14', text)
+                self.assertIn('macos-26' if name == 'app-rust-native' else 'macos-15', text)
                 if name != 'app-rust-native':
                     self.assertIn('ubuntu-24.04', text)
                     self.assertIn('ubuntu-24.04-arm', text)
