@@ -99,7 +99,9 @@ final class NativeChromeTests: XCTestCase {
             let visible = window.convertToScreen(window.contentLayoutRect)
             let headings = nodes.compactMap { $0 as? NSAccessibilityElementProtocol }.filter {
                 let node = $0 as! NSObject
-                return text(node, "accessibilityRole") == NSAccessibility.Role.staticText.rawValue
+                // `SymairaPage` marks its title as a header; macOS may report it as heading or static text.
+                let role = text(node, "accessibilityRole")
+                return (role == NSAccessibility.Role.staticText.rawValue || role == "AXHeading")
                     && (text(node, "accessibilityValue") ?? text(node, "accessibilityLabel")) == item.rawValue
                     && $0.accessibilityFrame().minX > visible.minX + 200
             }
@@ -112,9 +114,9 @@ final class NativeChromeTests: XCTestCase {
             // Every page starts its content zone at the same height: the failure state proves it here.
             var failure: NSAccessibilityElementProtocol?
             for _ in 0..<30 where failure == nil {
+                // `SymairaPageState` renders a failed load as a notice with the shared Retry action.
                 failure = elements(window).compactMap { $0 as? NSAccessibilityElementProtocol }.first {
-                    text($0 as! NSObject, "accessibilityValue") == "Failed to Load"
-                        || text($0 as! NSObject, "accessibilityLabel") == "Failed to Load"
+                    text($0 as! NSObject, "accessibilityIdentifier") == "symaira.page.retry"
                 }
                 if failure == nil { try await Task.sleep(for: .milliseconds(100)) }
             }
