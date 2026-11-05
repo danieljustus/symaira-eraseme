@@ -14,9 +14,9 @@ Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
 data brokers. It is a local-first Rust CLI with a native SwiftUI macOS app and
 an authenticated MCP JSON-RPC interface.
 
-**Current source tree:** Rust-only CLI and native SwiftUI macOS app, version 0.14.1.
-This patch preserves identity keys, enforces single-use consent and completes
-all release assets before immutable publication. The Rust-only package layout
+**Current source tree:** Rust-only CLI and native SwiftUI macOS app, version 0.15.0.
+This release is the first without Go sources, supports macOS on Apple Silicon
+and Linux (amd64/arm64) only, and patches dependency advisories. The Rust-only package layout
 was introduced in the
 [`v0.14.0` canary prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
 The historical `v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the
@@ -198,7 +198,7 @@ make app-test
 ./app/SymairaEraseMe/build.sh
 
 # Local development packaging example only; not a release-version claim
-VERSION=0.14.1 ./scripts/package-dmg.sh
+VERSION=0.15.0 ./scripts/package-dmg.sh
 ```
 
 Use a full-history clone. Even then, squash merges and deleted feature branches
@@ -262,8 +262,9 @@ Tags matching `v*` trigger [.github/workflows/release.yml](.github/workflows/rel
 No GUI Homebrew cask is configured; the macOS GUI is distributed as a DMG.
 Previously published `v0.13.0` dual-backend prerelease assets remain unchanged;
 `v0.12.1` is the last Go-only stable release. The `v0.14.0` canary introduced
-the Rust-only package layout; version 0.14.1 adds identity/consent safety fixes
-and complete-asset immutable publication. Canary publication alone does not
+the Rust-only package layout; version 0.14.1 added identity/consent safety fixes
+and complete-asset immutable publication; version 0.15.0 removes the Go sources
+and the Windows and macOS Intel targets. Canary publication alone does not
 complete stable acceptance or Go-retirement technical gates. The maintainer's
 2026-10-12 decision separately authorizes source retirement and waives only
 the seven-day observation period. The historical `python-final` tag remains
