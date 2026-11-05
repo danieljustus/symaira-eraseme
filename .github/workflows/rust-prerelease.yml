@@ -60,7 +60,7 @@ jobs:
       matrix:
         include:
           - name: macOS arm64
-            runner: macos-14
+            runner: macos-15
             os: darwin
             arch: arm64
             target: aarch64-apple-darwin

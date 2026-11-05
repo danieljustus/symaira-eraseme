@@ -114,7 +114,7 @@ jobs:
         include:
           - {runner: ubuntu-24.04, os: linux, arch: amd64}
           - {runner: ubuntu-24.04-arm, os: linux, arch: arm64}
-          - {runner: macos-14, os: darwin, arch: arm64}
+          - {runner: macos-15, os: darwin, arch: arm64}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     steps:
