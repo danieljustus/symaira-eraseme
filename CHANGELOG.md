@@ -4,11 +4,21 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
-Preparing the next patch on the Rust-only line (target `v0.14.2`). These notes
-do not claim publication or complete CUT-005 acceptance. New releases remain
-canary-first, with all assets completed before immutable publication and
-separately verified stable promotion before Homebrew distribution. Historical
-`v0.13.0`, `v0.14.0` and `v0.14.1` assets remain unchanged.
+## [v0.15.0] - 2026-11-05
+
+Canary prerelease on the Rust-only line and the first release built from a
+source tree without Go product sources. Assets are completed before immutable
+publication; stable promotion and Homebrew distribution require separately
+verified candidate-bound acceptance. Historical `v0.13.0`, `v0.14.0` and
+`v0.14.1` assets remain unchanged.
+
+### Breaking
+
+- Supported targets are now macOS on Apple Silicon and Linux amd64/arm64. New
+  releases no longer ship Windows (amd64/arm64) or macOS Intel archives, and
+  the Homebrew Formula restricts macOS to arm64 (#1275). Windows-only source,
+  tests and helper scripts are removed (#1281). Frozen Windows and Intel
+  conformance captures stay unchanged as historical evidence.
 
 ### Changed
 
@@ -28,6 +38,13 @@ separately verified stable promotion before Homebrew distribution. Historical
   conformance captures (#1228).
 - Document explicit frozen-history preparation before testing a fresh clone;
   preserve the source pins and offline replay after preparation (#1237).
+- The macOS app adopts the shared Symaira Liquid Topography workspace (#1255)
+  and the shared AppKit 0.18 page and sheet scaffolds; load errors show a
+  notice with Retry, and shared controls localize to English and German
+  (#1284). Brand assets and the app icon follow the refreshed palette (#1266).
+- Update the MiniJinja, sha2, rustls-native-certs, signal-hook and schannel
+  dependencies, with refreshed source-bound native conformance evidence
+  (#1248, #1280).
 
 ### Fixed
 
@@ -46,6 +63,9 @@ separately verified stable promotion before Homebrew distribution. Historical
   plain-text preferences plist. An existing key is migrated on launch and the
   old preference is removed only after a verified Keychain write; on failure
   the key is kept and the Settings window shows the error (#1254).
+- Patch dependency advisories with refreshed native evidence: rustls (#1247),
+  rustls-webpki and its root store (#1261), and `ctutils` plus `tokio`
+  (RUSTSEC-2026-0385, RUSTSEC-2026-0386) (#1268).
 
 ## [v0.14.1] - 2026-10-10
 
