@@ -13,7 +13,6 @@ on:
       - rust-tests/parity/encrypted_store_switchback.py
       - rust-tests/parity/test_plain_store_switchback.py
       - rust-tests/parity/linux_store_sandbox.py
-      - rust-tests/parity/windows_store_sandbox.py
       - rust-tests/parity/backup_restore_rehearsal.py
       - rust-tests/parity/prepare_backup_restore.py
       - rust-tests/parity/go_build_info.py
@@ -37,7 +36,6 @@ on:
       - scripts/rust_artifact_sbom.py
       - scripts/verify_rust_artifact_sbom.py
       - scripts/verify-release-source.sh
-      - scripts/verify_windows_dll_dependencies.py
       - scripts/classify-switchback-inputs.sh
       - tests/test_make_rust_release_contract.py
       - tests/test_rust_artifact_sbom.py

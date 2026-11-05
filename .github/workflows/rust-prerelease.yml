@@ -24,7 +24,6 @@ on:
       - tests/test_immutable_release_publication.py
       - tests/test_homebrew_release_workflow.py
       - scripts/verify-release-source.sh
-      - scripts/verify_windows_dll_dependencies.py
       - tests/verify_release_archives.py
       - README.md
       - LICENSE

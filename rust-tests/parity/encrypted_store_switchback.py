@@ -25,11 +25,6 @@ CASES = ("go-existing-state", "rust-existing-state", "rust-write",
 
 def mcp_command(root, label, argv, env, stdin_bytes, timeout=30):
     """Run one bounded stdio MCP request while retaining protocol evidence."""
-    if sys.platform == "win32":
-        from windows_store_sandbox import command as windows_command
-        record = windows_command(root, label, argv, env, timeout, stdin_bytes=stdin_bytes)
-        gate.require(record["success"], label + ": MCP process failed; retained raw evidence")
-        return record
     import resource
 
     def bounds():

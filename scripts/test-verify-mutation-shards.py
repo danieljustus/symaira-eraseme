@@ -25,23 +25,18 @@ def campaign():
 
 
 class Controls(unittest.TestCase):
-    def test_consent_exclusions_match_windows_source_in_both_consumers(self):
+    def test_inactive_exclusions_match_source_in_both_consumers(self):
         root = pathlib.Path(__file__).resolve().parent.parent
-        lines = (root / "crates/symeraseme-core/src/identity/consent.rs").read_text().splitlines()
-        expected = []
-        for name in ("close_windows_file", "checked_windows_close"):
-            index = next(i for i, line in enumerate(lines) if line.startswith(f"fn {name}("))
-            self.assertIn("#[cfg(windows)]", lines[max(0, index - 2):index])
-            self.assertTrue(lines[index + 1].lstrip().startswith("use "))
-            column = lines[index + 1].index("use ") + 1
-            expected.append(rf'consent\.rs:{index + 2}:{column}: replace {name} .* with Ok\(\(\)\)$')
-        index = next(i for i, line in enumerate(lines) if "if unsafe { CloseHandle(handle) } != 0" in line)
-        column = lines[index].index("!=") + 1
-        expected.append(rf'consent\.rs:{index + 1}:{column}: replace != with == in checked_windows_close$')
+        lines = (root / "crates/symeraseme-cli/src/mcp/http.rs").read_text().splitlines()
+        index = next(i for i, line in enumerate(lines) if "can't assign requested address" in line)
+        self.assertEqual(lines[index - 2], '#[cfg(not(target_os = "linux"))]')
+        expected = [rf'http\.rs:{index + 1}:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$']
         for path in (root / ".github/workflows/rust-hardening.yml",
                      root / "scripts/verify-mutation-shards.py"):
             with self.subTest(path=path.name):
-                self.assertEqual(re.findall(r"r'(consent[^']+)'", path.read_text()), expected)
+                text = path.read_text()
+                self.assertEqual(re.findall(r"r'(http[^']+)'", text), expected)
+                self.assertEqual(re.findall(r"r'(consent[^']+)'", text), [])
 
     def test_complete_disjoint_campaign_passes(self):
         self.assertEqual(shards.verify_group(campaign(), "crypto", 2, "source")["total_mutants"], 2)
