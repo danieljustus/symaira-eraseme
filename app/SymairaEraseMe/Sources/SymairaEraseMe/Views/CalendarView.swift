@@ -6,15 +6,17 @@ struct CalendarView: View {
     @StateObject private var vm = CalendarViewModel()
 
     var body: some View {
-        Page(title: "Calendar", subtitle: "Upcoming deadlines and tick actions", refresh: vm.refresh) {
+        SymairaPage(title: "Calendar", subtitle: "Upcoming deadlines and tick actions") {
             SymairaSegmentedControl(
                 "Weeks", selection: $vm.weeks,
                 options: [(2, "2 weeks"), (4, "4 weeks"), (8, "8 weeks"), (12, "12 weeks")])
             .frame(width: 420)
+            Spacer()
+            PageRefreshButton(title: "Calendar", refresh: vm.refresh)
         } content: {
-            PageState(state: vm.state, loading: "Loading calendar…", retry: vm.refresh) { data in
+            SymairaPageState(state: vm.state.pageState, loading: "Loading calendar…", retry: { Task { await vm.refresh() } }) { data in
                 if data.upcomingDeadlines == nil && vm.tickActions.isEmpty {
-                    PageEmpty(
+                    SymairaPageEmpty(
                         icon: .calendar,
                         title: "No Calendar Data",
                         message: "Create a campaign to see upcoming deadlines."

@@ -93,7 +93,7 @@ final class LiquidTopographyTests: XCTestCase {
                 try await render(
                     settings, name: "Settings-error-\(scheme)-\(Int(width))", width: width, scheme: scheme)
                 manager.lastError = nil
-                let sheet = SheetScaffold(title: "New Campaign", dismiss: {}, primaryTitle: "Create Campaign") {
+                let sheet = SymairaSheetScaffold(title: "New Campaign", dismiss: {}, primaryTitle: "Create Campaign") {
                     SymairaFormSection("Campaign Details") {
                         SymairaFormRow("Campaign ID") {
                             TextField("Campaign ID", text: .constant("srd")).labelsHidden().textFieldStyle(.symaira)

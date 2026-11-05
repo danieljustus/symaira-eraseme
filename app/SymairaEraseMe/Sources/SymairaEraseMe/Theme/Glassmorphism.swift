@@ -69,157 +69,35 @@ extension Label where Title == Text, Icon == SymairaIconView<Int> {
     }
 }
 
-// MARK: - Page scaffold
+// MARK: - Page scaffold glue
 
-/// One grid for every sidebar page: a header zone (title, subtitle, refresh), a toolbar
-/// zone (filters, segments, page actions; kept even when empty) and a content zone that
-/// therefore starts at the same height everywhere. Loading, failure and empty states
-/// replace the whole content zone.
-enum PageLayout {
-    static let maxWidth: CGFloat = 1008
-    static let stateHeight: CGFloat = 240
-    /// Fixed, not minimum: segments and primary buttons are taller than fields, and a
-    /// growing toolbar would push one page's content below another's.
-    static let toolbarHeight: CGFloat = 44
-}
-
-struct Page<Toolbar: View, Content: View>: View {
+/// Header refresh control. `SymairaPage` has no built-in refresh, so every page puts this
+/// as the last item of its fixed-height toolbar zone; Command-R triggers it.
+struct PageRefreshButton: View {
     let title: String
-    /// Required: a one-line header on some pages and two on others misaligns the controls.
-    let subtitle: String
-    /// Lists that scroll themselves (native `Table`) fill the page instead of nesting scroll views.
-    var scrolls = true
     let refresh: () async -> Void
-    @ViewBuilder var toolbar: Toolbar
-    @ViewBuilder var content: Content
 
     var body: some View {
-        let column = VStack(alignment: .leading, spacing: SymairaSpacing.large) {
-            header
-            HStack(spacing: SymairaSpacing.medium) { toolbar }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: PageLayout.toolbarHeight)
-            content
+        Button {
+            Task { await refresh() }
+        } label: {
+            SymairaIconView(.refresh)
         }
-        .padding(SymairaSpacing.xLarge)
-        .frame(maxWidth: PageLayout.maxWidth, maxHeight: scrolls ? nil : .infinity, alignment: .topLeading)
-        .frame(maxWidth: .infinity)
-        if scrolls {
-            ScrollView { column }
-        } else {
-            column
-        }
-    }
-
-    private var header: some View {
-        HStack(alignment: .center, spacing: SymairaSpacing.medium) {
-            VStack(alignment: .leading, spacing: SymairaSpacing.xSmall) {
-                Text(title)
-                    .symairaText(.display)
-                    .foregroundStyle(BrandColors.textPrimary)
-                    .topoProtected()
-                Text(subtitle)
-                    .symairaText(.caption)
-                    .foregroundStyle(BrandColors.textMuted)
-                    .topoProtected()
-            }
-            Spacer(minLength: SymairaSpacing.large)
-            Button {
-                Task { await refresh() }
-            } label: {
-                SymairaIconView(.refresh)
-            }
-            .symairaButtonStyle(.secondary)
-            .accessibilityLabel("Refresh \(title.lowercased())")
-            .topoProtected()
-        }
+        .symairaButtonStyle(.secondary)
+        .keyboardShortcut("r", modifiers: .command)
+        .accessibilityLabel("Refresh \(title.lowercased())")
+        .topoProtected()
     }
 }
 
-extension Page where Toolbar == EmptyView {
-    init(
-        title: String, subtitle: String, scrolls: Bool = true, refresh: @escaping () async -> Void,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.init(
-            title: title, subtitle: subtitle, scrolls: scrolls, refresh: refresh, toolbar: { EmptyView() },
-            content: content)
-    }
-}
-
-/// Loading and failure look identical on every page; `loaded` decides empty vs content.
-struct PageState<Value, Loaded: View>: View {
-    let state: ViewState<Value>
-    let loading: String
-    let retry: () async -> Void
-    @ViewBuilder let loaded: (Value) -> Loaded
-
-    var body: some View {
-        switch state {
-        case .idle, .loading:
-            SymairaLoadingState(loading).frame(height: PageLayout.stateHeight)
-        case .failed(let message):
-            ErrorStateView(message: message) { Task { await retry() } }
-                .frame(height: PageLayout.stateHeight)
-        case .loaded(let value):
-            loaded(value)
+extension ViewState {
+    /// Bridge to the shared page state model rendered by `SymairaPageState`.
+    var pageState: SymairaPageLoadState<T> {
+        switch self {
+        case .idle: .idle
+        case .loading: .loading
+        case .loaded(let value): .loaded(value)
+        case .failed(let message): .failed(message)
         }
-    }
-}
-
-/// Empty result with the shared state height.
-struct PageEmpty: View {
-    let icon: SymairaIcon
-    let title: String
-    let message: String
-
-    var body: some View {
-        SymairaEmptyState(icon: icon, title: title, message: message)
-            .frame(height: PageLayout.stateHeight)
-    }
-}
-
-// MARK: - Sheet scaffold
-
-/// One frame for every sheet: heading, scrolling content and a footer where the
-/// secondary dismiss button sits left of the primary action. Esc and Return work.
-struct SheetScaffold<Content: View>: View {
-    let title: String
-    var dismissTitle = "Cancel"
-    let dismiss: () -> Void
-    var primaryTitle: String?
-    var primaryDisabled = false
-    var primary: () -> Void = {}
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .symairaText(.heading)
-                .foregroundStyle(BrandColors.textPrimary)
-                .padding([.horizontal, .top], SymairaSpacing.xLarge)
-                .padding(.bottom, SymairaSpacing.large)
-            ScrollView {
-                VStack(alignment: .leading, spacing: SymairaSpacing.large) { content }
-                    .padding(.horizontal, SymairaSpacing.xLarge)
-                    .padding(.bottom, SymairaSpacing.large)
-            }
-            Divider().overlay(SymairaTokens.line)
-            HStack(spacing: SymairaSpacing.medium) {
-                Spacer()
-                Button(dismissTitle, action: dismiss)
-                    .symairaButtonStyle(.secondary)
-                    .keyboardShortcut(.cancelAction)
-                if let primaryTitle {
-                    Button(primaryTitle, action: primary)
-                        .symairaButtonStyle(.primary)
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(primaryDisabled)
-                }
-            }
-            .padding(SymairaSpacing.large)
-        }
-        .background(BrandColors.bgDark)
-        .onExitCommand(perform: dismiss)
     }
 }

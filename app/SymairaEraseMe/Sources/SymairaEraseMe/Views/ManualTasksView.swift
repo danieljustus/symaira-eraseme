@@ -9,20 +9,22 @@ struct ManualTasksView: View {
     @State private var completionNotes: String = ""
 
     var body: some View {
-        Page(title: "Manual Tasks", subtitle: "Tasks requiring human intervention", refresh: vm.refresh) {
+        SymairaPage(title: "Manual Tasks", subtitle: "Tasks requiring human intervention") {
             SymairaSegmentedControl(
                 "Filter", selection: $vm.filterStatus,
                 options: [("", "All"), ("pending", "Pending"), ("completed", "Completed")])
             .frame(width: 360)
+            Spacer()
+            PageRefreshButton(title: "Manual Tasks", refresh: vm.refresh)
         } content: {
             if let success = vm.successMessage {
                 SymairaNotice(message: success, tone: .positive)
             }
-            PageState(state: vm.state, loading: "Loading tasks…", retry: vm.refresh) { tasks in
+            SymairaPageState(state: vm.state.pageState, loading: "Loading tasks…", retry: { Task { await vm.refresh() } }) { tasks in
                 // Counts only make sense for loaded data; failures start where every page's content starts.
                 summaryCards
                 if tasks.isEmpty {
-                    PageEmpty(
+                    SymairaPageEmpty(
                         icon: .checklist,
                         title: "No Manual Tasks",
                         message: "No matching tasks. Broker web forms and verification steps are handled here manually."
@@ -84,7 +86,7 @@ struct ManualTasksView: View {
     }
 
     private var completeSheet: some View {
-        SheetScaffold(
+        SymairaSheetScaffold(
             title: "Complete Task",
             dismiss: {
                 showCompleteSheet = false
