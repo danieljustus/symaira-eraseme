@@ -430,9 +430,9 @@ jobs:
           release = json.load(open(sys.argv[1]))
           tag = sys.argv[2]
           version = tag.removeprefix('v')
-          archives = {f'symeraseme_{version}_{system}_{arch}.{extension}'
-                      for system, extension in [('darwin', 'tar.gz'), ('linux', 'tar.gz'), ('windows', 'zip')]
-                      for arch in ('amd64', 'arm64')}
+          # Keep in sync with TARGETS in scripts/stage_rust_release_archives.py.
+          archives = {f'symeraseme_{version}_{system}_{arch}.tar.gz'
+                      for system, arch in [('darwin', 'arm64'), ('linux', 'amd64'), ('linux', 'arm64')]}
           expected = archives | {name + suffix for name in archives for suffix in ('.cdx.json', '.rust-audit.json')}
           expected |= {'checksums.txt', 'sbom-checksums.txt', f'Symaira-EraseMe-{version}-macos.dmg'}
           if release['tag_name'] != tag or release['draft'] is not True or release['prerelease'] is not True:
@@ -450,7 +450,7 @@ jobs:
           names = {p.name for p in pathlib.Path('.').iterdir()}
           if names != {a['name'] for a in json.load(open(sys.argv[1]))['assets']}:
               raise SystemExit('Downloaded assets differ from the complete release')
-          for manifest, suffixes in [('checksums.txt', ('.tar.gz', '.zip', '.dmg')), ('sbom-checksums.txt', ('.json',))]:
+          for manifest, suffixes in [('checksums.txt', ('.tar.gz', '.dmg')), ('sbom-checksums.txt', ('.json',))]:
               entries = [line.split() for line in pathlib.Path(manifest).read_text().splitlines()]
               expected = {name for name in names if name.endswith(suffixes)}
               if not entries or any(len(row) != 2 or not re.fullmatch(r'[0-9a-f]{64}', row[0]) for row in entries):
