@@ -579,6 +579,66 @@ fn seed_store(database: &Path) {
         .expect("apply the frozen rows");
 }
 
+/// The instant the `plan status` / `plan tick` oracle bytes describe.
+///
+/// The Go oracle (recorded with #994 on 2026-09-20) read the frozen rows at its
+/// own `time.Now()`, and the CLI offers no clock injection. Its recorded
+/// outcome holds for any wall clock between the overdue deadline
+/// (2026-08-20 12:00:05) and the confirmed request's 90-day rescan
+/// (2026-11-05 12:00:00); after that the rescan becomes due and `plan tick`
+/// truthfully reports one action. The replay therefore keeps the rows'
+/// distance to the wall clock equal to the distance at this instant.
+const TICK_STATUS_ORACLE_DAY: &str = "2026-09-20 00:00:00";
+
+/// Applies the frozen rows with every instant shifted by whole days, so the
+/// current wall clock sits at the same distance to them as the oracle's did.
+///
+/// A uniform whole-day shift preserves every interval between the rows and
+/// keeps the effective clock within one day after [`TICK_STATUS_ORACLE_DAY`],
+/// well inside the window in which the recorded outcome is valid.
+fn seed_store_at_oracle_distance(database: &Path) {
+    const LAYOUT: &str = "%Y-%m-%d %H:%M:%S";
+    let oracle_day = chrono::NaiveDateTime::parse_from_str(TICK_STATUS_ORACLE_DAY, LAYOUT)
+        .expect("oracle day")
+        .and_utc();
+    let now = chrono::DateTime::<chrono::Utc>::from(SystemTime::now());
+    let elapsed_days = (now - oracle_day).num_days().max(0);
+    let shift = chrono::Duration::days(elapsed_days);
+    let mut shifted = String::with_capacity(TICK_STATUS_SEED.len());
+    let mut instants = 0;
+    for line in TICK_STATUS_SEED.lines() {
+        if line.starts_with("--") {
+            shifted.push_str(line);
+        } else {
+            let mut rest = line;
+            while let Some(start) = rest.find('\'') {
+                let (before, quoted) = rest.split_at(start + 1);
+                shifted.push_str(before);
+                let end = quoted.find('\'').expect("terminated SQL literal");
+                let literal = &quoted[..end];
+                match chrono::NaiveDateTime::parse_from_str(literal, LAYOUT) {
+                    Ok(instant) => {
+                        instants += 1;
+                        shifted.push_str(&(instant + shift).format(LAYOUT).to_string());
+                    }
+                    Err(_) => shifted.push_str(literal),
+                }
+                shifted.push('\'');
+                rest = &quoted[end + 1..];
+            }
+            shifted.push_str(rest);
+        }
+        shifted.push('\n');
+    }
+    // Every created/recorded/state instant in the frozen rows moves together.
+    assert_eq!(instants, 22, "the frozen rows changed their instants");
+    let store = symeraseme_core::storage::Store::open(database).expect("open the seeded store");
+    store
+        .connection()
+        .execute_batch(&shifted)
+        .expect("apply the shifted frozen rows");
+}
+
 /// Replaces the reported instants with the fixture's placeholder.
 ///
 /// Only the fields the oracle itself folds are masked, and each one is parsed as
@@ -667,7 +727,7 @@ fn source_bound_status_and_tick_match_the_go_oracle() {
         let data_dir = root.join(format!("data-{id}"));
         fs::create_dir_all(&home).expect("isolated home");
         fs::create_dir_all(&data_dir).expect("isolated data directory");
-        seed_store(&data_dir.join("symeraseme.db"));
+        seed_store_at_oracle_distance(&data_dir.join("symeraseme.db"));
 
         let output = run_with_data_dir(&argv, &home, &cwd, &capture, index, &data_dir, &[]);
         assert_eq!(
