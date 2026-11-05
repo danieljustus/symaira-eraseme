@@ -126,7 +126,6 @@ fn run(case: &Value, root: &Path, id: &str) -> Output {
         .current_dir(cwd)
         .env_clear()
         .env("HOME", &home)
-        .env("USERPROFILE", &home)
         .env("XDG_CONFIG_HOME", case_root.join("xdg-config"))
         .env("XDG_DATA_HOME", case_root.join("xdg-data"))
         .env("XDG_CACHE_HOME", case_root.join("xdg-cache"))
@@ -144,10 +143,6 @@ fn run(case: &Value, root: &Path, id: &str) -> Output {
         .env("LANG", "C")
         .env("TZ", "UTC")
         .stdin(Stdio::null());
-    #[cfg(windows)]
-    if let Some(system_root) = std::env::var_os("SystemRoot") {
-        command.env("SystemRoot", system_root);
-    }
     command.output().expect("isolated CLI process runs")
 }
 
@@ -286,11 +281,6 @@ fn replay(case: &Value) {
                     .as_object_mut()
                     .expect("entry object")
                     .remove("content");
-                #[cfg(not(unix))]
-                normalized
-                    .as_object_mut()
-                    .expect("entry object")
-                    .remove("mode");
                 (
                     entry["path"].as_str().expect("entry path").to_owned(),
                     normalized,

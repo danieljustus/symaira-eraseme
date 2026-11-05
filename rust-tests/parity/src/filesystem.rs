@@ -27,19 +27,8 @@ pub struct Manifest {
 }
 
 fn mode(metadata: &fs::Metadata) -> u32 {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        metadata.permissions().mode() & 0o7777
-    }
-    #[cfg(not(unix))]
-    {
-        if metadata.permissions().readonly() {
-            0o444
-        } else {
-            0o666
-        }
-    }
+    use std::os::unix::fs::PermissionsExt;
+    metadata.permissions().mode() & 0o7777
 }
 
 pub fn manifest(root: &Path) -> std::io::Result<Manifest> {

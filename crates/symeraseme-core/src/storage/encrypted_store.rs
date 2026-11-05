@@ -8,9 +8,7 @@ use super::store::Store;
 use rand::Rng;
 use rusqlite::Connection;
 use std::collections::{HashMap, HashSet};
-#[cfg(not(windows))]
-use std::fs::File;
-use std::fs::{self, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex, RwLock};
@@ -24,32 +22,6 @@ fn validate_replacement_path(path: &Path) -> io::Result<()> {
         ));
     }
     Ok(())
-}
-
-#[cfg(windows)]
-#[allow(unsafe_code)]
-fn replace_file(source: &Path, target: &Path) -> io::Result<()> {
-    use std::os::windows::ffi::OsStrExt;
-    #[link(name = "kernel32")]
-    unsafe extern "system" {
-        fn MoveFileExW(source: *const u16, target: *const u16, flags: u32) -> i32;
-        fn GetLastError() -> u32;
-    }
-    validate_replacement_path(source)?;
-    validate_replacement_path(target)?;
-    let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
-    let target: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
-    // MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH.
-    // SAFETY: Both paths reject interior NULs. The terminated UTF-16 buffers
-    // remain alive throughout the call, and the flags preserve atomic replacement.
-    let ok = unsafe { MoveFileExW(source.as_ptr(), target.as_ptr(), 0x1 | 0x8) };
-    if ok != 0 {
-        Ok(())
-    } else {
-        Err(io::Error::from_raw_os_error(
-            unsafe { GetLastError() } as i32
-        ))
-    }
 }
 
 /// Cutoff age for stale decrypted temporary files (300 seconds).
@@ -66,11 +38,7 @@ fn default_encrypted_temp_dir() -> Result<PathBuf, EncryptedStoreError> {
     let root = absolute_path(std::env::var_os("HOME").map(PathBuf::from))
         .map(|home| home.join("Library/Caches"))
         .unwrap_or_else(std::env::temp_dir);
-    #[cfg(target_os = "windows")]
-    let root = absolute_path(std::env::var_os("LOCALAPPDATA").map(PathBuf::from))
-        .or_else(|| absolute_path(std::env::var_os("USERPROFILE").map(PathBuf::from)))
-        .unwrap_or_else(std::env::temp_dir);
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(target_os = "macos"))]
     let root = default_unix_cache_root(
         std::env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
         std::env::var_os("HOME").map(PathBuf::from),
@@ -87,12 +55,12 @@ fn checked_temp_root(root: PathBuf) -> Result<PathBuf, EncryptedStoreError> {
     Ok(root.join("symeraseme").join("database"))
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(target_os = "macos")]
 fn absolute_path(path: Option<PathBuf>) -> Option<PathBuf> {
     path.filter(|path| !path.as_os_str().is_empty() && path.is_absolute())
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(not(target_os = "macos"))]
 fn default_unix_cache_root(xdg: Option<PathBuf>, home: Option<PathBuf>) -> PathBuf {
     xdg.filter(|path| path.is_absolute())
         .or_else(|| {
@@ -113,44 +81,13 @@ mod tests {
     use std::time::{Duration, SystemTime};
     use tempfile::tempdir;
 
-    #[cfg(windows)]
-    #[test]
-    fn replace_file_rejects_nul_in_both_paths_without_touching_sentinels() {
-        let dir = tempdir().unwrap();
-        let source = dir.path().join("source.db");
-        let target = dir.path().join("target.db");
-        std::fs::write(&source, b"source sentinel").unwrap();
-        std::fs::write(&target, b"target sentinel").unwrap();
-        for invalid_source in [false, true] {
-            let mut invalid = if invalid_source { &source } else { &target }
-                .as_os_str()
-                .to_os_string();
-            invalid.push("\0ignored-suffix");
-            let invalid = PathBuf::from(invalid);
-            let error = if invalid_source {
-                super::replace_file(&invalid, &target)
-            } else {
-                super::replace_file(&source, &invalid)
-            }
-            .unwrap_err();
-            assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
-            assert_eq!(std::fs::read(&source).unwrap(), b"source sentinel");
-            assert_eq!(std::fs::read(&target).unwrap(), b"target sentinel");
-            assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 2);
-        }
-    }
-
     #[test]
     fn default_temp_dir_is_user_scoped() {
         #[cfg(target_os = "macos")]
         let root = super::absolute_path(std::env::var_os("HOME").map(PathBuf::from))
             .map(|home| home.join("Library/Caches"))
             .unwrap_or_else(std::env::temp_dir);
-        #[cfg(target_os = "windows")]
-        let root = super::absolute_path(std::env::var_os("LOCALAPPDATA").map(PathBuf::from))
-            .or_else(|| super::absolute_path(std::env::var_os("USERPROFILE").map(PathBuf::from)))
-            .unwrap_or_else(std::env::temp_dir);
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(not(target_os = "macos"))]
         let root = super::default_unix_cache_root(
             std::env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
             std::env::var_os("HOME").map(PathBuf::from),
@@ -160,7 +97,7 @@ mod tests {
         assert_eq!(default_encrypted_temp_dir().unwrap(), expected);
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     #[test]
     fn cache_environment_candidates_require_nonempty_absolute_paths() {
         assert_eq!(super::absolute_path(None), None);
@@ -282,7 +219,7 @@ mod tests {
         std::fs::remove_file(temp).unwrap();
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn relative_xdg_cache_path_falls_back_to_absolute_home_cache() {
         assert_eq!(
@@ -539,18 +476,9 @@ pub fn ensure_private_file(path: impl AsRef<Path>, mode: u32) -> io::Result<()> 
 
 /// Syncs the containing directory to ensure durability of renames and directory metadata.
 pub fn sync_dir(dir: impl AsRef<Path>) -> io::Result<()> {
-    #[cfg(windows)]
-    {
-        let _ = dir;
-        Ok(())
-    }
-
-    #[cfg(not(windows))]
-    {
-        let dir = dir.as_ref();
-        let file = File::open(dir)?;
-        file.sync_all()
-    }
+    let dir = dir.as_ref();
+    let file = File::open(dir)?;
+    file.sync_all()
 }
 
 /// Deletes the `-wal` and `-shm` sidecars next to `path`.
@@ -892,17 +820,7 @@ pub fn atomic_transition_with_recovery(
     }
 
     // Atomically replace target
-    let replace = || {
-        #[cfg(windows)]
-        {
-            replace_file(&write_path, target)
-        }
-        #[cfg(not(windows))]
-        {
-            fs::rename(&write_path, target)
-        }
-    };
-    if let Err(err) = replace() {
+    if let Err(err) = fs::rename(&write_path, target) {
         // Rename failed: write_path remains as recovery
         let rec_name = format!(".symeraseme_recovery_{id:016x}.tmp");
         let rec_path = parent.join(rec_name);

@@ -30,22 +30,10 @@ const SURFACE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../rust-tests/parity/cases/cli/surface.json"
 ));
-/// Hang guard for one CLI subprocess, not a performance budget.
-///
-/// A healthy case finishes in tens of milliseconds on Linux/macOS and in
-/// 0.8–2.1 s per whole `plan_populated_paths_match_the_go_bodies` run on a
-/// hosted Windows runner (nine green native runs). In the one observed failure
-/// (issue #1269) process creation and file I/O on the runner stalled for about
-/// a minute: every spawn-heavy test slowed 20–40x (`manual_task_*` 10–24 s
-/// against under 1 s, the plan test 14 s) while the CPU-bound frozen-fixture
-/// tests ran at normal speed. No CLI work was slower, so the guard stays tight
-/// where it already has two orders of magnitude of headroom and only widens on
-/// Windows, where Defender and the hosted disk can stall a spawn.
-const PROCESS_TIMEOUT: Duration = if cfg!(windows) {
-    Duration::from_secs(60)
-} else {
-    Duration::from_secs(10)
-};
+/// Hang guard for one CLI subprocess, not a performance budget. A healthy case
+/// finishes in tens of milliseconds on Linux/macOS, so this keeps two orders of
+/// magnitude of headroom.
+const PROCESS_TIMEOUT: Duration = Duration::from_secs(10);
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_OUTPUT_BYTES: u64 = 4 * 1024 * 1024;
 
@@ -350,23 +338,11 @@ fn terminate_bounded(child: &mut Child) -> std::io::Result<()> {
     ))
 }
 
-#[cfg(unix)]
 fn configure_process_group(command: &mut Command) {
     use std::os::unix::process::CommandExt;
     command.process_group(0);
 }
 
-#[cfg(windows)]
-fn configure_process_group(command: &mut Command) {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    command.creation_flags(CREATE_NEW_PROCESS_GROUP);
-}
-
-#[cfg(not(any(unix, windows)))]
-fn configure_process_group(_command: &mut Command) {}
-
-#[cfg(unix)]
 fn kill_process_tree(child: &Child) -> std::io::Result<()> {
     let group = format!("-{}", child.id());
     let status = Command::new("kill").args(["-KILL", &group]).status()?;
@@ -377,32 +353,6 @@ fn kill_process_tree(child: &Child) -> std::io::Result<()> {
             "kill process group exited {status}"
         )))
     }
-}
-
-#[cfg(windows)]
-fn kill_process_tree(child: &Child) -> std::io::Result<()> {
-    // `taskkill` prints "process not found" (exit 128) when the child already
-    // exited; that is the expected race, so its text is not test output.
-    let status = Command::new("taskkill")
-        .args(["/PID", &child.id().to_string(), "/T", "/F"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()?;
-    if status.success() || status.code() == Some(128) {
-        Ok(())
-    } else {
-        Err(std::io::Error::other(format!(
-            "taskkill process tree exited {status}"
-        )))
-    }
-}
-
-#[cfg(not(any(unix, windows)))]
-fn kill_process_tree(_child: &Child) -> std::io::Result<()> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "process-tree cleanup unsupported on this platform",
-    ))
 }
 
 struct Cleanup(PathBuf);
@@ -840,19 +790,6 @@ fn is_exact_case(case: &Value) -> bool {
         || case["category"] == "migration"
 }
 
-/// Stdout of a recorded Windows case in the replay's folded form. Schedule
-/// wrappers name the Go binary; it folds to the same placeholder as the Rust one.
-#[cfg(windows)]
-fn recorded_stdout(id: &str, observed: &frozen_windows_migration::Observation) -> Vec<u8> {
-    let text = std::str::from_utf8(&observed.stdout).expect("recorded stdout is UTF-8");
-    if id.starts_with("operate-schedule") {
-        text.replace("<GO_ORACLE_BIN>", "<ORACLE_ROOT>/bin/symeraseme")
-            .into_bytes()
-    } else {
-        text.as_bytes().to_vec()
-    }
-}
-
 #[test]
 fn frozen_command_surface_matches_phase_two_contract() {
     frozen_windows_migration::reject_retired_capture_env()
@@ -889,10 +826,6 @@ fn frozen_command_surface_matches_phase_two_contract() {
     fs::create_dir_all(&cwd).expect("isolated cwd");
     fs::create_dir_all(&capture).expect("capture directory");
     let _cleanup = Cleanup(root.clone());
-    #[cfg(windows)]
-    assert_eq!(behavior["commit"], "4e582f28", "pinned CLI oracle commit");
-    #[cfg(windows)]
-    let mut recorded_count = 0usize;
 
     for (index, case) in selected.iter().enumerate() {
         let argv = case["argv"]
@@ -963,26 +896,6 @@ fn frozen_command_surface_matches_phase_two_contract() {
             Some(expected_status),
             "{id} frozen status"
         );
-        // Windows replays the 13 retained native Go records; other hosts keep
-        // the frozen expectations unchanged.
-        #[cfg(windows)]
-        let recorded = frozen_windows_migration::command_ids()
-            .contains(&id)
-            .then(|| {
-                frozen_windows_migration::command_observation(
-                    frozen_windows_migration::native_host_target().expect("native Windows target"),
-                    id,
-                )
-                .expect("retained Windows command record")
-            });
-        #[cfg(windows)]
-        if recorded.is_some() {
-            recorded_count += 1;
-        }
-        #[cfg(windows)]
-        let expected_status = recorded
-            .as_ref()
-            .map_or(expected_status, |observed| observed.status);
         assert_eq!(output.status.code(), Some(expected_status), "{id} status");
         let expected_stdout = match id {
             "root-version" => {
@@ -996,24 +909,6 @@ fn frozen_command_surface_matches_phase_two_contract() {
             .into_bytes(),
             "config-show" => b"data_dir=~/.local/share/symeraseme\nport=8000\n".to_vec(),
             "config-show-json" | "operate-config-show" => b"{\"config\":{\"data_dir\":\"~/.local/share/symeraseme\",\"db_dir\":\"\",\"encrypt_db\":false,\"port\":8000,\"allow_remote\":false},\"success\":true}\n".to_vec(),
-            #[cfg(windows)]
-            "operate-init-profile" => format!(
-                "{{\"profile_path\":{},\"success\":true}}\n",
-                serde_json::to_string(
-                    &root.join("cli")
-                        .join(id)
-                        .join("data")
-                        .join("identity.encrypted")
-                        .to_string_lossy()
-                )
-                .expect("native Go filepath.Join profile path")
-            )
-            .into_bytes(),
-            #[cfg(windows)]
-            _ if recorded.is_some() => recorded_stdout(
-                id,
-                recorded.as_ref().expect("recorded Windows command record"),
-            ),
             _ => decode_base64(case["stdout_base64"].as_str().unwrap()),
         };
         // `plan status` reports a wall clock, so its value is masked before the
@@ -1026,7 +921,7 @@ fn frozen_command_surface_matches_phase_two_contract() {
                 )
             {
                 mask_wall_clock(&output.stdout)
-            } else if id == "operate-init-profile" && !cfg!(windows) {
+            } else if id == "operate-init-profile" {
                 String::from_utf8_lossy(&output.stdout)
                     .replace(&root.to_string_lossy().to_string(), "<ORACLE_ROOT>")
                     .into_bytes()
@@ -1044,12 +939,6 @@ fn frozen_command_surface_matches_phase_two_contract() {
             fold_root(&expected_stdout, &root),
             "{id} stdout"
         );
-        #[cfg(windows)]
-        let expected_stderr = recorded.as_ref().map_or_else(
-            || decode_base64(case["stderr_base64"].as_str().unwrap()),
-            |observed| observed.stderr.clone(),
-        );
-        #[cfg(not(windows))]
         let expected_stderr = decode_base64(case["stderr_base64"].as_str().unwrap());
         assert_eq!(
             fold_root(&output.stderr, &root),
@@ -1091,11 +980,6 @@ fn frozen_command_surface_matches_phase_two_contract() {
     assert!(
         cwd_entries.is_empty(),
         "isolated cwd stayed clean: {cwd_entries:?}"
-    );
-    #[cfg(windows)]
-    assert_eq!(
-        recorded_count, 13,
-        "every retained Windows command record was replayed"
     );
 }
 
@@ -1435,12 +1319,6 @@ fn render_template_accepts_go_double_prefix_normalization() {
     assert_eq!(double_prefix.stderr, canonical.stderr);
 }
 
-#[cfg(windows)]
-const SCHEDULE_FIXTURE: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../tests/fixtures/cli-schedule/cases.json"
-));
-
 /// Writes the native units a case starts with, matching the oracle's seed flags.
 ///
 /// The oracle seeds by case, so the predicates here must name the same cases:
@@ -1594,20 +1472,6 @@ fn schedule_commands_match_the_go_oracle() {
     );
     let cases = fixture["cases"].as_array().expect("cases");
     assert_eq!(cases.len(), 13, "the fixture lost cases");
-    #[cfg(windows)]
-    {
-        let frozen: Value = serde_json::from_str(SCHEDULE_FIXTURE).expect("frozen case inventory");
-        let ids = |fixture: &Value| {
-            fixture["cases"]
-                .as_array()
-                .expect("cases")
-                .iter()
-                .map(|case| case["id"].as_str().expect("case id").to_owned())
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(ids(&fixture), ids(&frozen), "Windows oracle case inventory");
-    }
-
     let root = unique_root();
     let capture = root.join("capture");
     fs::create_dir_all(&capture).expect("capture directory");

@@ -7,7 +7,7 @@ description: >
 version: 1.0.0
 author: Symaira
 license: Apache-2.0
-platforms: [macos, linux, windows]
+platforms: [macos, linux]
 required_environment_variables: []
 metadata:
   hermes:

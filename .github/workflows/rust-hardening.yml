@@ -239,19 +239,7 @@ jobs:
           inactive = []
           if os.environ["MUTATION_SCOPE"] == "HTTP auth":
               inactive = [
-                  r'http\.rs:190:5: replace addr_in_use_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
-                  r'http\.rs:195:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
-                  r'http\.rs:204:5: replace windows_socket_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
-                  r'http\.rs:231:19: replace != with == in windows_socket_message$',
-                  r'http\.rs:247:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
-                  r'http\.rs:296:5: replace write_token_file .* with Ok\(\(\)\)$',
-                  r'http\.rs:313:5: replace create_token_directory .* with Ok\(\(\)\)$',
-              ]
-          elif os.environ["MUTATION_SCOPE"] == "consent":
-              inactive = [
-                  r'consent\.rs:627:5: replace close_windows_file .* with Ok\(\(\)\)$',
-                  r'consent\.rs:639:5: replace checked_windows_close .* with Ok\(\(\)\)$',
-                  r'consent\.rs:643:39: replace != with == in checked_windows_close$',
+                  r'http\.rs:190:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
               ]
           for pattern in inactive:
               command += ["--exclude-re", pattern]

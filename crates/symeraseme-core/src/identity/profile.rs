@@ -894,8 +894,7 @@ impl ProfilePaths {
 
     /// Process adapter, equivalent to Go's `os.UserHomeDir` and path overrides.
     pub fn from_process() -> Self {
-        let home_variable = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
-        let home = std::env::var_os(home_variable)
+        let home = std::env::var_os("HOME")
             .filter(|v| !v.is_empty())
             .map(PathBuf::from);
         let environment = [

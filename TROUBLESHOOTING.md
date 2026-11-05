@@ -141,13 +141,13 @@ not complete stable or Go-retirement technical acceptance. The maintainer
 authorized source retirement and waived only the seven-day post-stable
 observation period on 2026-10-12.
 
-## Windows source build
+## Windows
 
-The current Rust-only source-tree candidate builds on Windows with the Rust
-CLI target: `cargo build --locked -p symeraseme-cli --bin symeraseme-rust`.
-The release workflow defines native Windows target builds. Go implementation
-and module files have been removed; the current build and normal Rust tests
-do not require Go. Frozen Go observations retain their source-provenance checks.
+Windows is not a supported target (see [#1274](https://github.com/danieljustus/symaira-eraseme/issues/1274)).
+The Windows-only source branches were removed in
+[#1276](https://github.com/danieljustus/symaira-eraseme/issues/1276); the source
+tree builds and is tested on macOS arm64 and Linux only. Frozen Go observations
+retain their source-provenance checks, and normal builds and tests need no Go.
 
 ## Reporting a problem
 

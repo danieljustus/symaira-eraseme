@@ -41,7 +41,7 @@ if [[ -s "$changed_paths" ]]; then
       README.md|LICENSE|Makefile|regdata.go|go.mod|go.sum|cmd/*|internal/*|registry/*|\
       scripts/stage_rust_release_archives.py|scripts/rust_artifact_sbom.py|\
       scripts/verify_rust_artifact_sbom.py|scripts/verify-release-source.sh|\
-      scripts/verify_windows_dll_dependencies.py|tests/verify_release_archives.py|\
+      tests/verify_release_archives.py|\
       tests/test_rust_artifact_sbom.py|tests/test_rust_release_workflow.py|\
       tests/test_immutable_release_publication.py|tests/test_homebrew_release_workflow.py|\
       tests/test_make_rust_release_contract.py)

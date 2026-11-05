@@ -350,16 +350,8 @@ impl crate::email::session::ImapDialer for ImapDialer {
     }
 }
 
-/// Go reports Winsock provider initialization failures from `socket`, while
-/// Rust's timed connect returns only the OS error without that operation.
+/// Prefix a dial failure with Go's `connect` operation.
 fn go_dial_cause(error: &std::io::Error) -> String {
-    #[cfg(windows)]
-    if error.raw_os_error() == Some(10106) {
-        return format!(
-            "socket: {}",
-            error.to_string().trim_end_matches(" (os error 10106)")
-        );
-    }
     format!("connect: {}", go_dial_error(error))
 }
 
@@ -929,14 +921,6 @@ fn read_bounded_body(reader: &mut BufReader<IoStream>, len: usize) -> Result<Vec
 mod dial_tests {
     use super::*;
     use crate::email::session::ImapDialer as _;
-
-    #[cfg(windows)]
-    #[test]
-    fn winsock_provider_error_uses_go_socket_wording() {
-        let cause = go_dial_cause(&std::io::Error::from_raw_os_error(10106));
-        assert!(cause.starts_with("socket: "), "{cause}");
-        assert!(!cause.contains("(os error 10106)"), "{cause}");
-    }
 
     #[test]
     fn resolves_hostnames_and_formats_refused_connections_like_go() {

@@ -32,7 +32,6 @@ fn run(binary: &Path, cwd: &Path, args: &[&str], stdin: &[u8], backend: Option<&
         .args(args)
         .current_dir(cwd)
         .env("HOME", cwd.join("home"))
-        .env("USERPROFILE", cwd.join("home"))
         .env("XDG_CONFIG_HOME", cwd.join("config"))
         .env("XDG_DATA_HOME", cwd.join("data"))
         .env("SYMERASEME_DATA_DIR", cwd.join("data"))
@@ -61,17 +60,9 @@ fn retired_backend_override_never_dispatches_a_go_sibling() {
     let project = scratch.0.join("project");
     fs::create_dir(&project).expect("create project working directory");
     fs::write(project.join(".symeraseme.toml"), "port = 8123\n").expect("write project config");
-    let rust = scratch.0.join(if cfg!(windows) {
-        "symeraseme.exe"
-    } else {
-        "symeraseme"
-    });
+    let rust = scratch.0.join("symeraseme");
     fs::copy(env!("CARGO_BIN_EXE_symeraseme-rust"), &rust).expect("stage Rust binary");
-    let sibling = scratch.0.join(if cfg!(windows) {
-        "symeraseme-go.exe"
-    } else {
-        "symeraseme-go"
-    });
+    let sibling = scratch.0.join("symeraseme-go");
     let request = br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"rust-only-test","version":"1"}}}"#;
 
     for present in [false, true] {

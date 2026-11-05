@@ -120,13 +120,8 @@ fn create_layout(root: &Path, files: &[FixtureFile]) -> std::io::Result<PathBuf>
 }
 
 fn set_mode(path: &Path, mode: u32) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
-    }
-    #[cfg(not(unix))]
-    let _ = (path, mode);
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
     Ok(())
 }
 
@@ -153,7 +148,7 @@ fn reject_reserved_environment(case: &Case) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Unix uses a dedicated process group; Windows uses a Job Object.
+/// A dedicated Unix process group lets cleanup terminate descendants.
 #[cfg(unix)]
 struct ProcessTree;
 
@@ -174,181 +169,6 @@ fn configure_process_group(command: &mut Command) -> std::io::Result<ProcessTree
         });
     }
     Ok(ProcessTree)
-}
-
-#[cfg(windows)]
-struct ProcessTree {
-    job: windows_sys::Win32::Foundation::HANDLE,
-}
-
-#[cfg(windows)]
-impl ProcessTree {
-    fn attach(&self, child: &Child) -> std::io::Result<()> {
-        assign_process_to_job(self.job, child)?;
-        resume_suspended_child(child.id())
-    }
-
-    fn terminate(&self, _child: &mut Child) -> std::io::Result<()> {
-        // SAFETY: the owned job handle remains open for this call.
-        let terminated =
-            unsafe { windows_sys::Win32::System::JobObjects::TerminateJobObject(self.job, 1) };
-        if terminated == 0 {
-            Err(std::io::Error::last_os_error())
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[cfg(windows)]
-fn assign_process_to_job(
-    job: windows_sys::Win32::Foundation::HANDLE,
-    child: &Child,
-) -> std::io::Result<()> {
-    use std::os::windows::io::AsRawHandle;
-    // SAFETY: the caller supplies a live job handle and `child` owns a live
-    // process handle for the duration of this call.
-    let assigned = unsafe {
-        windows_sys::Win32::System::JobObjects::AssignProcessToJobObject(
-            job,
-            child.as_raw_handle().cast(),
-        )
-    };
-    if assigned == 0 {
-        Err(std::io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
-}
-
-#[cfg(windows)]
-fn resume_suspended_child(process_id: u32) -> std::io::Result<()> {
-    use std::mem::size_of;
-    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
-    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
-    };
-    use windows_sys::Win32::System::Threading::{OpenThread, ResumeThread, THREAD_SUSPEND_RESUME};
-
-    // SAFETY: a thread snapshot has no pointer inputs and returns an owned handle.
-    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) };
-    if snapshot == INVALID_HANDLE_VALUE {
-        return Err(std::io::Error::last_os_error());
-    }
-    let mut entry = THREADENTRY32 {
-        dwSize: size_of::<THREADENTRY32>() as u32,
-        ..THREADENTRY32::default()
-    };
-    // The child was created suspended, so it cannot create another thread
-    // before its primary thread is resumed.
-    // SAFETY: `entry` is initialized with the required size and snapshot is live.
-    let mut has_entry = unsafe { Thread32First(snapshot, &mut entry) } != 0;
-    let mut primary_thread = None;
-    let mut enumeration_error = if has_entry {
-        None
-    } else {
-        Some(std::io::Error::last_os_error())
-    };
-    while has_entry {
-        if entry.th32OwnerProcessID == process_id {
-            primary_thread = Some(entry.th32ThreadID);
-            break;
-        }
-        // SAFETY: same initialized entry and live snapshot as Thread32First.
-        has_entry = unsafe { Thread32Next(snapshot, &mut entry) } != 0;
-        if !has_entry {
-            enumeration_error = Some(std::io::Error::last_os_error());
-        }
-    }
-    // SAFETY: snapshot is the owned handle returned above.
-    if unsafe { windows_sys::Win32::Foundation::CloseHandle(snapshot) } == 0 {
-        let error = std::io::Error::last_os_error();
-        if enumeration_error.is_none() {
-            enumeration_error = Some(error);
-        }
-    }
-    let thread_id = primary_thread.ok_or_else(|| {
-        enumeration_error.unwrap_or_else(|| {
-            std::io::Error::other("suspended child primary thread was not found")
-        })
-    })?;
-    // SAFETY: the thread ID came from the snapshot of the suspended child.
-    let thread = unsafe { OpenThread(THREAD_SUSPEND_RESUME, 0, thread_id) };
-    if thread.is_null() {
-        return Err(std::io::Error::last_os_error());
-    }
-    // SAFETY: thread is an open handle with THREAD_SUSPEND_RESUME access.
-    let resumed = unsafe { ResumeThread(thread) };
-    let resume_result = if resumed == u32::MAX {
-        Err(std::io::Error::last_os_error())
-    } else {
-        Ok(())
-    };
-    // SAFETY: thread is the owned handle returned by OpenThread.
-    let close_result = if unsafe { windows_sys::Win32::Foundation::CloseHandle(thread) } == 0 {
-        Err(std::io::Error::last_os_error())
-    } else {
-        Ok(())
-    };
-    resume_result.and(close_result)
-}
-
-#[cfg(windows)]
-impl Drop for ProcessTree {
-    fn drop(&mut self) {
-        // KILL_ON_JOB_CLOSE is the final cleanup guard for assigned descendants.
-        // SAFETY: this handle is owned by this guard and closed exactly once.
-        unsafe { windows_sys::Win32::Foundation::CloseHandle(self.job) };
-    }
-}
-
-#[cfg(windows)]
-fn configure_process_group(command: &mut Command) -> std::io::Result<ProcessTree> {
-    use std::mem::size_of;
-    use std::os::windows::process::CommandExt;
-    use std::ptr::null;
-    use windows_sys::Win32::System::JobObjects::{
-        CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-        JobObjectExtendedLimitInformation, SetInformationJobObject,
-    };
-    use windows_sys::Win32::System::Threading::CREATE_SUSPENDED;
-
-    command.creation_flags(CREATE_SUSPENDED);
-
-    // SAFETY: null attributes and name create an unnamed job owned by this process.
-    let job = unsafe { CreateJobObjectW(null(), null()) };
-    if job.is_null() {
-        return Err(std::io::Error::last_os_error());
-    }
-    let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    // SAFETY: `limits` is initialized, correctly aligned, and lives through this call.
-    let configured = unsafe {
-        SetInformationJobObject(
-            job,
-            JobObjectExtendedLimitInformation,
-            (&mut limits as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
-            size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-        )
-    };
-    if configured == 0 {
-        let error = std::io::Error::last_os_error();
-        // SAFETY: job is owned here and no ProcessTree guard exists on this path.
-        unsafe { windows_sys::Win32::Foundation::CloseHandle(job) };
-        return Err(error);
-    }
-    Ok(ProcessTree { job })
-}
-
-#[cfg(not(any(unix, windows)))]
-struct ProcessTree;
-
-#[cfg(not(any(unix, windows)))]
-fn configure_process_group(_command: &mut Command) -> std::io::Result<ProcessTree> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "parity subprocess tree cleanup is unsupported on this platform",
-    ))
 }
 
 #[cfg(unix)]
@@ -384,17 +204,6 @@ impl ProcessTree {
     }
 }
 
-#[cfg(not(any(unix, windows)))]
-impl ProcessTree {
-    fn attach(&self, _child: &Child) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    fn terminate(&self, child: &mut Child) -> std::io::Result<()> {
-        child.kill()
-    }
-}
-
 fn kill_process_group(tree: &ProcessTree, child: &mut Child) -> std::io::Result<()> {
     tree.terminate(child)
 }
@@ -408,22 +217,11 @@ fn terminate_unassigned_child(child: &mut Child) -> std::io::Result<()> {
 }
 
 fn raw_status(status: &std::process::ExitStatus, timed_out: bool) -> RawStatus {
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::ExitStatusExt;
-        RawStatus {
-            exit_code: status.code(),
-            signal: status.signal(),
-            timed_out,
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        RawStatus {
-            exit_code: status.code(),
-            signal: None,
-            timed_out,
-        }
+    use std::os::unix::process::ExitStatusExt;
+    RawStatus {
+        exit_code: status.code(),
+        signal: status.signal(),
+        timed_out,
     }
 }
 
@@ -676,16 +474,6 @@ mod tests {
         }
     }
 
-    #[cfg(windows)]
-    fn dummy(output: &str) -> Program {
-        Program {
-            executable: PathBuf::from("cmd.exe"),
-            // `set /p` requires a variable name; the old command returned 1
-            // before it could exercise subprocess output or fast-exit behavior.
-            argv: vec!["/C".into(), format!("echo {output}")],
-        }
-    }
-
     #[test]
     fn rejects_absolute_root_prefix_and_parent_fixture_paths() {
         let paths = [
@@ -703,9 +491,6 @@ mod tests {
     fn isolates_home_and_cwd_and_captures_raw_bytes() {
         let case = Case::new("isolation", dummy("same"), dummy("same"));
         let result = run_program(&case, &case.go).expect("dummy program runs");
-        #[cfg(windows)]
-        assert_eq!(result.stdout, b"same\r\n");
-        #[cfg(not(windows))]
         assert_eq!(result.stdout, b"same");
         assert_ne!(result.cwd, std::env::current_dir().unwrap());
         assert!(result.home.starts_with(&result.sandbox));
@@ -751,105 +536,5 @@ mod tests {
         };
         let result = run_program(&case, &case.go).expect("timeout is captured");
         assert!(result.status.timed_out);
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn fast_exiting_parent_cleans_up_descendant_holding_inherited_pipes() {
-        const HELPER: &str = "SYMERASEME_PARITY_DESCENDANT_HELPER";
-        const SPAWNED: &str = "SYMERASEME_PARITY_DESCENDANT_SPAWNED";
-        if std::env::var_os(HELPER).is_some() {
-            let system_root = std::env::var("SystemRoot").expect("Windows provides SystemRoot");
-            let mut child =
-                Command::new(PathBuf::from(system_root).join("System32").join("PING.EXE"))
-                    .args(["-n", "10", "127.0.0.1"])
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit())
-                    .spawn()
-                    .expect("launch long-running descendant");
-            thread::sleep(Duration::from_millis(50));
-            assert!(child.try_wait().expect("probe descendant").is_none());
-            println!("{SPAWNED}");
-            return;
-        }
-        let mut case = Case::new("windows-descendant", dummy("same"), dummy("same"));
-        case.environment.values.insert(
-            "SystemRoot".into(),
-            std::env::var("SystemRoot").expect("Windows provides SystemRoot"),
-        );
-        case.environment.values.insert(HELPER.into(), "1".into());
-        case.go = Program {
-            executable: std::env::current_exe().expect("parity test executable"),
-            argv: vec![
-                "--exact".into(),
-                "process::tests::fast_exiting_parent_cleans_up_descendant_holding_inherited_pipes"
-                    .into(),
-                "--nocapture".into(),
-            ],
-        };
-        let started = Instant::now();
-        let result = run_program(&case, &case.go).expect("Job Object cleans up descendants");
-        assert!(
-            started.elapsed() < Duration::from_secs(3),
-            "descendant cleanup took {:?}; parent status={:?}, stdout={:?}, stderr={:?}",
-            started.elapsed(),
-            result.status,
-            result.stdout,
-            result.stderr
-        );
-        assert_eq!(result.status.exit_code, Some(0));
-        assert!(
-            result.stderr.is_empty(),
-            "launch failed: {:?}",
-            result.stderr
-        );
-        assert!(
-            result
-                .stdout
-                .windows(SPAWNED.len())
-                .any(|part| part == SPAWNED.as_bytes()),
-            "descendant helper did not run: {:?}",
-            result.stdout
-        );
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn suspended_fast_exit_is_resumed_after_job_assignment() {
-        let case = Case::new("windows-fast-exit", dummy("same"), dummy("same"));
-        let result = run_program(&case, &case.go).expect("assigned process resumes");
-        assert_eq!(result.stdout, b"same\r\n");
-        assert_eq!(result.status.exit_code, Some(0));
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn timeout_marks_and_terminates_the_job() {
-        let mut case = Case::new("windows-timeout", dummy("same"), dummy("same"));
-        case.timeout = Duration::from_millis(30);
-        let ping = PathBuf::from(std::env::var("SystemRoot").expect("Windows provides SystemRoot"))
-            .join("System32")
-            .join("PING.EXE");
-        case.go = Program {
-            executable: ping,
-            argv: vec!["-n".into(), "10".into(), "127.0.0.1".into()],
-        };
-        let result = run_program(&case, &case.go).expect("timeout is captured");
-        assert!(result.status.timed_out);
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn failed_job_assignment_terminates_and_reaps_suspended_child() {
-        let mut command = Command::new("cmd.exe");
-        command.args(["/C", "exit 0"]);
-        let job = configure_process_group(&mut command).expect("Job Object is created");
-        let mut child = command.spawn().expect("suspended child starts");
-        let error = assign_process_to_job(std::ptr::null_mut(), &child)
-            .expect_err("invalid job handle fails assignment");
-        assert!(!error.to_string().is_empty());
-        terminate_unassigned_child(&mut child).expect("failed assignment child is reaped");
-        drop(job);
     }
 }

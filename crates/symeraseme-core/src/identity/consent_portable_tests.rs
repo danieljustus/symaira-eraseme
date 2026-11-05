@@ -8,27 +8,8 @@ use sha2::{Digest, Sha256};
 
 pub(super) fn close_owned_file(file: fs::File) -> io::Result<()> {
     close_file(file, |file| {
-        #[cfg(unix)]
-        {
-            nix::unistd::close(file).map_err(io::Error::from)
-        }
-        #[cfg(windows)]
-        {
-            close_windows_file(file)
-        }
-        #[cfg(not(any(unix, windows)))]
-        {
-            drop(file);
-            Ok(())
-        }
+        nix::unistd::close(file).map_err(io::Error::from)
     })
-}
-
-#[cfg(windows)]
-fn fixed_store(path: &Path) -> ConsentStore {
-    ConsentStore::new(path)
-        .with_clock(|| 1000)
-        .with_random_source(|length| Ok(vec![7; length]))
 }
 
 fn fixture_case(name: &str) -> Value {
@@ -51,22 +32,6 @@ fn fixture_case(name: &str) -> Value {
     let cases = fixture["cases"].as_array().unwrap();
     assert_eq!(cases.len(), 16);
     cases
-        .iter()
-        .find(|case| case["name"] == name)
-        .unwrap()
-        .clone()
-}
-
-#[cfg(windows)]
-pub(super) fn fault_fixture_case(name: &str) -> Value {
-    let fixture: Value = serde_json::from_str(include_str!(
-        "../../../../tests/fixtures/consent-contract/id005-faults.json"
-    ))
-    .unwrap();
-    assert_eq!(fixture["schema"], "consent-id005-faults-v1");
-    fixture["cases"]
-        .as_array()
-        .unwrap()
         .iter()
         .find(|case| case["name"] == name)
         .unwrap()
@@ -223,34 +188,4 @@ fn id005_destination_conflict_cleans_owned_temp_and_preserves_go_tree() {
     fs::remove_file(&owned_temp).unwrap();
     fs::write(destination.join("sentinel"), "changed destination").unwrap();
     assert!(!matches_go_cleanup(root.path(), true, &expected));
-}
-
-#[cfg(windows)]
-#[test]
-fn id005_windows_checked_close_matches_go_rollback() {
-    let expected = fault_fixture_case("close_failure");
-    let root = tempfile::tempdir().unwrap();
-    let dir = root.path().join("consent");
-    let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([7; 16]);
-    let path = dir.join(token_filename(&token));
-    fs::create_dir_all(&dir).unwrap();
-    fs::write(dir.join(".consent-sentinel.tmp"), "unrelated sentinel").unwrap();
-    fixed_store(&dir).issue_token("before", 60).unwrap();
-
-    let error = atomic_write_with(
-        &path,
-        b"replacement must not be published",
-        fs::File::sync_all,
-        |file| {
-            close_owned_file(file)?;
-            Err(io::Error::other("injected after native checked close"))
-        },
-        |_| panic!("chmod reached after close failure"),
-    )
-    .unwrap_err();
-    // The source-bound Go probe forces os.ErrClosed by pre-closing its file.
-    // Safe Rust cannot recreate that stale owned handle; this checks that the
-    // native Windows close succeeds and later rollback matches Go's tree.
-    assert_eq!(error.to_string(), "injected after native checked close");
-    assert!(matches_go_cleanup(root.path(), true, &expected));
 }

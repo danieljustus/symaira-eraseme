@@ -178,11 +178,7 @@ fn normalize_provider_order(stderr: &[u8]) -> Vec<u8> {
 fn prepare(logs: &Path) -> PathBuf {
     let rust_bin = logs.join("rust-bin");
     fs::create_dir(&rust_bin).unwrap();
-    let rust_agent = rust_bin.join(if cfg!(windows) {
-        "claude.exe"
-    } else {
-        "claude"
-    });
+    let rust_agent = rust_bin.join("claude");
     let mut build = Command::new("rustc");
     build
         .args(["+1.98.0", "--edition=2024", "--crate-type=bin", "-o"])

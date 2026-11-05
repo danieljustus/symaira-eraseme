@@ -943,42 +943,23 @@ fn detect_backend(explicit: &str, on_path: &dyn Fn(&str) -> bool) -> String {
 /// Go's `cliOnPath`: a PATH lookup with the executable bit.
 pub fn cli_on_path(name: &str) -> bool {
     let path = std::env::var_os("PATH");
-    let extensions = platform_path_extensions();
     let allow_relative = std::env::var("GODEBUG")
         .unwrap_or_default()
         .split(',')
         .any(|setting| setting == "execerrdot=0");
     let cwd = std::env::current_dir().ok();
-    cli_on_path_from_with_extensions(
-        name,
-        path.as_deref(),
-        allow_relative,
-        cwd.as_deref(),
-        &extensions,
-    )
+    cli_on_path_from(name, path.as_deref(), allow_relative, cwd.as_deref())
 }
 
-#[cfg(all(unix, test))]
 fn cli_on_path_from(
     name: &str,
     path: Option<&std::ffi::OsStr>,
     allow_relative: bool,
     cwd: Option<&Path>,
 ) -> bool {
-    cli_on_path_from_with_extensions(name, path, allow_relative, cwd, &platform_path_extensions())
-}
-
-fn cli_on_path_from_with_extensions(
-    name: &str,
-    path: Option<&std::ffi::OsStr>,
-    allow_relative: bool,
-    cwd: Option<&Path>,
-    extensions: &[OsString],
-) -> bool {
     let Some(path) = path.filter(|path| !path.is_empty()) else {
         return false;
     };
-    let candidates = executable_candidates(name, extensions);
     for entry in std::env::split_paths(path) {
         let relative = entry.as_os_str().is_empty() || !entry.is_absolute();
         if relative && !allow_relative {
@@ -990,10 +971,7 @@ fn cli_on_path_from_with_extensions(
             } else {
                 cwd.join(&entry)
             };
-            if candidates
-                .iter()
-                .any(|candidate| is_executable(&directory.join(candidate)))
-            {
+            if is_executable(&directory.join(name)) {
                 // Go's exec.LookPath returns ErrDot when a match came from a
                 // relative PATH entry, so AgentClient treats it as unavailable.
                 return false;
@@ -1007,65 +985,11 @@ fn cli_on_path_from_with_extensions(
         } else {
             cwd.map_or_else(|| entry.clone(), |cwd| cwd.join(&entry))
         };
-        if candidates
-            .iter()
-            .any(|candidate| is_executable(&directory.join(candidate)))
-        {
+        if is_executable(&directory.join(name)) {
             return true;
         }
     }
     false
-}
-
-fn executable_candidates(name: &str, extensions: &[OsString]) -> Vec<OsString> {
-    let mut candidates = Vec::new();
-    // Go's Windows findExecutable tries the bare filename only if no
-    // extensions are configured or the last path component already has one.
-    let has_extension = name
-        .rsplit(['/', '\\', ':'])
-        .next()
-        .is_some_and(|component| component.contains('.'));
-    if extensions.is_empty() || has_extension {
-        candidates.push(OsString::from(name));
-    }
-    candidates.extend(extensions.iter().map(|extension| {
-        let mut candidate = OsString::from(name);
-        candidate.push(extension);
-        candidate
-    }));
-    candidates
-}
-
-fn platform_path_extensions() -> Vec<OsString> {
-    #[cfg(windows)]
-    {
-        let pathext = std::env::var_os("PATHEXT");
-        windows_path_extensions(pathext.as_deref())
-    }
-    #[cfg(not(windows))]
-    {
-        Vec::new()
-    }
-}
-
-#[cfg(any(windows, test))]
-fn windows_path_extensions(pathext: Option<&std::ffi::OsStr>) -> Vec<OsString> {
-    let pathext = pathext
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| std::ffi::OsStr::new(".COM;.EXE;.BAT;.CMD"));
-    pathext
-        .to_string_lossy()
-        .split(';')
-        .filter(|extension| !extension.is_empty())
-        .map(|extension| {
-            let normalized = if extension.starts_with('.') {
-                extension.to_owned()
-            } else {
-                format!(".{extension}")
-            };
-            OsString::from(normalized.to_ascii_lowercase())
-        })
-        .collect()
 }
 
 fn is_executable(path: &Path) -> bool {
@@ -1075,15 +999,8 @@ fn is_executable(path: &Path) -> bool {
     if !metadata.is_file() {
         return false;
     }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        metadata.permissions().mode() & 0o111 != 0
-    }
-    #[cfg(not(unix))]
-    {
-        true
-    }
+    use std::os::unix::fs::PermissionsExt;
+    metadata.permissions().mode() & 0o111 != 0
 }
 
 #[cfg(test)]
