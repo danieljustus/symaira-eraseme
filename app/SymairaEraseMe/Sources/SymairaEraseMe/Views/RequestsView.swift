@@ -15,15 +15,15 @@ struct RequestsView: View {
     var body: some View {
         // Not HSplitView: its NSSplitView ignores the toolbar safe area and clips the header.
         HStack(spacing: 0) {
-            Page(
-                title: "Requests", subtitle: "\(vm.total.plainDigits) total requests", scrolls: false,
-                refresh: vm.refresh
+            SymairaPage(
+                title: "Requests", subtitle: "\(vm.total.plainDigits) total requests", scrolls: false
             ) {
                 filters
+                PageRefreshButton(title: "Requests", refresh: vm.refresh)
             } content: {
-                PageState(state: vm.state, loading: "Loading requests…", retry: vm.refresh) { requests in
+                SymairaPageState(state: vm.state.pageState, loading: "Loading requests…", retry: { Task { await vm.refresh() } }) { requests in
                     if requests.isEmpty {
-                        PageEmpty(
+                        SymairaPageEmpty(
                             icon: .mail,
                             title: "No Requests",
                             message: "Create a campaign to generate removal requests."

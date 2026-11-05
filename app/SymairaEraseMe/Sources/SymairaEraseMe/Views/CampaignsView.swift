@@ -9,7 +9,7 @@ struct CampaignsView: View {
     @State private var pendingExecuteId: String?
 
     var body: some View {
-        Page(title: "Campaigns", subtitle: "Removal campaigns and their progress", refresh: vm.refresh) {
+        SymairaPage(title: "Campaigns", subtitle: "Removal campaigns and their progress") {
             Spacer()
             Button {
                 showCreateSheet = true
@@ -17,6 +17,7 @@ struct CampaignsView: View {
                 Label("New Campaign", symairaIcon: .add)
             }
             .symairaButtonStyle(.primary)
+            PageRefreshButton(title: "Campaigns", refresh: vm.refresh)
         } content: {
             if let plan = vm.planResult {
                 SymairaNotice(message: plan.message ?? "Campaign created", tone: .positive)
@@ -24,9 +25,9 @@ struct CampaignsView: View {
             if let exec = vm.executeResult {
                 SymairaNotice(message: exec.message ?? "Execution complete", tone: .positive)
             }
-            PageState(state: vm.state, loading: "Loading campaigns…", retry: vm.refresh) { campaigns in
+            SymairaPageState(state: vm.state.pageState, loading: "Loading campaigns…", retry: { Task { await vm.refresh() } }) { campaigns in
                 if campaigns.isEmpty {
-                    PageEmpty(
+                    SymairaPageEmpty(
                         icon: .announcement,
                         title: "No Campaigns",
                         message: "Create your first campaign to start removing data from brokers."
@@ -82,7 +83,7 @@ struct CampaignsView: View {
 
 
     private var createSheet: some View {
-        SheetScaffold(
+        SymairaSheetScaffold(
             title: "New Campaign",
             dismiss: {
                 showCreateSheet = false

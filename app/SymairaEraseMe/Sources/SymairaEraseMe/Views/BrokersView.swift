@@ -6,12 +6,14 @@ struct BrokersView: View {
     @StateObject private var vm = BrokersViewModel()
 
     var body: some View {
-        Page(title: "Brokers", subtitle: "\(vm.total.plainDigits) brokers in registry", refresh: vm.refresh) {
+        SymairaPage(title: "Brokers", subtitle: "\(vm.total.plainDigits) brokers in registry") {
             filterFields
+            Spacer(minLength: 0)
+            PageRefreshButton(title: "Brokers", refresh: vm.refresh)
         } content: {
-            PageState(state: vm.state, loading: "Loading brokers…", retry: vm.refresh) { _ in
+            SymairaPageState(state: vm.state.pageState, loading: "Loading brokers…", retry: { Task { await vm.refresh() } }) { _ in
                 if vm.filteredBrokers.isEmpty {
-                    PageEmpty(
+                    SymairaPageEmpty(
                         icon: .team,
                         title: "No Brokers Found",
                         message: "Adjust filters or check the broker registry."
@@ -68,7 +70,7 @@ struct BrokersView: View {
     }
 
     private func brokerDetailSheet(_ broker: Broker) -> some View {
-        SheetScaffold(title: "Broker Details", dismissTitle: "Close", dismiss: { vm.selectedBroker = nil }) {
+        SymairaSheetScaffold(title: "Broker Details", dismissTitle: "Close", dismiss: { vm.selectedBroker = nil }) {
             // Header
             VStack(alignment: .leading, spacing: 4) {
                 Text(broker.name)

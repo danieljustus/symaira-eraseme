@@ -7,14 +7,16 @@ struct DashboardView: View {
     @StateObject private var vm = DashboardViewModel()
 
     var body: some View {
-        Page(
+        SymairaPage(
             title: "Dashboard",
-            subtitle: vm.data.map { "Generated \($0.generatedAt.formattedDate)" } ?? "Overview of your removal requests",
-            refresh: vm.refresh
+            subtitle: vm.data.map { "Generated \($0.generatedAt.formattedDate)" } ?? "Overview of your removal requests"
         ) {
-            PageState(state: vm.state, loading: "Loading dashboard…", retry: vm.refresh) { data in
+            Spacer()
+            PageRefreshButton(title: "Dashboard", refresh: vm.refresh)
+        } content: {
+            SymairaPageState(state: vm.state.pageState, loading: "Loading dashboard…", retry: { Task { await vm.refresh() } }) { data in
                 if data.totalRequests == 0 {
-                    PageEmpty(
+                    SymairaPageEmpty(
                         icon: .chart,
                         title: "No Data Yet",
                         message: "Create a campaign to start removing your data from brokers."
@@ -231,24 +233,6 @@ struct EventRow: View {
             }
         }
         .padding(.vertical, 6)
-    }
-}
-
-// MARK: - Error State View
-
-struct ErrorStateView: View {
-    let message: String
-    let onRetry: () -> Void
-
-    var body: some View {
-        SymairaEmptyState(
-            icon: .warning, title: "Failed to Load", message: message
-        ) {
-            Button(action: onRetry) {
-                Label("Retry", symairaIcon: .refresh)
-            }
-            .symairaButtonStyle(.secondary)
-        }
     }
 }
 
