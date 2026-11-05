@@ -62,10 +62,9 @@ impl Runner for ExecRunner {
 /// still find `/bin/launchctl` — a silent behavioural difference from Go, and
 /// one that would run a system binary where Go refuses.
 fn missing_executable(name: &str) -> io::Error {
-    let path_variable = if cfg!(windows) { "%PATH%" } else { "$PATH" };
     io::Error::new(
         io::ErrorKind::NotFound,
-        format!("exec: {name:?}: executable file not found in {path_variable}"),
+        format!("exec: {name:?}: executable file not found in $PATH"),
     )
 }
 
@@ -98,15 +97,8 @@ fn is_executable(path: &Path) -> bool {
     if !metadata.is_file() {
         return false;
     }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        metadata.permissions().mode() & 0o111 != 0
-    }
-    #[cfg(not(unix))]
-    {
-        true
-    }
+    use std::os::unix::fs::PermissionsExt;
+    metadata.permissions().mode() & 0o111 != 0
 }
 
 /// The options Go's `InstallOptions` carries.
@@ -197,23 +189,9 @@ fn resolve_home(options: &InstallOptions<'_>) -> Result<PathBuf, SchedulerError>
     dirs_home().ok_or_else(|| SchedulerError::ResolveHomeDirectory(io::Error::other("no HOME")))
 }
 
-/// Resolves the user's home directory the way Go's `os.UserHomeDir` does.
+/// Resolves the user's home directory the way Go's `os.UserHomeDir` does on Unix.
 fn dirs_home() -> Option<PathBuf> {
-    #[cfg(windows)]
-    {
-        if let Some(profile) = std::env::var_os("USERPROFILE") {
-            return Some(PathBuf::from(profile));
-        }
-        let drive = std::env::var_os("HOMEDRIVE")?;
-        let path = std::env::var_os("HOMEPATH")?;
-        let mut combined = PathBuf::from(drive);
-        combined.push(path);
-        Some(combined)
-    }
-    #[cfg(not(windows))]
-    {
-        std::env::var_os("HOME").map(PathBuf::from)
-    }
+    std::env::var_os("HOME").map(PathBuf::from)
 }
 
 /// Go's `installRoot`: the per-user unit directory for the platform.
@@ -626,10 +604,9 @@ pub fn uninstall(options: &InstallOptions<'_>) -> Result<(), SchedulerError> {
 mod tests {
     #[test]
     fn missing_executable_matches_go_platform_wording() {
-        let variable = if cfg!(windows) { "%PATH%" } else { "$PATH" };
         assert_eq!(
             super::missing_executable("launchctl").to_string(),
-            format!("exec: \"launchctl\": executable file not found in {variable}")
+            "exec: \"launchctl\": executable file not found in $PATH"
         );
     }
 }

@@ -104,17 +104,11 @@ fn which_systemctl() -> Option<PathBuf> {
 /// Matches Go's `exec.LookPath`, which on Unix skips a `PATH` candidate that
 /// exists but is not executable rather than accepting the first same-named
 /// file it finds.
-#[cfg(unix)]
 fn is_executable_file(path: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
     fs::metadata(path)
         .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
         .unwrap_or(false)
-}
-
-#[cfg(not(unix))]
-fn is_executable_file(path: &Path) -> bool {
-    path.is_file()
 }
 
 /// Describes the schedule to generate. Default values select the Python
@@ -316,7 +310,6 @@ pub fn resolve_binary_path(explicit: &str) -> Result<String, SchedulerError> {
 /// directory into every generated wrapper — a real behavioural difference, not
 /// a cosmetic one.
 fn working_directory() -> io::Result<PathBuf> {
-    #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
         if let Some(pwd) = env::var_os("PWD") {
@@ -514,11 +507,7 @@ fn is_safe_relative_filename(name: &str) -> bool {
         return false;
     }
     let path = Path::new(name);
-    // `has_root` alone misses a Windows drive-relative prefix like `C:temp`
-    // (a `Prefix` component with no following root), which `is_absolute`
-    // also misses since it requires *both* a prefix and a root; reject
-    // either shape rather than relying on `is_absolute` alone.
-    if path.has_root() || path.components().any(|c| matches!(c, Component::Prefix(_))) {
+    if path.has_root() {
         return false;
     }
     let clean = lexically_clean(path);
@@ -539,7 +528,6 @@ fn write_with_mode(path: &Path, contents: &[u8], mode: u32) -> io::Result<()> {
     // Go's os.WriteFile applies its mode only when creating a file. On an
     // existing file its truncating write preserves the file's current mode.
     // Keep that behavior while retaining the atomic replacement used here.
-    #[cfg(unix)]
     let mode = match fs::metadata(path) {
         Ok(metadata) => {
             use std::os::unix::fs::PermissionsExt;
@@ -565,15 +553,8 @@ fn write_with_mode(path: &Path, contents: &[u8], mode: u32) -> io::Result<()> {
 }
 
 fn tighten_permissions(path: &Path, mode: u32) -> io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = (path, mode);
-    }
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
     Ok(())
 }
 
@@ -707,13 +688,10 @@ pub fn detect_legacy_python_units(paths: &[PathBuf]) -> io::Result<Vec<LegacyUni
     Ok(units)
 }
 
-#[cfg(windows)]
-const HOME_ENV_VAR: &str = "USERPROFILE";
-#[cfg(not(windows))]
 const HOME_ENV_VAR: &str = "HOME";
 
-/// Matches `os.UserHomeDir()`'s Unix/Windows behavior: `$HOME` (or
-/// `%USERPROFILE%` on Windows), erroring when unset or empty.
+/// Matches `os.UserHomeDir()`'s Unix behavior: `$HOME`, erroring when unset
+/// or empty.
 fn resolve_home_dir() -> io::Result<PathBuf> {
     match env::var_os(HOME_ENV_VAR) {
         Some(value) if !value.is_empty() => Ok(PathBuf::from(value)),
@@ -859,7 +837,6 @@ mod tests {
         assert_eq!(written[0].file_name().unwrap(), "a.sh");
         assert_eq!(written[1].file_name().unwrap(), "z.txt");
 
-        #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             let sh_mode = fs::metadata(&written[0]).unwrap().permissions().mode() & 0o777;
@@ -895,17 +872,6 @@ mod tests {
         // real segment, matching Go's filepath.Clean("a/b/../../c") == "c".
         assert!(is_safe_relative_filename("a/b/../../c"));
         assert!(is_safe_relative_filename("install.sh"));
-    }
-
-    #[test]
-    #[cfg(windows)]
-    fn is_safe_relative_filename_rejects_windows_rooted_and_drive_relative_forms() {
-        // Rooted with no prefix: `is_absolute()` is false for this shape,
-        // so a check based on `is_absolute()` alone would wrongly accept it.
-        assert!(!is_safe_relative_filename(r"\Windows\System32\evil.sh"));
-        // Drive-relative with no root: also `is_absolute() == false`.
-        assert!(!is_safe_relative_filename(r"C:temp\evil.sh"));
-        assert!(!is_safe_relative_filename(r"C:\Windows\evil.sh"));
     }
 
     #[test]
@@ -1021,7 +987,6 @@ mod tests {
         let temp = tempfile::tempdir().expect("tempdir");
         let path = temp.path().join("script.sh");
         write_with_mode(&path, b"#!/bin/sh\n", 0o755).expect("write with mode");
-        #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;

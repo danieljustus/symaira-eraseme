@@ -20,32 +20,6 @@ mod imap_server;
 const TEST: &str = "oauth2_transport_uses_configured_platform_roots_and_rejects_bad_chains";
 const CHILD: &str = "SYMERASEME_OAUTH_TRUST_CASE";
 
-#[cfg(windows)]
-fn inspect_windows_root() {
-    use schannel::cert_context::ValidUses;
-    use schannel::cert_store::CertStore;
-    let expected =
-        CertificateDer::from_pem_file(std::env::var("SYMERASEME_OAUTH_TEST_ROOT").unwrap())
-            .unwrap();
-    assert!(std::env::var_os("SSL_CERT_FILE").is_none());
-    assert!(std::env::var_os("SSL_CERT_DIR").is_none());
-    let store = CertStore::open_local_machine("ROOT").unwrap();
-    let cert = store
-        .certs()
-        .find(|cert| cert.to_der() == expected.as_ref())
-        .expect("the exact owned CA must be present in Windows LocalMachine ROOT");
-    eprintln!(
-        "native owned CA time_valid={:?} valid_uses={:?}",
-        cert.is_time_valid(),
-        cert.valid_uses().map(|uses| match uses {
-            ValidUses::All => vec!["all".to_owned()],
-            ValidUses::Oids(oids) => oids,
-        })
-    );
-    let mut parsed = rustls::RootCertStore::empty();
-    eprintln!("native owned CA rustls_parse={:?}", parsed.add(expected));
-}
-
 fn check_imap(case: &str) {
     let cert_path = std::env::var("SYMERASEME_OAUTH_TEST_CERT").unwrap();
     let key_path = std::env::var("SYMERASEME_OAUTH_TEST_KEY").unwrap();
@@ -272,16 +246,6 @@ impl InstalledRoot {
             .unwrap();
             root.installed = true;
         }
-        #[cfg(windows)]
-        {
-            checked(
-                Command::new("certutil")
-                    .args(["-addstore", "Root"])
-                    .arg(source),
-            )
-            .unwrap();
-            root.installed = true;
-        }
         root
     }
 
@@ -399,8 +363,6 @@ print('owned CA native store and external entry absent; unrelated admin trust se
                 "/Library/Keychains/System.keychain",
             ]))?;
         }
-        #[cfg(windows)]
-        checked(Command::new("certutil").args(["-delstore", "Root", &self.name]))?;
         self.installed = false;
         Ok(())
     }
@@ -499,10 +461,6 @@ fn serve_connection(listener: TcpListener, config: ServerConfig) -> Vec<u8> {
 #[test]
 fn oauth2_transport_uses_configured_platform_roots_and_rejects_bad_chains() {
     if let Ok(case) = std::env::var(CHILD) {
-        #[cfg(windows)]
-        if std::env::var_os("SYMERASEME_NATIVE_TRUST_CHILD").is_some() && case == "trusted" {
-            inspect_windows_root();
-        }
         let (endpoint, server) = serve(
             Path::new(&std::env::var("SYMERASEME_OAUTH_TEST_CERT").unwrap()),
             Path::new(&std::env::var("SYMERASEME_OAUTH_TEST_KEY").unwrap()),

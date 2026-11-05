@@ -502,14 +502,8 @@ fn loader_rejects_aliases_and_malformed_yaml_deterministically() {
     assert!(load_from_dir(too_many_nodes.path()).is_err());
 }
 
-#[cfg(unix)]
 fn symlink_file(original: &Path, link: &Path) -> std::io::Result<()> {
     std::os::unix::fs::symlink(original, link)
-}
-
-#[cfg(windows)]
-fn symlink_file(original: &Path, link: &Path) -> std::io::Result<()> {
-    std::os::windows::fs::symlink_file(original, link)
 }
 
 fn tempfile_root() -> tempfile::TempDir {

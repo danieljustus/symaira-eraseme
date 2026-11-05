@@ -35,7 +35,7 @@ const FROZEN_WINDOWS: &[u8] =
 #[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
 mod go_source_pin;
 
-/// Linux, Windows and Mac require their actual source-bound native captures.
+/// Linux and Mac require their actual source-bound native captures.
 fn selected_oracle_capture() -> &'static Value {
     static CAPTURE: OnceLock<Value> = OnceLock::new();
     CAPTURE.get_or_init(|| {
@@ -43,14 +43,6 @@ fn selected_oracle_capture() -> &'static Value {
             Ok("0") | Err(std::env::VarError::NotPresent) => {
                 if cfg!(target_os = "linux") {
                     return verified_frozen_install(FROZEN_OBSERVATIONS);
-                }
-                if cfg!(windows) {
-                    let arch = match std::env::consts::ARCH {
-                        "x86_64" => "amd64",
-                        "aarch64" => "arm64",
-                        other => panic!("no actual Windows install capture for {other}"),
-                    };
-                    return verified_native_install(FROZEN_WINDOWS, "windows", arch);
                 }
                 if cfg!(target_os = "macos") {
                     let arch = match std::env::consts::ARCH {
@@ -338,8 +330,8 @@ impl Runner for RecordingRunner {
 fn normalize_path(value: &str, case_root: &Path, temp_root: &Path) -> String {
     // Fold HOME first: the later root folding would rewrite the raw path into
     // `<TMPROOT>/<case>/home`, after which the raw form no longer matches.
-    let home = path_slashes(&case_root.join("home").to_string_lossy(), cfg!(windows));
-    let folded = path_slashes(value, cfg!(windows)).replace(&home, "\u{1}HOME\u{1}");
+    let home = path_slashes(&case_root.join("home").to_string_lossy(), false);
+    let folded = path_slashes(value, false).replace(&home, "\u{1}HOME\u{1}");
     normalize(&folded, case_root, temp_root).replace("\u{1}HOME\u{1}", "<HOME>")
 }
 
@@ -367,15 +359,15 @@ fn path_slashes_preserves_unix_and_normalizes_windows() {
 /// Folds the volatile roots the way the capture does, so hashes and command
 /// lines agree across machines.
 fn normalize(value: &str, case_root: &Path, temp_root: &Path) -> String {
-    let mut out = path_slashes(value, cfg!(windows));
-    let temp = path_slashes(&temp_root.to_string_lossy(), cfg!(windows));
-    let case = path_slashes(&case_root.to_string_lossy(), cfg!(windows));
+    let mut out = path_slashes(value, false);
+    let temp = path_slashes(&temp_root.to_string_lossy(), false);
+    let case = path_slashes(&case_root.to_string_lossy(), false);
     out = out.replace(&temp, "<TMPROOT>");
     out = out.replace(&case, "<CASE>");
     // The crontab staging file lives in the system temp directory, whose form
     // differs by platform: macOS keeps a trailing separator ("/var/folders/.../T/"),
     // Linux does not ("/tmp"). Trim it to match Go's folding.
-    let staging = path_slashes(&std::env::temp_dir().to_string_lossy(), cfg!(windows));
+    let staging = path_slashes(&std::env::temp_dir().to_string_lossy(), false);
     let staging = staging.trim_end_matches('/');
     out = out.replace(
         &format!("{staging}/.symeraseme-crontab-"),
@@ -413,7 +405,6 @@ fn capture(
 ) -> (BTreeMap<String, String>, BTreeMap<String, String>) {
     use sha2::{Digest, Sha256};
     let mut hashes = BTreeMap::new();
-    #[cfg_attr(windows, allow(unused_mut))]
     let mut modes = BTreeMap::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(current) = stack.pop() {
@@ -594,24 +585,8 @@ fn rust_install_status_uninstall_match_the_go_capture() {
     let document = selected_oracle_capture();
     let committed: Value = serde_json::from_str(FIXTURE).expect("committed fixture is JSON");
     assert_eq!(document["runner_script"], committed["runner_script"]);
-    let live_cases = comparable_fixture_cases(&document["cases"], cfg!(windows));
-    let committed_cases = comparable_fixture_cases(&committed["cases"], cfg!(windows));
-    #[cfg(windows)]
-    for (name, case) in document["cases"].as_object().expect("cases object") {
-        assert_eq!(
-            case["files"]
-                .as_object()
-                .expect("files object")
-                .keys()
-                .collect::<Vec<_>>(),
-            committed["cases"][name]["files"]
-                .as_object()
-                .expect("files object")
-                .keys()
-                .collect::<Vec<_>>(),
-            "{name}: generated file inventory differs from the Unix fixture"
-        );
-    }
+    let live_cases = comparable_fixture_cases(&document["cases"], false);
+    let committed_cases = comparable_fixture_cases(&committed["cases"], false);
     assert_eq!(
         live_cases, committed_cases,
         "the committed fixture no longer matches live Go behaviour; regenerate it"
@@ -755,7 +730,6 @@ fn rust_install_status_uninstall_match_the_go_capture() {
             );
         }
 
-        #[cfg_attr(windows, allow(unused_variables))]
         let (hashes, modes) = capture(&case_root, &case_root, &root);
         let expected_files: BTreeMap<String, String> =
             serde_json::from_value(case["files"].clone()).expect("files shape");

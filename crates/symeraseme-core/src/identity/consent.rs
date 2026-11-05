@@ -461,7 +461,6 @@ impl ConsentStore {
     fn ensure_directory(&self) -> io::Result<()> {
         let mut builder = fs::DirBuilder::new();
         builder.recursive(true);
-        #[cfg(unix)]
         {
             use std::os::unix::fs::DirBuilderExt;
             builder.mode(CONSENT_DIR_MODE);
@@ -512,25 +511,12 @@ impl ConsentStore {
 
 /// Return the configured default data directory used for consent files.
 pub fn default_consent_directory() -> io::Result<PathBuf> {
-    let home = consent_home_from_environment(
-        std::env::var_os("HOME"),
-        std::env::var_os("USERPROFILE"),
-        cfg!(windows),
-    );
+    let home = consent_home_from_environment(std::env::var_os("HOME"));
     consent_directory_from(std::env::var("SYMERASEME_DATA_DIR").ok(), home.as_deref())
 }
 
-fn consent_home_from_environment(
-    home: Option<std::ffi::OsString>,
-    userprofile: Option<std::ffi::OsString>,
-    windows: bool,
-) -> Option<PathBuf> {
-    let value = if windows { userprofile } else { home }?;
-    if value.is_empty() {
-        None
-    } else {
-        Some(PathBuf::from(value))
-    }
+fn consent_home_from_environment(home: Option<std::ffi::OsString>) -> Option<PathBuf> {
+    home.filter(|value| !value.is_empty()).map(PathBuf::from)
 }
 
 fn consent_directory_from(data_dir: Option<String>, home: Option<&Path>) -> io::Result<PathBuf> {
@@ -573,20 +559,8 @@ fn atomic_write(path: &Path, body: &[u8]) -> io::Result<()> {
         fs::File::sync_all,
         |file| {
             close_file(file, |file| {
-                #[cfg(unix)]
-                {
-                    // Transfer the owner once; retain native EINTR and other errors.
-                    nix::unistd::close(file).map_err(io::Error::from)
-                }
-                #[cfg(windows)]
-                {
-                    close_windows_file(file)
-                }
-                #[cfg(not(any(unix, windows)))]
-                {
-                    drop(file);
-                    Ok(())
-                }
+                // Transfer the owner once; retain native EINTR and other errors.
+                nix::unistd::close(file).map_err(io::Error::from)
             })
         },
         chmod_temporary,
@@ -637,70 +611,24 @@ fn directory_create_error(error: io::Error, is_file: impl FnOnce() -> bool) -> i
     }
 }
 
-#[cfg(windows)]
-fn close_windows_file(file: fs::File) -> io::Result<()> {
-    use std::os::windows::io::IntoRawHandle;
-
-    let handle = file.into_raw_handle();
-    // SAFETY: `file` owns this live handle. Consuming it above transfers its
-    // sole ownership here; CloseHandle is called exactly once and no `File`
-    // drop can close or reuse the handle afterward.
-    checked_windows_close(handle)
-}
-
-#[cfg(windows)]
-#[allow(unsafe_code)]
-fn checked_windows_close(handle: windows_sys::Win32::Foundation::HANDLE) -> io::Result<()> {
-    use windows_sys::Win32::Foundation::CloseHandle;
-    // SAFETY: CloseHandle validates the opaque kernel handle. Production
-    // transfers one live owner above; the native negative control supplies
-    // a null handle without constructing a stale owned File.
-    if unsafe { CloseHandle(handle) } != 0 {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
-}
-
 fn chmod_temporary(path: &Path) -> io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        // The temporary entry is a file. Apply the required mode directly,
-        // matching Go's checked Chmod without an extra metadata failure path.
-        fs::set_permissions(path, fs::Permissions::from_mode(CONSENT_FILE_MODE))
-    }
-    #[cfg(not(unix))]
-    tighten_permissions(path)
+    use std::os::unix::fs::PermissionsExt;
+    // The temporary entry is a file. Apply the required mode directly,
+    // matching Go's checked Chmod without an extra metadata failure path.
+    fs::set_permissions(path, fs::Permissions::from_mode(CONSENT_FILE_MODE))
 }
 
 fn tighten_permissions(path: &Path) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
     let metadata = fs::metadata(path)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut permissions = metadata.permissions();
-        let mode = if metadata.is_dir() {
-            CONSENT_DIR_MODE
-        } else {
-            CONSENT_FILE_MODE
-        };
-        permissions.set_mode(mode);
-        fs::set_permissions(path, permissions)?;
-    }
-    #[cfg(windows)]
-    #[allow(clippy::permissions_set_readonly_false)]
-    {
-        // Go's os.Chmod on Windows maps the owner-write bit to read-only.
-        // POSIX modes/ACL equivalence require separate native evidence.
-        let mut permissions = metadata.permissions();
-        permissions.set_readonly(false);
-        fs::set_permissions(path, permissions)?;
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = metadata;
-    }
+    let mut permissions = metadata.permissions();
+    let mode = if metadata.is_dir() {
+        CONSENT_DIR_MODE
+    } else {
+        CONSENT_FILE_MODE
+    };
+    permissions.set_mode(mode);
+    fs::set_permissions(path, permissions)?;
     Ok(())
 }
 
@@ -711,10 +639,6 @@ mod filesystem_tests;
 #[cfg(test)]
 #[path = "consent_portable_tests.rs"]
 mod portable_filesystem_tests;
-
-#[cfg(all(test, windows))]
-#[path = "consent_windows_tests.rs"]
-mod windows_filesystem_tests;
 
 #[cfg(test)]
 mod tests {
@@ -773,25 +697,6 @@ mod tests {
         ConsentStore::new(directory)
             .with_clock(|| 1_000_000)
             .with_random_source(|length| Ok((0..length).map(|value| value as u8).collect()))
-    }
-
-    #[test]
-    fn windows_consent_directory_uses_userprofile() {
-        use std::ffi::OsString;
-
-        let home = consent_home_from_environment(
-            Some(OsString::from("/unix/home")),
-            Some(OsString::from("/windows/profile")),
-            true,
-        );
-        assert_eq!(
-            consent_directory_from(None, home.as_deref()).unwrap(),
-            PathBuf::from("/windows/profile/.local/share/symeraseme")
-        );
-        assert_eq!(
-            consent_directory_from(Some("~/custom-data".to_owned()), home.as_deref()).unwrap(),
-            PathBuf::from("/windows/profile/custom-data")
-        );
     }
 
     #[test]
@@ -976,22 +881,6 @@ mod tests {
         assert_eq!(file_mode, CONSENT_FILE_MODE);
     }
 
-    #[cfg(windows)]
-    #[test]
-    fn readonly_permission_is_cleared_on_windows() {
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("consent.tmp");
-        fs::write(&path, b"consent").unwrap();
-        let mut permissions = fs::metadata(&path).unwrap().permissions();
-        permissions.set_readonly(true);
-        fs::set_permissions(&path, permissions).unwrap();
-        assert!(fs::metadata(&path).unwrap().permissions().readonly());
-
-        tighten_permissions(&path).unwrap();
-
-        assert!(!fs::metadata(&path).unwrap().permissions().readonly());
-    }
-
     #[allow(dead_code)]
     fn _fixed_clock_is_not_wall_clock() -> i64 {
         SystemTime::now()
@@ -1017,15 +906,12 @@ mod tests {
     fn consent_home_treats_an_empty_home_as_missing() {
         use std::ffi::OsString;
 
+        assert_eq!(consent_home_from_environment(Some(OsString::new())), None);
         assert_eq!(
-            consent_home_from_environment(Some(OsString::new()), None, false),
-            None
-        );
-        assert_eq!(
-            consent_home_from_environment(Some(OsString::from("/home/person")), None, false),
+            consent_home_from_environment(Some(OsString::from("/home/person"))),
             Some(PathBuf::from("/home/person"))
         );
-        assert_eq!(consent_home_from_environment(None, None, false), None);
+        assert_eq!(consent_home_from_environment(None), None);
     }
 
     /// MkdirAll's fail-closed contract: a file obstructing the consent path

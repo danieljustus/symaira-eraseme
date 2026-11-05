@@ -389,59 +389,23 @@ fn configure_process_group(command: &mut Command) -> std::io::Result<()> {
     Ok(())
 }
 
-#[cfg(unix)]
 fn kill_process_tree(child: &mut Child) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        unsafe extern "C" {
-            fn kill(pid: i32, signal: i32) -> i32;
-        }
-        let pid =
-            i32::try_from(child.id()).map_err(|_| std::io::Error::other("invalid child pid"))?;
-        const SIGKILL: i32 = 9;
-        let result = unsafe { kill(-pid, SIGKILL) };
-        if result != 0 {
-            let error = std::io::Error::last_os_error();
-            if error.raw_os_error() != Some(3)
-                    // Darwin: EPERM (1) for a group of only unreaped zombies.
-                    && !(cfg!(target_os = "macos") && error.raw_os_error() == Some(1))
-            {
-                return Err(error);
-            }
-        }
-        Ok(())
+    unsafe extern "C" {
+        fn kill(pid: i32, signal: i32) -> i32;
     }
-    #[cfg(windows)]
-    {
-        if child.try_wait()?.is_some() {
-            return Ok(());
+    let pid = i32::try_from(child.id()).map_err(|_| std::io::Error::other("invalid child pid"))?;
+    const SIGKILL: i32 = 9;
+    let result = unsafe { kill(-pid, SIGKILL) };
+    if result != 0 {
+        let error = std::io::Error::last_os_error();
+        if error.raw_os_error() != Some(3)
+            // Darwin: EPERM (1) for a group of only unreaped zombies.
+            && !(cfg!(target_os = "macos") && error.raw_os_error() == Some(1))
+        {
+            return Err(error);
         }
-        let status = Command::new("taskkill")
-            .args(["/PID", &child.id().to_string(), "/T", "/F"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()?;
-        if !status.success() {
-            // taskkill can lose a race with a process that exits after the
-            // preflight check. Treat that already-completed cleanup as
-            // idempotent; a still-running process remains a hard failure.
-            if child.try_wait()?.is_some() {
-                return Ok(());
-            }
-            return Err(std::io::Error::other(
-                "taskkill failed to clean oracle tree",
-            ));
-        }
-        Ok(())
     }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = child;
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "oracle process-tree cleanup is unsupported on this platform",
-        ))
-    }
+    Ok(())
 }
 
 #[cfg(unix)]

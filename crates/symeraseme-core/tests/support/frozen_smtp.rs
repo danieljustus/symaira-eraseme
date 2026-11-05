@@ -257,14 +257,8 @@ impl Corpus {
     pub fn observation(&self, name: &str, input: &[u8]) -> (std::process::Output, Vec<String>) {
         let case = self.case(name);
         assert_eq!(self.input(name), input, "original SMTP input changed");
-        #[cfg(unix)]
         let status = {
             use std::os::unix::process::ExitStatusExt;
-            std::process::ExitStatus::from_raw(0)
-        };
-        #[cfg(windows)]
-        let status = {
-            use std::os::windows::process::ExitStatusExt;
             std::process::ExitStatus::from_raw(0)
         };
         (

@@ -27,7 +27,6 @@ fn go_fixture() -> serde_json::Value {
     fixture
 }
 
-#[cfg(unix)]
 #[test]
 fn relative_path_hit_matches_real_go_agent_availability() {
     use std::ffi::OsStr;
@@ -90,68 +89,4 @@ fn production_factory_defers_agent_resolution_until_first_availability_check() {
     // The production factory's unresolved cache must use the first probe result.
     assert!(client.resolve_backend(&|name| name == "claude").1);
     assert_eq!(client.resolved_backend(), "claude");
-}
-
-#[test]
-fn windows_pathext_candidates_follow_go_path_extension_rules() {
-    use std::ffi::OsStr;
-    use std::fs;
-
-    let fixture = go_fixture();
-    // The source-pinned fixture confirms the shared first-probe availability
-    // contract. The PATHEXT cases below exercise Go 1.27.1's Windows
-    // exec.LookPath extension rules; native Windows execution remains a CI gate.
-    assert_eq!(fixture["available_after_path_change"], true);
-
-    let extensions = super::windows_path_extensions(Some(OsStr::new("EXE;.CMD")));
-    assert_eq!(extensions, [OsStr::new(".exe"), OsStr::new(".cmd")]);
-    assert_eq!(
-        super::windows_path_extensions(None),
-        [
-            OsStr::new(".com"),
-            OsStr::new(".exe"),
-            OsStr::new(".bat"),
-            OsStr::new(".cmd")
-        ]
-    );
-
-    let root = tempfile::tempdir().expect("isolated PATH directory");
-    let executable = root.path().join("claude.exe");
-    fs::write(&executable, "fake CLI").expect("write Windows-style executable");
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&executable, fs::Permissions::from_mode(0o700))
-            .expect("make synthetic executable runnable");
-    }
-    assert!(super::cli_on_path_from_with_extensions(
-        "claude",
-        Some(root.path().as_os_str()),
-        false,
-        None,
-        &super::windows_path_extensions(Some(OsStr::new(".EXE"))),
-    ));
-
-    fs::remove_file(executable).unwrap();
-    let bare = root.path().join("claude");
-    fs::write(&bare, "extensionless native PATH control").unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&bare, fs::Permissions::from_mode(0o700)).unwrap();
-    }
-    assert!(!super::cli_on_path_from_with_extensions(
-        "claude",
-        Some(root.path().as_os_str()),
-        false,
-        None,
-        &super::windows_path_extensions(Some(OsStr::new(".EXE"))),
-    ));
-    assert!(super::cli_on_path_from_with_extensions(
-        "claude",
-        Some(root.path().as_os_str()),
-        false,
-        None,
-        &super::windows_path_extensions(Some(OsStr::new(";"))),
-    ));
 }
