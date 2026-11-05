@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ICON_SOURCE="$ROOT_DIR/assets/branding/AppIcon.icon"
 ICNS_SOURCE="$ROOT_DIR/assets/branding/AppIcon.icns"
-TMP_DIR="$(mktemp -d)"
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/symeraseme-icon-test.XXXXXX")"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 XCODE_VERSION="$(xcodebuild -version | sed -n '1p')"
