@@ -5,10 +5,13 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'scripts'))
+from stage_rust_release_archives import TARGETS  # noqa: E402
 
 
 class ImmutableReleasePublication(unittest.TestCase):
@@ -35,9 +38,9 @@ class ImmutableReleasePublication(unittest.TestCase):
                 root = Path(directory)
                 assets = root / 'assets'
                 assets.mkdir()
+                # The publication step must expect exactly the staged release targets.
                 archives = [f'symeraseme_0.14.1_{system}_{arch}.{extension}'
-                            for system, extension in [('darwin', 'tar.gz'), ('linux', 'tar.gz'), ('windows', 'zip')]
-                            for arch in ('amd64', 'arm64')]
+                            for system, arch, extension, _ in TARGETS]
                 dmg = 'Symaira-EraseMe-0.14.1-macos.dmg'
                 sidecars = [name + suffix for name in archives for suffix in ('.cdx.json', '.rust-audit.json')]
                 for name in archives + [dmg] + sidecars:
