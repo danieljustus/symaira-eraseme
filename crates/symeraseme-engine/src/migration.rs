@@ -6,9 +6,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-#[cfg(any(windows, test))]
-mod windows_case_fold;
-
 /// Go's `migration.validateRoots`: required flags, absolute+cleaned paths, no
 /// symlink components, a real source directory, no symlink destination, and
 /// two directories that are neither equal nor nested.
@@ -25,16 +22,10 @@ fn validate_roots(source: &str, destination: &str) -> Result<(String, String), S
     reject_symlink_components(&destination)
         .map_err(|error| format!("destination path is unsafe: {error}"))?;
     let info = std::fs::symlink_metadata(&source).map_err(|error| {
-        if cfg!(windows) && error.kind() == std::io::ErrorKind::NotFound {
-            let text = error.to_string();
-            let cause = text.split(" (os error").next().unwrap_or(&text);
-            format!("stat source directory: GetFileAttributesEx {source}: {cause}")
-        } else {
-            format!(
-                "stat source directory: lstat {source}: {}",
-                go_errno_text(&error)
-            )
-        }
+        format!(
+            "stat source directory: lstat {source}: {}",
+            go_errno_text(&error)
+        )
     })?;
     if !info.is_dir() || info.file_type().is_symlink() {
         return Err("source must be a real directory".to_owned());
@@ -109,39 +100,9 @@ fn is_allowed_system_symlink(path: &str) -> bool {
 /// Go's `pathWithin`: whether `candidate` sits at or under `root`.
 fn path_within(root: &str, candidate: &str) -> bool {
     match (clean_absolute(root), clean_absolute(candidate)) {
-        (Ok(root), Ok(candidate)) => {
-            #[cfg(windows)]
-            {
-                path_prefix_casefold(&root, &candidate)
-            }
-            #[cfg(not(windows))]
-            {
-                candidate.starts_with(root)
-            }
-        }
+        (Ok(root), Ok(candidate)) => candidate.starts_with(root),
         _ => false,
     }
-}
-
-// Kept executable on the host for exhaustive Go Unicode and component tests;
-// actual Windows drive/UNC and filesystem behavior still needs native tests.
-#[cfg(any(windows, test))]
-fn path_prefix_casefold(root: &Path, candidate: &Path) -> bool {
-    let mut candidates = candidate.components();
-    root.components().all(|component| {
-        candidates.next().is_some_and(|candidate| {
-            match (
-                component.as_os_str().to_str(),
-                candidate.as_os_str().to_str(),
-            ) {
-                (Some(left), Some(right)) => {
-                    let fold = |c| windows_case_fold::fold(if c == '/' { '\\' } else { c });
-                    left.chars().map(fold).eq(right.chars().map(fold))
-                }
-                _ => false,
-            }
-        })
-    })
 }
 
 /// Go's wrapped `os.Lstat` text: `lstat <path>: <errno>`. Rust attaches no
@@ -613,7 +574,6 @@ fn mkdir(path: impl AsRef<Path>) -> Result<(), String> {
     let path = path.as_ref();
     let mut builder = fs::DirBuilder::new();
     builder.recursive(true);
-    #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
         builder.mode(0o700);
@@ -621,24 +581,8 @@ fn mkdir(path: impl AsRef<Path>) -> Result<(), String> {
     builder.create(path).map_err(|e| io_error("mkdir", path, e))
 }
 fn file_mode(info: &fs::Metadata) -> u32 {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        info.permissions().mode() & 0o777
-    }
-    #[cfg(windows)]
-    {
-        if info.permissions().readonly() {
-            0o444
-        } else {
-            0o666
-        }
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        let _ = info;
-        0o600
-    }
+    use std::os::unix::fs::PermissionsExt;
+    info.permissions().mode() & 0o777
 }
 fn write_atomic(path: impl AsRef<Path>, data: &[u8], mode: u32) -> Result<(), String> {
     use std::io::Write;
@@ -648,63 +592,22 @@ fn write_atomic(path: impl AsRef<Path>, data: &[u8], mode: u32) -> Result<(), St
     mkdir(parent)?;
     let mut builder = tempfile::Builder::new();
     builder.prefix(".migration-write-");
-    #[cfg(not(windows))]
     let mut tmp = builder
         .tempfile_in(parent)
         .map_err(|e| io_error("open", path, e))?;
-    // tempfile::persist on Windows resets all attributes to NORMAL. Create an
-    // ordinary temporary file and rename it without discarding READONLY.
-    #[cfg(windows)]
-    let mut tmp = builder
-        .make_in(parent, |temporary| {
-            fs::OpenOptions::new()
-                .create_new(true)
-                .read(true)
-                .write(true)
-                .open(temporary)
-        })
-        .map_err(|e| io_error("open", path, e))?;
-    #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         tmp.as_file()
             .set_permissions(fs::Permissions::from_mode(mode))
             .map_err(|e| io_error("chmod", path, e))?;
     }
-    #[cfg(not(any(unix, windows)))]
-    let _ = mode;
     tmp.write_all(data)
         .map_err(|e| io_error("write", path, e))?;
     tmp.as_file()
         .sync_all()
         .map_err(|e| io_error("sync", path, e))?;
-    // Windows READONLY is a file attribute, not an ACL. Apply it to the private
-    // file immediately before atomic publication, after fallible content writes.
-    #[cfg(windows)]
-    let mut permissions = {
-        let mut permissions = tmp
-            .as_file()
-            .metadata()
-            .map_err(|e| io_error("stat", tmp.path(), e))?
-            .permissions();
-        permissions.set_readonly(mode & 0o200 == 0);
-        tmp.as_file()
-            .set_permissions(permissions.clone())
-            .map_err(|e| io_error("chmod", tmp.path(), e))?;
-        permissions
-    };
-    #[cfg(not(windows))]
     tmp.persist(path)
         .map_err(|e| io_error("rename", path, e.error))?;
-    #[cfg(windows)]
-    if let Err(error) = fs::rename(tmp.path(), path) {
-        // Only our already-open temporary file is made removable. Never clear
-        // an existing destination's READONLY bit to force replacement.
-        #[allow(clippy::permissions_set_readonly_false)]
-        permissions.set_readonly(false);
-        let _ = tmp.as_file().set_permissions(permissions);
-        return Err(io_error("rename", path, error));
-    }
     Ok(())
 }
 fn json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, String> {
@@ -1079,51 +982,6 @@ fn artifact_data(
 mod tests {
     use super::*;
 
-    #[test]
-    fn migration_windows_fold_matches_every_go_unicode_scalar() {
-        let fixture: serde_json::Value = serde_json::from_str(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../rust-tests/parity/oracle/migration-safety/fold.json"
-        )))
-        .unwrap();
-        assert_eq!(fixture["toolchain"], "go1.26.6");
-        assert_eq!(fixture["unicode"], "15.0.0");
-        let pairs = fixture["pairs"].as_array().unwrap();
-        assert_eq!(pairs.len(), 1454);
-        let mut remaining = pairs.iter().peekable();
-        for value in 0..=0x10ffff {
-            let Some(character) = char::from_u32(value) else {
-                continue;
-            };
-            let expected = if remaining
-                .peek()
-                .is_some_and(|p| p[0].as_u64() == Some(u64::from(value)))
-            {
-                u32::try_from(remaining.next().unwrap()[1].as_u64().unwrap()).unwrap()
-            } else {
-                value
-            };
-            assert_eq!(
-                windows_case_fold::fold(character),
-                expected,
-                "U+{value:04X}"
-            );
-        }
-        assert!(remaining.next().is_none());
-        assert!(path_prefix_casefold(
-            Path::new("/Legacy/Σcope"),
-            Path::new("/legacy/ςCOPE/child")
-        ));
-        assert!(!path_prefix_casefold(
-            Path::new("/Legacy"),
-            Path::new("/legacy-other")
-        ));
-        assert!(!path_prefix_casefold(
-            Path::new("/Legacy/child"),
-            Path::new("/legacy")
-        ));
-        assert!(!path_prefix_casefold(Path::new("/I"), Path::new("/ı")));
-    }
     #[cfg(unix)]
     #[test]
     fn migration_path_cleaning_preserves_native_bytes() {

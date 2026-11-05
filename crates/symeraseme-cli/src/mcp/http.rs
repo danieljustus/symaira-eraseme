@@ -84,10 +84,6 @@ pub(crate) fn serve(
     let stopping = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&stopping))
         .map_err(|error| error.to_string())?;
-    #[cfg(windows)]
-    signal_hook::flag::register(signal_hook::consts::SIGBREAK, Arc::clone(&stopping))
-        .map_err(|error| error.to_string())?;
-    #[cfg(unix)]
     signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&stopping))
         .map_err(|error| error.to_string())?;
 
@@ -180,61 +176,8 @@ fn listen_error(address: &str, error: std::io::Error) -> String {
     }
 }
 
-#[cfg(not(windows))]
 fn addr_in_use_message() -> String {
     "address already in use".to_owned()
-}
-
-#[cfg(windows)]
-fn addr_in_use_message() -> String {
-    windows_socket_message(10048) // WSAEADDRINUSE
-}
-
-#[cfg(windows)]
-fn addr_not_available_message() -> String {
-    windows_socket_message(10049) // WSAEADDRNOTAVAIL
-}
-
-/// Go's Windows syscall diagnostic requests US English first and preserves
-/// punctuation, trimming only CR/LF. Rust's Display adds an OS-code suffix and
-/// uses the user's locale, which does not preserve that byte contract.
-#[cfg(windows)]
-#[allow(unsafe_code)] // Audited fixed-buffer, read-only Windows message boundary.
-fn windows_socket_message(code: u32) -> String {
-    #[link(name = "Kernel32")]
-    unsafe extern "system" {
-        fn FormatMessageW(
-            flags: u32,
-            source: *const std::ffi::c_void,
-            code: u32,
-            language: u32,
-            buffer: *mut u16,
-            size: u32,
-            arguments: *const std::ffi::c_void,
-        ) -> u32;
-    }
-    let mut buffer = [0u16; 300];
-    for language in [0x0409, 0] {
-        // SAFETY: the system supplies the message, no insert arguments are
-        // processed, and this writable UTF-16 buffer has the declared size.
-        let length = unsafe {
-            FormatMessageW(
-                0x0000_3200, // FROM_SYSTEM | ARGUMENT_ARRAY | IGNORE_INSERTS
-                std::ptr::null(),
-                code,
-                language,
-                buffer.as_mut_ptr(),
-                buffer.len() as u32,
-                std::ptr::null(),
-            )
-        };
-        if length != 0 {
-            return String::from_utf16_lossy(&buffer[..length as usize])
-                .trim_end_matches(['\r', '\n'])
-                .to_owned();
-        }
-    }
-    format!("winapi error #{code}")
 }
 
 #[cfg(target_os = "linux")]
@@ -242,7 +185,7 @@ fn addr_not_available_message() -> String {
     "cannot assign requested address".to_owned()
 }
 
-#[cfg(all(not(target_os = "linux"), not(windows)))]
+#[cfg(not(target_os = "linux"))]
 fn addr_not_available_message() -> String {
     "can't assign requested address".to_owned()
 }
@@ -278,7 +221,6 @@ fn write_token() -> std::io::Result<Arc<String>> {
     Ok(Arc::new(token))
 }
 
-#[cfg(unix)]
 fn write_token_file(path: &Path, token: &str) -> std::io::Result<()> {
     use std::os::unix::fs::OpenOptionsExt;
     let mut file = OpenOptions::new()
@@ -291,50 +233,15 @@ fn write_token_file(path: &Path, token: &str) -> std::io::Result<()> {
     set_mode(path)
 }
 
-#[cfg(not(unix))]
-fn write_token_file(path: &Path, token: &str) -> std::io::Result<()> {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(path)
-        .map_err(|error| token_file_error("open", path, error))?;
-    file.write_all(token.as_bytes())
-        .map_err(|error| token_file_error("write", path, error))
-}
-
-#[cfg(any(not(unix), test))]
-fn token_file_error(operation: &str, path: &Path, error: std::io::Error) -> std::io::Error {
-    // Go's os.PathError includes the operation and path, but not Rust's errno suffix.
-    let text = error.to_string();
-    let message = text.split(" (os error ").next().unwrap_or(&text);
-    std::io::Error::new(
-        error.kind(),
-        format!("{operation} {}: {message}", path.display()),
-    )
-}
-
-#[cfg(unix)]
 fn create_token_directory(dir: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::DirBuilderExt;
     let mut builder = fs::DirBuilder::new();
     builder.recursive(true).mode(0o700).create(dir)
 }
 
-#[cfg(not(unix))]
-fn create_token_directory(dir: &Path) -> std::io::Result<()> {
-    fs::create_dir_all(dir)
-}
-
-#[cfg(unix)]
 fn set_mode(path: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     fs::set_permissions(path, fs::Permissions::from_mode(0o600))
-}
-
-#[cfg(not(unix))]
-fn set_mode(_path: &Path) -> std::io::Result<()> {
-    Ok(())
 }
 
 async fn handle_request(
@@ -628,11 +535,7 @@ mod transport_tests {
     // Independent expectations measured by the retained native Go/Rust bind
     // comparisons. Never derive expected wording from the implementation.
     fn expected_addr_in_use() -> &'static str {
-        if cfg!(windows) {
-            "Only one usage of each socket address (protocol/network address/port) is normally permitted."
-        } else {
-            "address already in use"
-        }
+        "address already in use"
     }
 
     /// Go's `listen` error wording for each bind failure class.
@@ -648,9 +551,7 @@ mod transport_tests {
         );
 
         let unavailable = std::io::Error::from(std::io::ErrorKind::AddrNotAvailable);
-        let expected_unavailable = if cfg!(windows) {
-            "The requested address is not valid in its context."
-        } else if cfg!(target_os = "linux") {
+        let expected_unavailable = if cfg!(target_os = "linux") {
             "cannot assign requested address"
         } else {
             "can't assign requested address"
@@ -724,26 +625,6 @@ mod transport_tests {
     }
 
     #[test]
-    fn windows_token_file_errors_preserve_go_path_diagnostics() {
-        // Synthetic formatter control; the retained Windows replay proves native bytes.
-        for operation in ["open", "write"] {
-            let error = token_file_error(
-                operation,
-                Path::new(r"C:\private\data\mcp_token"),
-                std::io::Error::new(
-                    std::io::ErrorKind::PermissionDenied,
-                    "Access is denied. (os error 5)",
-                ),
-            );
-            assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
-            assert_eq!(
-                error.to_string(),
-                format!(r"{operation} C:\private\data\mcp_token: Access is denied.")
-            );
-        }
-    }
-
-    #[test]
     fn token_files_are_written_and_tightened_inside_a_private_directory() {
         let root = tempfile::tempdir().unwrap();
         let data = root.path().join("data");
@@ -781,7 +662,6 @@ mod transport_tests {
                 ])
                 .env("HTTP_BIND_CASE", case)
                 .env("HOME", root.path())
-                .env("USERPROFILE", root.path())
                 .env("SYMERASEME_DATA_DIR", root.path().join("data"))
                 .output()
                 .unwrap();

@@ -48,7 +48,6 @@ fn start(binary: &Path, root: &Path) -> (Server, u16, String) {
                 .current_dir(root)
                 .env_clear()
                 .env("HOME", root)
-                .env("USERPROFILE", root)
                 .env("SYMERASEME_DATA_DIR", root.join("data"))
                 .env("TMPDIR", root)
                 .env("TMP", root)
@@ -195,11 +194,7 @@ fn bounded_response_capture_preserves_fin_and_native_reset_bytes() {
     for (reset, body, complete) in [
         (false, &raw[..], true),
         (false, &raw[..raw.len() - 1], false),
-        // Windows can discard unread bytes on RST; buffered-after-reset bytes
-        // are a Unix control, not a portable delivery guarantee.
-        #[cfg(not(windows))]
         (true, &raw[..], true),
-        #[cfg(not(windows))]
         (true, &raw[..raw.len() - 1], false),
     ] {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

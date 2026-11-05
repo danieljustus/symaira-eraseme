@@ -15,6 +15,7 @@ REVISIONS = (
     'ac0b3b4b5c5729c9cbcf1ffbd5c7efce59440a33',  # MiniJinja/minor native dependency refresh
     'e61132f85b89580c96d95d098289f7238e810255',  # webpki distrusted-roots native dependency refresh
     'e2cf176337f6f90e64f76b5f39d3a859e87774ea',  # ctutils/tokio RUSTSEC native dependency refresh
+    '433622f6e6c884694a304f483ae481f93069b455',  # minor-patch group native dependency refresh
 )
 REPOSITORY = 'https://github.com/danieljustus/symaira-eraseme.git'
 

@@ -23,7 +23,6 @@ class BackupRestoreControls(unittest.TestCase):
             '.github/workflows/backup-restore-native.yml',
             'rust-tests/parity/plain_store_switchback.py',
             'rust-tests/parity/linux_store_sandbox.py',
-            'rust-tests/parity/windows_store_sandbox.py',
             'rust-tests/parity/prepare_backup_restore.py',
             'rust-tests/parity/src/bin/store_sandbox_control.rs',
             'rust-tests/parity/go_build_info.py',

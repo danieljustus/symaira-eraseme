@@ -419,21 +419,7 @@ fn user_cache_dir(context: &ConfigContext) -> Result<PathBuf, ConfigError> {
         Ok(context.home_dir.join("Library").join("Caches"))
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        let local_app_data = context.environment.get("LOCALAPPDATA");
-        let explicit_temp = context
-            .environment
-            .get("TEMP")
-            .or_else(|| context.environment.get("TMP"));
-        windows_cache_root(
-            local_app_data.map(String::as_str),
-            &context.home_dir,
-            explicit_temp.map(String::as_str),
-        )
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(target_os = "macos"))]
     {
         if let Some(xdg_cache_home) = context.environment.get("XDG_CACHE_HOME")
             && !xdg_cache_home.is_empty()
@@ -443,32 +429,6 @@ fn user_cache_dir(context: &ConfigContext) -> Result<PathBuf, ConfigError> {
         }
         Ok(context.home_dir.join(".cache"))
     }
-}
-
-#[cfg(any(target_os = "windows", test))]
-fn windows_cache_root(
-    local_app_data: Option<&str>,
-    home_dir: &Path,
-    explicit_temp: Option<&str>,
-) -> Result<PathBuf, ConfigError> {
-    if let Some(local_app_data) = local_app_data
-        && !local_app_data.is_empty()
-        && Path::new(local_app_data).is_absolute()
-    {
-        return Ok(PathBuf::from(local_app_data));
-    }
-    if home_dir.is_absolute() {
-        return Ok(home_dir.to_path_buf());
-    }
-    if let Some(explicit_temp) = explicit_temp
-        && !explicit_temp.is_empty()
-        && Path::new(explicit_temp).is_absolute()
-    {
-        return Ok(PathBuf::from(explicit_temp));
-    }
-    Err(ConfigError::Context(
-        "cache directory requires an absolute LOCALAPPDATA, home, or explicit temp directory",
-    ))
 }
 
 fn clean_absolute(path: &Path) -> PathBuf {
@@ -500,71 +460,6 @@ mod tests {
         );
     }
 
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn windows_cache_root_prefers_local_app_data_then_home_then_explicit_temp() {
-        let local_app_data = Path::new(r"C:\Users\Test\AppData\Local");
-        let home = Path::new(r"C:\Users\Test");
-        let temp = Path::new(r"C:\Users\Test\AppData\Local\Temp");
-
-        assert_eq!(
-            windows_cache_root(
-                Some(local_app_data.to_str().unwrap()),
-                home,
-                Some(temp.to_str().unwrap())
-            )
-            .unwrap(),
-            local_app_data
-        );
-        assert_eq!(
-            windows_cache_root(None, home, Some(temp.to_str().unwrap())).unwrap(),
-            home
-        );
-        assert_eq!(
-            windows_cache_root(
-                None,
-                Path::new("relative-home"),
-                Some(temp.to_str().unwrap())
-            )
-            .unwrap(),
-            temp
-        );
-        assert!(windows_cache_root(None, Path::new("relative-home"), None).is_err());
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    #[test]
-    fn windows_cache_root_precedence_uses_portable_absolute_test_paths() {
-        let root = std::env::temp_dir().join("symeraseme-windows-cache");
-        let local_app_data = root.join("local-app-data");
-        let home = root.join("home");
-        let temp = root.join("explicit-temp");
-
-        assert_eq!(
-            windows_cache_root(
-                Some(local_app_data.to_str().unwrap()),
-                &home,
-                Some(temp.to_str().unwrap())
-            )
-            .unwrap(),
-            local_app_data
-        );
-        assert_eq!(
-            windows_cache_root(None, &home, Some(temp.to_str().unwrap())).unwrap(),
-            home
-        );
-        assert_eq!(
-            windows_cache_root(
-                None,
-                Path::new("relative-home"),
-                Some(temp.to_str().unwrap())
-            )
-            .unwrap(),
-            temp
-        );
-        assert!(windows_cache_root(None, Path::new("relative-home"), None).is_err());
-    }
-
     #[cfg(target_os = "macos")]
     #[test]
     fn native_cache_root_matches_macos_contract() {
@@ -577,7 +472,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn native_cache_root_matches_xdg_and_unix_fallback_contract() {
         let root = std::env::temp_dir().join("symeraseme-native-cache-unix");

@@ -15,15 +15,7 @@ use serde::Deserialize;
 #[path = "support/frozen_agent_error.rs"]
 mod frozen_agent_error;
 
-#[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
-#[cfg(windows)]
-use std::os::windows::process::ExitStatusExt;
-
-#[cfg(windows)]
-use symeraseme_core::storage::Store;
-#[cfg(windows)]
-use symeraseme_core::storage::repository::Repository;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const BAD_STDERR: &[u8] = b"before\xf0\x80\x80after\xffend";
@@ -46,10 +38,7 @@ struct Captured {
 
 fn measured(corpus: &frozen_agent_error::Corpus, name: &str) -> Captured {
     let (code, stdout, stderr) = corpus.process(name);
-    #[cfg(unix)]
     let status = ExitStatus::from_raw(code << 8);
-    #[cfg(windows)]
-    let status = ExitStatus::from_raw(u32::try_from(code).unwrap());
     Captured {
         status,
         stdout,
@@ -115,11 +104,7 @@ fn capture(mut command: Command, root: &Path, name: &str, timeout: Duration) -> 
 }
 
 fn rust_fixture(root: &Path) -> PathBuf {
-    let executable = root.join(if cfg!(windows) {
-        "synthetic-agent-error.exe"
-    } else {
-        "synthetic-agent-error"
-    });
+    let executable = root.join("synthetic-agent-error");
     let mut build = Command::new("rustc");
     build
         .args(["+1.98.0", "--edition=2024", "--crate-type=bin", "-o"])
@@ -143,7 +128,6 @@ fn isolated(command: &mut Command, root: &Path, bin: &Path, data: &Path) {
         .env_clear()
         .current_dir(root)
         .env("HOME", &home)
-        .env("USERPROFILE", &home)
         .env("TMP", &temp)
         .env("TEMP", &temp)
         .env("TMPDIR", &temp)
@@ -156,16 +140,6 @@ fn isolated(command: &mut Command, root: &Path, bin: &Path, data: &Path) {
         .env("SYMERASEME_LLM_PROVIDER", "agent")
         .env("SYMERASEME_AGENT_BACKEND", "claude")
         .env("TERM", "dumb");
-    #[cfg(windows)]
-    {
-        // Windows process loading and Go's LookPath need only these OS keys.
-        for key in ["SystemRoot", "WINDIR"] {
-            if let Some(value) = std::env::var_os(key) {
-                command.env(key, value);
-            }
-        }
-        command.env("PATHEXT", ".EXE");
-    }
 }
 
 fn decode(value: &str) -> Vec<u8> {
@@ -278,32 +252,6 @@ fn native_helper_and_go_contract_observation() {
     tampered[0] ^= 1;
     assert!(compare_bytes(&tampered, &expected).is_err());
     assert!(compare_bytes(&expected, &expected).is_ok());
-
-    #[cfg(windows)]
-    {
-        let rust_root = root.path().join("rust");
-        let rust_bin = rust_root.join("bin");
-        let rust_data = rust_root.join("data");
-        fs::create_dir_all(&rust_bin).expect("Rust bin");
-        fs::create_dir_all(&rust_data).expect("Rust data");
-        fs::copy(&rust_fixture, rust_bin.join("claude.exe")).expect("Rust native fake agent");
-        seed(&rust_data);
-        let mut command = Command::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
-        command.args(["mcp", "--stdio"]);
-        isolated(&mut command, &rust_root, &rust_bin, &rust_data);
-        let input_path = rust_root.join("request.json");
-        fs::write(&input_path, &request).expect("bounded request fixture");
-        command.stdin(std::fs::File::open(input_path).expect("request stdin"));
-        let rust = capture(command, root.path(), "rust", Duration::from_secs(30));
-        assert!(
-            rust.status.success(),
-            "Rust MCP status {}: {}",
-            rust.status,
-            String::from_utf8_lossy(&rust.stderr)
-        );
-        assert!(rust.stderr.is_empty(), "MCP stdio stderr stays clean");
-        compare_bytes(&rust.stdout, &expected).expect("native Go/Rust MCP byte parity");
-    }
 }
 
 #[test]
@@ -351,26 +299,4 @@ fn retired_agent_error_capture_controls_fail_closed() {
         assert!(!output.status.success());
         assert!(String::from_utf8_lossy(&output.stderr).contains(message));
     }
-}
-
-#[cfg(windows)]
-fn seed(data: &Path) {
-    let store = Store::open(data.join("symeraseme.db")).expect("seed store open");
-    let request_id = Repository::new(&store)
-        .create_removal_request(
-            "oracle-broker",
-            "email",
-            "oracle-campaign",
-            "DE",
-            "gdpr-art17.de.md.j2",
-            "",
-        )
-        .expect("seed removal request");
-    store
-        .connection()
-        .execute(
-            "INSERT INTO inbox_replies (request_id, message_id, thread_id, from_addr, subject, snippet) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            (request_id, "oracle-message", "oracle-thread", "privacy@example.invalid", "We need your current address", "Your current address does not match our records."),
-        )
-        .expect("seed inbox reply");
 }

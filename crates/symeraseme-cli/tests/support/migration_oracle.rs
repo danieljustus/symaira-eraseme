@@ -1,7 +1,6 @@
 //! CLI-024: replay recorded migration inputs, output bytes and filesystem state.
 
 use super::frozen_windows_migration;
-#[cfg(not(windows))]
 use super::run;
 use super::{Cleanup, binary, fold_root, hex_digest, unique_root};
 use serde_json::Value;
@@ -11,9 +10,6 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 type Manifest = BTreeMap<String, Value>;
-#[cfg(windows)]
-type RootManifests = BTreeMap<String, Manifest>;
-
 fn input_path(root: &Path, relative: &str) -> PathBuf {
     assert!(
         !relative.is_empty()
@@ -115,7 +111,6 @@ fn migration_fixture_paths_reject_escape() {
 }
 
 #[test]
-#[cfg(not(windows))]
 fn migration_filesystem_matches_frozen_go_backup_and_state() {
     let fixture: Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -146,7 +141,6 @@ fn migration_filesystem_matches_frozen_go_backup_and_state() {
     }
 }
 
-#[cfg(not(windows))]
 fn replay_filesystem(id: &str, case: &Value) {
     let root = unique_root();
     fs::create_dir_all(&root).expect("isolated runtime root");
@@ -245,8 +239,6 @@ fn replay_filesystem(id: &str, case: &Value) {
                 if entry["type"] == "directory" {
                     entry.as_object_mut().expect("record").remove("size_bytes");
                 }
-                #[cfg(not(unix))]
-                entry.as_object_mut().expect("record").remove("mode");
                 (
                     entry["path"].as_str().expect("manifest path").to_owned(),
                     entry,
@@ -267,7 +259,6 @@ fn replay_filesystem(id: &str, case: &Value) {
 }
 
 #[test]
-#[cfg(not(windows))]
 fn migration_filesystem_rejects_corrupted_output_and_backup() {
     let fixture: Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -329,32 +320,6 @@ const FILESYSTEM_IDS: [&str; 5] = [
     "migration-copy-secrets-rejected",
     "migration-incomplete-backup",
 ];
-
-#[cfg(windows)]
-fn project(manifests: &RootManifests) -> Projected {
-    manifests
-        .iter()
-        .map(|(root, entries)| {
-            let shape = entries
-                .iter()
-                .map(|(path, entry)| {
-                    (
-                        path.clone(),
-                        (
-                            entry["type"].as_str().expect("entry type").to_owned(),
-                            entry.get("size_bytes").and_then(Value::as_u64),
-                            entry
-                                .get("sha256")
-                                .and_then(Value::as_str)
-                                .map(str::to_owned),
-                        ),
-                    )
-                })
-                .collect();
-            (root.clone(), shape)
-        })
-        .collect()
-}
 
 fn recorded_processes(case: &frozen_windows_migration::FsCase) -> Vec<NativeProcess> {
     case.processes
@@ -534,157 +499,11 @@ fn migration_metadata_hashes_are_not_ignored() {
     }
 }
 
-#[cfg(windows)]
-fn native_process(output: &super::ProcessOutput, root: &Path) -> NativeProcess {
-    NativeProcess {
-        status: output.status.code(),
-        stdout: fold_root(&output.stdout, root),
-        stderr: fold_root(&output.stderr, root),
-    }
-}
-
-/// Runs the Rust CLI through one recorded filesystem case. Nothing here runs Go.
-#[cfg(windows)]
-fn run_rust_case(
-    id: &str,
-    case: &Value,
-) -> (Vec<NativeProcess>, Projected, BTreeMap<String, bool>) {
-    let root = unique_root();
-    fs::create_dir_all(&root).expect("isolated native migration root");
-    let _cleanup = Cleanup(root.clone());
-    for directory in ["home", "cwd", "capture"] {
-        fs::create_dir_all(root.join(directory)).expect("native migration process directory");
-    }
-    let source = root.join("filesystem").join(id).join("legacy-source");
-    fs::create_dir_all(&source).expect("native migration source");
-    fs::create_dir_all(root.join("filesystem").join(id).join("home"))
-        .expect("native migration case home");
-    if id == "migration" {
-        write_input(&source.join("config.toml"), "data_dir = 'legacy'\n", 0o644);
-    } else {
-        for directory in case["input_directories"]
-            .as_array()
-            .expect("input directories")
-        {
-            fs::create_dir_all(input_path(&root, directory.as_str().expect("directory")))
-                .expect("native migration input directory");
-        }
-        for (relative, input) in case["input_files"].as_object().expect("input files") {
-            write_input(
-                &input_path(&root, relative),
-                input["content"].as_str().expect("input content"),
-                u32::try_from(input["mode"].as_u64().expect("input mode"))
-                    .expect("file mode fits u32"),
-            );
-        }
-    }
-    let source_before = manifest(&source, &root);
-    let mut processes: Vec<&Value> = case.get("preparation").map_or_else(Vec::new, |value| {
-        value
-            .as_array()
-            .expect("preparation processes")
-            .iter()
-            .collect()
-    });
-    processes.push(&case["process"]);
-    let mut outputs = Vec::with_capacity(processes.len());
-    for (index, process) in processes.into_iter().enumerate() {
-        let argv: Vec<_> = process["argv"]
-            .as_array()
-            .expect("operation argv")
-            .iter()
-            .map(|arg| arg.as_str().expect("string argument"))
-            .collect();
-        let raw = super::run_program_with_resources(
-            &binary(),
-            &argv,
-            &root.join("home"),
-            &root.join("cwd"),
-            &root.join("capture"),
-            index,
-            None,
-        );
-        outputs.push(native_process(&raw, &root));
-    }
-
-    let mut manifests: RootManifests = BTreeMap::new();
-    let mut exists = BTreeMap::new();
-    for (name, recorded_path) in case["manifest_roots"].as_object().expect("manifest roots") {
-        let relative = recorded_path
-            .as_str()
-            .expect("recorded root")
-            .strip_prefix("<ORACLE_ROOT>/")
-            .expect("isolated recorded root");
-        let path = input_path(&root, relative);
-        exists.insert(
-            name.clone(),
-            path.try_exists().expect("native root existence"),
-        );
-        manifests.insert(name.clone(), manifest(&path, &root));
-    }
-    assert_eq!(
-        manifests["source"], source_before,
-        "{id}: native source changed"
-    );
-    (outputs, project(&manifests), exists)
-}
-
-#[test]
-#[cfg(windows)]
-fn migration_filesystem_matches_recorded_native_go() {
-    frozen_windows_migration::reject_retired_capture_env()
-        .expect("retired Windows capture mode must not be requested");
-    let target = frozen_windows_migration::native_host_target().expect("native Windows target");
-    let fixture: Value = serde_json::from_str(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../rust-tests/parity/cases/filesystem/manifests.json"
-    )))
-    .expect("filesystem oracle JSON");
-    assert_eq!(fixture["commit"], "4e582f28");
-    let cases: BTreeMap<_, _> = fixture["cases"]
-        .as_array()
-        .expect("filesystem cases")
-        .iter()
-        .filter_map(|case| {
-            let id = case["id"].as_str().expect("case id");
-            FILESYSTEM_IDS.contains(&id).then_some((id, case))
-        })
-        .collect();
-    assert_eq!(
-        cases.len(),
-        FILESYSTEM_IDS.len(),
-        "every recorded case has an input"
-    );
-
-    for (id, case) in cases {
-        let recorded = frozen_windows_migration::filesystem_observation(target, id)
-            .expect("retained Windows record");
-        let (processes, projection, exists) = run_rust_case(id, case);
-        let expected = recorded_processes(&recorded);
-        assert_processes_equal(id, &expected, &processes);
-        assert_projection_equal(id, &recorded_projection(&recorded), &projection);
-        assert_snapshots_match(id, &recorded, &projection, &exists);
-        if id == "migration" {
-            // Rust-side controls after the positive case: changed stdout must be rejected.
-            let mut corrupted = processes.clone();
-            corrupted[0].stdout.push(b'!');
-            assert!(
-                rejects(|| assert_processes_equal(id, &expected, &corrupted)),
-                "{id}: Rust stdout control accepted"
-            );
-        }
-        assert_comparator_rejects_corruption(id, &recorded);
-    }
-}
-
 fn write_input(path: &Path, content: &str, mode: u32) {
     fs::create_dir_all(path.parent().expect("input parent")).expect("input parent directory");
     fs::write(path, content.as_bytes()).expect("recorded input");
-    #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("oracle input mode");
     }
-    #[cfg(not(unix))]
-    let _ = mode;
 }

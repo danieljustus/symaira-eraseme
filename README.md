@@ -59,8 +59,10 @@ existing iOS app or Web client. Linux remains supported for CLI/server use and C
 | macOS Intel | Unsupported; no native CI or new release artifacts |
 
 Historical release assets and frozen platform observations stay immutable.
-Windows-only source and fixtures are retained as unsupported historical code;
-their later removal is separate from this CI/release change. See [#1274](https://github.com/danieljustus/symaira-eraseme/issues/1274).
+Windows-only source, native test harnesses and PowerShell helpers have been
+removed ([#1276](https://github.com/danieljustus/symaira-eraseme/issues/1276));
+frozen Windows captures under `tests/fixtures/go-frozen/` stay as read-only
+historical evidence. See [#1274](https://github.com/danieljustus/symaira-eraseme/issues/1274).
 
 ## Install
 

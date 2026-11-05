@@ -4,11 +4,7 @@ use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
 pub fn helper(root: &Path) -> PathBuf {
-    let executable = root.join(if cfg!(windows) {
-        "agent-helper.exe"
-    } else {
-        "agent-helper"
-    });
+    let executable = root.join("agent-helper");
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/native_host_agent.rs");
     let log = root.join("agent-build.log");
     let output = std::fs::File::create(&log).unwrap();

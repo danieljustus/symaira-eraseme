@@ -212,8 +212,8 @@ Migrations on open (transparent, log only):
 
 Encrypted-file detection: file begins with the V1 header **or** `V2/V3
 magic + salt` prefix. Decrypted copies live below the current user's cache
-directory in `symeraseme/database/`, with 0700 directories and 0600 files on
-POSIX systems; Windows uses the current user's profile ACLs.
+directory in `symeraseme/database/`, with 0700 directories and 0600 files
+(POSIX modes on macOS and Linux).
 `SYMERASEME_ENCRYPT_DB` unset/`0` → plain SQLite file.
 
 Close lifecycle and failure semantics:

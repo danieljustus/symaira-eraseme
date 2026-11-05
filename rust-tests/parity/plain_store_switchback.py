@@ -82,9 +82,6 @@ def install_artifact(artifact, active):
 
 def command(root, label, argv, env, timeout=30):
     """Retain failures and raw bytes; bound file growth and the owned process group."""
-    if sys.platform == 'win32':
-        from windows_store_sandbox import command as windows_command
-        return windows_command(root, label, argv, env, timeout)
     import resource
 
     def bounds():

@@ -26,20 +26,8 @@ def verify_group(documents, scope, denominator, head):
         assert receipt["scope"] == scope and receipt["head"] == head, "mixed source/scope"
         assert receipt["target"] == "x86_64-unknown-linux-gnu", "unexpected mutation target"
         expected_inactive = [
-            r'http\.rs:190:5: replace addr_in_use_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
-            r'http\.rs:195:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
-            r'http\.rs:204:5: replace windows_socket_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
-            r'http\.rs:231:19: replace != with == in windows_socket_message$',
-            r'http\.rs:247:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
-            r'http\.rs:296:5: replace write_token_file .* with Ok\(\(\)\)$',
-            r'http\.rs:313:5: replace create_token_directory .* with Ok\(\(\)\)$',
+            r'http\.rs:190:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
         ] if scope == "HTTP auth" else []
-        if scope == "consent":
-            expected_inactive = [
-                r'consent\.rs:627:5: replace close_windows_file .* with Ok\(\(\)\)$',
-                r'consent\.rs:639:5: replace checked_windows_close .* with Ok\(\(\)\)$',
-                r'consent\.rs:643:39: replace != with == in checked_windows_close$',
-            ]
         assert receipt["inactive_target_exclusions"] == expected_inactive, "unexpected platform exclusions"
         index, total = map(int, receipt["shard"].split("/"))
         assert total == denominator and 0 <= index < total, "wrong shard denominator"

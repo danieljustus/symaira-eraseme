@@ -323,9 +323,7 @@ pub fn default_state_path() -> PathBuf {
             .join("symeraseme")
             .join("oauth2_state.json"),
         _ => {
-            let home = std::env::var_os("HOME")
-                .filter(|value| !value.is_empty())
-                .or_else(|| std::env::var_os("USERPROFILE").filter(|value| !value.is_empty()));
+            let home = std::env::var_os("HOME").filter(|value| !value.is_empty());
             match home {
                 Some(home) => PathBuf::from(home)
                     .join(".local")
@@ -503,42 +501,19 @@ fn current_unix() -> i64 {
 }
 
 fn create_private_directory(path: &Path) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        std::fs::DirBuilder::new()
-            .recursive(true)
-            .mode(0o700)
-            .create(path)
-    }
-    #[cfg(not(unix))]
-    {
-        std::fs::create_dir_all(path)
-    }
+    use std::os::unix::fs::DirBuilderExt;
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(path)
 }
 
 fn set_private_file_mode(file: &std::fs::File) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        file.set_permissions(std::fs::Permissions::from_mode(0o600))
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = file;
-        Ok(())
-    }
+    use std::os::unix::fs::PermissionsExt;
+    file.set_permissions(std::fs::Permissions::from_mode(0o600))
 }
 
 fn set_private_file_mode_path(path: &Path) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = path;
-        Ok(())
-    }
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
 }
