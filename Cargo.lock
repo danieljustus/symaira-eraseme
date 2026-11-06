@@ -1410,7 +1410,6 @@ dependencies = [
  "sha2",
  "symeraseme-core",
  "tempfile",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2216,7 +2215,6 @@ dependencies = [
  "rusqlite",
  "rustls",
  "rustls-native-certs",
- "schannel",
  "scrypt",
  "serde",
  "serde_json",
@@ -2229,7 +2227,6 @@ dependencies = [
  "tokio",
  "toml",
  "ureq",
- "windows-sys 0.61.2",
  "yaml-rust2",
  "yaml_serde",
  "zeroize",

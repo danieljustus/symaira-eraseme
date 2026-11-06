@@ -13,19 +13,6 @@ sha2.workspace = true
 tempfile.workspace = true
 symeraseme-core = { path = "../../crates/symeraseme-core", version = "0.15.0" }
 
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = [
-    "Win32_Foundation",
-    "Win32_Security",
-    "Win32_System_Diagnostics_ToolHelp",
-    "Win32_System_JobObjects",
-    "Win32_System_Threading",
-] }
-
 [[bin]]
 name = "parity"
 path = "src/main.rs"
-
-[[bin]]
-name = "store_sandbox_control"
-path = "src/bin/store_sandbox_control.rs"
