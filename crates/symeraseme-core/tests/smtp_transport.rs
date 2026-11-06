@@ -2,18 +2,73 @@
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde_json::{Value, json};
-
+use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
-
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 use symeraseme_core::email::OAuth2Token;
 use symeraseme_core::email::smtp::{NetSmtpTransport, SmtpConfig, SmtpTransport};
 
+#[path = "support/capture_smtp.rs"]
+mod capture_smtp;
 #[path = "support/frozen_smtp.rs"]
 mod frozen_smtp;
 
+fn repo() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+fn child(command: Command, root: &Path, input: Option<&Path>, budget: Duration) -> Vec<u8> {
+    child_captured(command, root, input, budget).stdout
+}
+
+fn child_captured(
+    mut command: Command,
+    root: &Path,
+    input: Option<&Path>,
+    budget: Duration,
+) -> std::process::Output {
+    let out = root.join("child.stdout");
+    let err = root.join("child.stderr");
+    let input = match input {
+        Some(path) => Stdio::from(fs::File::open(path).unwrap()),
+        None => Stdio::null(),
+    };
+    let mut child = command
+        .stdin(input)
+        .stdout(fs::File::create(&out).unwrap())
+        .stderr(fs::File::create(&err).unwrap())
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + budget;
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            child.kill().unwrap();
+            child.wait().unwrap();
+            panic!("owned SMTP oracle child exceeded deadline");
+        }
+        thread::sleep(Duration::from_millis(20));
+    };
+    child.wait().unwrap();
+    for path in [&out, &err] {
+        assert!(fs::metadata(path).unwrap().len() <= 65536);
+    }
+    assert!(
+        status.success(),
+        "SMTP oracle: {}",
+        String::from_utf8_lossy(&fs::read(&err).unwrap())
+    );
+    std::process::Output {
+        status,
+        stdout: fs::read(out).unwrap(),
+        stderr: fs::read(err).unwrap(),
+    }
+}
 fn line<S: Read>(io: &mut BufReader<S>) -> String {
     let mut line = String::new();
     let n = Read::by_ref(io).take(65537).read_line(&mut line).unwrap();
@@ -326,12 +381,31 @@ fn server(case: &'static str) -> (u16, thread::JoinHandle<Vec<String>>) {
 
 #[test]
 fn live_go_smtp_envelope_auth_dot_framing_and_failures_match() {
+    let root = tempfile::tempdir().unwrap();
     let frozen = frozen_smtp::observations("transport");
+    let helper = root.path().join(if cfg!(windows) {
+        "smtp-go.exe"
+    } else {
+        "smtp-go"
+    });
+    if frozen.is_none() {
+        let mut build = Command::new("go");
+        build
+            .args(["build", "-o"])
+            .arg(&helper)
+            .arg("./rust-tests/parity/oracle/campaign-smtp")
+            .current_dir(repo())
+            .env("GOTOOLCHAIN", "go1.26.6")
+            .env("GOPROXY", "off")
+            .env("GOSUMDB", "off");
+        child(build, root.path(), None, Duration::from_secs(180));
+    }
     let recipients = vec![
         "to@example.invalid".into(),
         "cc@example.invalid".into(),
         "bcc@example.invalid".into(),
     ];
+    let mut measured = Vec::new();
     for case in [
         "plain",
         "oauth",
@@ -343,8 +417,16 @@ fn live_go_smtp_envelope_auth_dot_framing_and_failures_match() {
         "greeting-rejected",
         "helo-fallback",
     ] {
-        let recorded: Value = serde_json::from_slice(&frozen.input(case)).unwrap();
-        let go_port = u16::try_from(recorded["Config"]["Port"].as_u64().unwrap()).unwrap();
+        let (go_port, go_server) = if let Some(corpus) = &frozen {
+            let recorded: Value = serde_json::from_slice(&corpus.input(case)).unwrap();
+            (
+                u16::try_from(recorded["Config"]["Port"].as_u64().unwrap()).unwrap(),
+                None,
+            )
+        } else {
+            let (port, thread) = server(case);
+            (port, Some(thread))
+        };
         let auth = matches!(
             case,
             "plain" | "auth-rejected" | "auth-challenge" | "credential-echo"
@@ -352,8 +434,36 @@ fn live_go_smtp_envelope_auth_dot_framing_and_failures_match() {
         let oauth = case == "oauth";
         let raw=b"From: sender@example.invalid\r\nTo: to@example.invalid\r\n\r\n.first\n..second\r\nlast\r";
         let request = json!({"Config":{"Host":"127.0.0.1","Port":go_port,"From":"sender@example.invalid","UseTLS":case=="missing-starttls","Username":if auth{"synthetic-user"}else{""},"Password":if auth{if case == "credential-echo" {"\tsynthetic-password"} else {"synthetic-password"}}else{""},"OAuth2":if oauth{json!({"Username":"synthetic-user","AccessToken":"synthetic-token"})}else{Value::Null},"Timeout":2_000_000_000u64},"Recipients":recipients,"Raw":STANDARD.encode(raw)});
+        let input = root.path().join("input.json");
         let request_bytes = serde_json::to_vec(&request).unwrap();
-        let (output, go_transcript) = frozen.observation(case, &request_bytes);
+        fs::write(&input, &request_bytes).unwrap();
+        let (output, go_transcript) = if let Some(corpus) = &frozen {
+            corpus.observation(case, &request_bytes)
+        } else {
+            let mut command = Command::new(&helper);
+            command
+                .arg("--transport")
+                .env_clear()
+                .env("HOME", root.path())
+                .env("USERPROFILE", root.path())
+                .env("TEMP", root.path())
+                .env("TMP", root.path());
+            for key in ["SystemRoot", "WINDIR"] {
+                if let Some(value) = std::env::var_os(key) {
+                    command.env(key, value);
+                }
+            }
+            let output =
+                child_captured(command, root.path(), Some(&input), Duration::from_secs(10));
+            let transcript = go_server.unwrap().join().unwrap();
+            measured.push(capture_smtp::case(
+                case,
+                &output,
+                &request_bytes,
+                &transcript,
+            ));
+            (output, transcript)
+        };
         let go: Value = serde_json::from_slice(&output.stdout).unwrap();
         let (rust_port, rust_server) = server(case);
         let config = SmtpConfig {
@@ -415,5 +525,8 @@ fn live_go_smtp_envelope_auth_dot_framing_and_failures_match() {
         } else {
             eprintln!("real Go/Rust SMTP case {case}: exact transaction, result and error matched");
         }
+    }
+    if frozen.is_none() {
+        capture_smtp::record("transport", &helper, &measured);
     }
 }

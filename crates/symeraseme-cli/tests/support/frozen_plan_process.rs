@@ -9,7 +9,7 @@ use std::process::{Command, Output};
 mod go_source_pin;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const REVISION: &str = "433622f6e6c884694a304f483ae481f93069b455";
+const REVISION: &str = "411b5c10eb041f0233e0e86710a3dd733b0012e2";
 
 fn digest(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
@@ -39,7 +39,7 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
         if !go_source_pin::current_tree_bound(name) {
             continue;
         }
-        let bytes = go_source_pin::current_source(ROOT, name);
+        let bytes = std::fs::read(Path::new(ROOT).join(path)).unwrap();
         assert_eq!(pin["bytes"], bytes.len(), "{name}");
         assert_eq!(pin["sha256"], digest(&bytes), "{name}");
     }
@@ -59,14 +59,6 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
             archive.status.success(),
             "immutable input generator must remain verifiable"
         );
-        let retired = matches!(
-            name.as_str(),
-            "crates/symeraseme-cli/tests/plan_execute_live_process.rs"
-                | "crates/symeraseme-cli/tests/support/capture_plan_process.rs"
-        );
-        if retired {
-            go_source_pin::assert_retired_generator_matches_archive(ROOT, name, &archive.stdout);
-        }
         // These three archived generators were measured as an actual Git
         // autocrlf checkout on both Windows producers. Preserve the recorded
         // digest and reproduce only that independently verified transform.
@@ -85,12 +77,10 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
         };
         assert_eq!(pin["bytes"], bytes.len());
         assert_eq!(pin["sha256"], digest(&bytes));
-        // Retired producers were independently authenticated above. Other
-        // inputs remain checkout-bound, including the strict dependency check.
-        if !retired {
-            let current = go_source_pin::current_source(ROOT, name);
-            go_source_pin::assert_current_matches_archive(name, &bytes, &current);
-        }
+        // Changed generators or dependency bytes outside local release labels
+        // require actual recapture, even when their immutable archive is available.
+        let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
+        go_source_pin::assert_current_matches_archive(name, &bytes, &current);
     }
     let build = record["embedded_build_info"].as_str().unwrap();
     let (os, arch) = target.split_once('/').unwrap();
@@ -113,14 +103,15 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
     record
 }
 
-pub fn observation(case: &str) -> (Output, Value) {
-    assert!(
-        std::env::var_os("SYMERASEME_CAPTURE_PLAN_PROCESSES").is_none(),
-        "live Go capture is retired; use the immutable historical capture producer"
-    );
+pub fn observation(case: &str) -> Option<(Output, Value)> {
+    if std::env::var_os("SYMERASEME_CAPTURE_PLAN_PROCESSES").is_some_and(|value| !value.is_empty())
+    {
+        return None; // Explicit native recording always executes actual Go.
+    }
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("1") => return None,
         Ok("0") | Err(std::env::VarError::NotPresent) => {}
-        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
     }
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
@@ -129,21 +120,21 @@ pub fn observation(case: &str) -> (Output, Value) {
         ("windows", "aarch64") => "windows/arm64",
         ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
-        _ => panic!("no recorded plan process for this target; live Go is retired"),
+        _ => return None, // Unrecorded hosts still execute actual Go.
     };
     let (raw, pin) = match (target, case) {
-        ("darwin/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/darwin-arm64/web-form.json").as_slice(), "a0f1ed8ffea1759f6af5ce086f1db31e4b53bc6e71dabfd44d48b76ddd97a8c6"),
-        ("darwin/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/darwin-arm64/senderless-email.json").as_slice(), "6ad91859e185a5fdf95d5157a536141f3226c453c7f20f0808a0f8671fabfbdb"),
-        ("darwin/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/darwin-amd64/web-form.json").as_slice(), "efb491f77fc33eaf7b86cfeb5a83e5b303eebe1ffa3f2f927ad58085d28dcdcd"),
-        ("darwin/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/darwin-amd64/senderless-email.json").as_slice(), "1e925d45edac05a291c98869d7a3c9bd1b3c9e3582bd179e7305cd723eaa328a"),
-        ("windows/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/windows-amd64/web-form.json").as_slice(), "f26d563bfebe97e535c47c4f4e7f8e7129b37db327485d740235ffdf8ae8afa0"),
-        ("windows/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/windows-amd64/senderless-email.json").as_slice(), "e646db81750dc3181fbfe6ce6b756ab6f54152cd12f99cda5bd01902ab33f00c"),
-        ("windows/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/windows-arm64/web-form.json").as_slice(), "6cba7e0eac77b893b92691c24fa6de143cccd0fad245c7cfa6781115968c674a"),
-        ("windows/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/windows-arm64/senderless-email.json").as_slice(), "82530c0c7b54b1ffc149726ba4cb940fce1db8bf5cfd1e9afee58c9ceeb20eca"),
-        ("linux/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/linux-arm64/web-form.json").as_slice(), "8587f08f062eef2468f9c96789844743fc9c510969b372067fa614fdff60a0d0"),
-        ("linux/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/linux-arm64/senderless-email.json").as_slice(), "508179bba80d376000825195863ac18c45bdbddb8b57dbf346e3e35d01e1622a"),
-        ("linux/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/linux-amd64/web-form.json").as_slice(), "33437c5d73b981a1d06baf111aceb4e33e7139c81c56ea84ec2c45d80783a252"),
-        ("linux/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/linux-amd64/senderless-email.json").as_slice(), "46e12d6167acb09df81a52470d43a90248e005e36e333ab4ee476df922903809"),
+        ("darwin/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/darwin-arm64/web-form.json").as_slice(), "8f62d4543d37828dde3779af4ad3c15863ba593e1076976bc40b1445ca619028"),
+        ("darwin/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/darwin-arm64/senderless-email.json").as_slice(), "a19aaca0873dac0a2453eb74c62db2c98cb61a24ae0162f14f630a17ba9c5046"),
+        ("darwin/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/darwin-amd64/web-form.json").as_slice(), "16cab4e196bfca3067bfb202549c123b5f56fac8ecb6e8688176721b978b048d"),
+        ("darwin/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/darwin-amd64/senderless-email.json").as_slice(), "55c6a510f177c3e514918c3d0bae23b4ad1c35c283fae645d47c4b8814f2d953"),
+        ("windows/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/windows-amd64/web-form.json").as_slice(), "08ea1f4f2e545f570e41cc0ae6b40f87a408644f1b093d4ad70b607cf55e515f"),
+        ("windows/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/windows-amd64/senderless-email.json").as_slice(), "88775aef4b81b72ddf6d14ce5f33f5b9f5d49c21e3d685f2d1fb3978c4a27312"),
+        ("windows/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/windows-arm64/web-form.json").as_slice(), "cff1f1e3deb46829c5581cbc8132ed861e3b28957cea4d1fb87c846fd80f75a0"),
+        ("windows/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/windows-arm64/senderless-email.json").as_slice(), "4ec3d0c43383617797bfd3dc9f388113d2f743c878213c8defafe40b79d135f1"),
+        ("linux/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/linux-arm64/web-form.json").as_slice(), "2b80539e316a2bac8941bf2801f9695ce35f5d70b0cbff0e7b6f4635ac6ac64e"),
+        ("linux/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/linux-arm64/senderless-email.json").as_slice(), "a278bee446215d349b6155024f1278da771fa93d4a1b320442b74a2ebd051d4c"),
+        ("linux/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/linux-amd64/web-form.json").as_slice(), "8cc6885308feb01d07044cb21ca63862aabec72a8212ee7a6bd81e6ae791ce24"),
+        ("linux/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-411b5c10/plan-processes/linux-amd64/senderless-email.json").as_slice(), "e61f3fe794f4d062816952c330bc62dfa5f26c53a28b1c02d11cab10c61f48c7"),
         _ => panic!("unrecorded plan process cannot receive a cached answer"),
     };
     let record = verify(raw, pin, case, target);
@@ -181,5 +172,5 @@ pub fn observation(case: &str) -> (Output, Value) {
             .decode(record["stderr_base64"].as_str().unwrap())
             .unwrap(),
     };
-    (output, record["persisted_effects"].clone())
+    Some((output, record["persisted_effects"].clone()))
 }

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campaign Report{{if .data.campaigns}} — {{(index .data.campaigns 0).campaign_id}}{{end}}</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f7fa;
+  --card: #ffffff;
+  --text: #1a1a2e;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --green: #10b981;
+  --yellow: #f59e0b;
+  --red: #ef4444;
+  --blue: #3b82f6;
+  --gray: #9ca3af;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --border: #334155;
+  }
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  padding: 20px;
+}
+.container { max-width: 900px; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin-bottom: 4px; }
+.subtitle { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 20px; }
+h2 { font-size: 1.1rem; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--border); }
+h3 { font-size: 0.95rem; margin: 14px 0 8px; }
+
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.metric-card {
+  background: var(--card);
+  border-radius: 6px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.metric-card .value { font-size: 1.3rem; font-weight: 700; }
+.metric-card .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.metric-card .change { font-size: 0.75rem; }
+.change.positive { color: var(--green); }
+.change.negative { color: var(--red); }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 12px; }
+th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+th { font-weight: 600; color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
+tr:hover { background: rgba(0,0,0,0.02); }
+
+.footer { margin-top: 30px; font-size: 0.7rem; color: var(--text-muted); text-align: center; }
+
+.error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; }
+@media (prefers-color-scheme: dark) {
+  .error { background: #7f1d1d; color: #fca5a5; }
+}
+
+.empty { color: var(--text-muted); font-style: italic; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Campaign Report</h1>
+  <p class="subtitle">
+    Generated {{datefmt .now "%Y-%m-%d %H:%M UTC"}}
+    &middot; {{.data.total_requests}} requests
+    &middot; {{.data.total_campaigns}} campaign(s)
+  </p>
+
+{{if .data.error}}  <div class="error">{{.data.error}}</div>
+{{end}}{{$sm := .data.success_metrics}}{{if $sm}}
+  <h2>Success Metrics</h2>
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="value">{{$sm.overall_confirmation_rate}}%</div>
+      <div class="label">Confirmation Rate</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">{{$sm.overall_rejection_rate}}%</div>
+      <div class="label">Rejection Rate</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">{{$sm.overdue_rate}}%</div>
+      <div class="label">Overdue Rate</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">{{default $sm.avg_response_time_days "—"}}</div>
+      <div class="label">Avg Response (days)</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">{{default $sm.median_response_time_days "—"}}</div>
+      <div class="label">Median Response (days)</div>
+    </div>
+  </div>
+{{end}}{{if .data.historical_comparison}}{{$hc := .data.historical_comparison}}
+  <h2>Historical Comparison</h2>
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="value">{{htmltext $hc.requests_change}}</div>
+      <div class="label">Request Change</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">{{$hc.confirmation_rate_change}}%</div>
+      <div class="label">Confirmation Rate Change</div>
+      <div class="change {{ternary (ge $hc.confirmation_rate_change 0) "positive" "negative"}}">{{ternary (ge $hc.confirmation_rate_change 0) "↑" "↓"}}</div>
+    </div>
+    <div class="metric-card">
+      <div class="value">{{$hc.rejection_rate_change}}%</div>
+      <div class="label">Rejection Rate Change</div>
+      <div class="change {{ternary (le $hc.rejection_rate_change 0) "positive" "negative"}}">{{ternary (gt $hc.rejection_rate_change 0) "↑" "↓"}}</div>
+    </div>
+  </div>
+{{end}}{{range .data.campaigns}}
+  <h2>Campaign: {{.campaign_id}}</h2>
+  <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px;">
+    {{.kind}} &middot; Created {{if .created_at}}{{slice .created_at 0 10}}{{else}}?{{end}}
+    &middot; {{.total}} requests
+    &middot; {{.confirmation_rate}}% confirmed
+  </p>
+
+  <div class="metrics-grid">
+    <div class="metric-card"><div class="value">{{.planned}}</div><div class="label">Planned</div></div>
+    <div class="metric-card"><div class="value">{{.sent}}</div><div class="label">Sent</div></div>
+    <div class="metric-card"><div class="value">{{.awaiting_ack}}</div><div class="label">Awaiting Ack</div></div>
+    <div class="metric-card"><div class="value">{{.awaiting_response}}</div><div class="label">Awaiting Response</div></div>
+    <div class="metric-card"><div class="value">{{.confirmed}}</div><div class="label">Confirmed</div></div>
+    <div class="metric-card"><div class="value">{{.rejected}}</div><div class="label">Rejected</div></div>
+    <div class="metric-card"><div class="value">{{.overdue}}</div><div class="label">Overdue</div></div>
+    <div class="metric-card"><div class="value">{{.total_reminders_sent}}</div><div class="label">Reminders</div></div>
+    <div class="metric-card"><div class="value">{{default .avg_response_time_days "—"}}</div><div class="label">Avg Response (days)</div></div>
+  </div>
+
+  <h3>Requests</h3>
+{{if .requests}}  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Broker</th>
+        <th>Jurisdiction</th>
+        <th>Status</th>
+        <th>Sent</th>
+        <th>Resolved</th>
+        <th>Reminders</th>
+      </tr>
+    </thead>
+    <tbody>
+{{range slicelist .requests 0 100}}      <tr>
+        <td>#{{.id}}</td>
+        <td>{{.broker_id}}</td>
+        <td>{{.jurisdiction}}</td>
+        <td>{{.current_status}}</td>
+        <td>{{slice (default .sent_at "") 0 10}}</td>
+        <td>{{slice (default .resolved_at "") 0 10}}</td>
+        <td>{{.reminders_sent}}</td>
+      </tr>
+{{end}}    </tbody>
+  </table>
+{{if gt (len .requests) 100}}  <p style="font-size:0.75rem;color:var(--text-muted);">Showing first 100 of {{len .requests}} requests.</p>
+{{end}}{{else}}  <p class="empty">No requests in this campaign.</p>
+{{end}}{{end}}{{if .data.broker_leaderboard}}
+  <h2>Broker Leaderboard</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Broker</th>
+        <th>Total</th>
+        <th>Confirmed</th>
+        <th>Rejected</th>
+        <th>Overdue</th>
+        <th>Success Rate</th>
+        <th>Avg Response</th>
+      </tr>
+    </thead>
+    <tbody>
+{{range .data.broker_leaderboard}}      <tr>
+        <td><strong>{{.broker_id}}</strong></td>
+        <td>{{.total}}</td>
+        <td>{{.confirmed}}</td>
+        <td>{{.rejected}}</td>
+        <td>{{.overdue}}</td>
+        <td>{{.success_rate}}%</td>
+        <td>{{default .avg_response_time_days "—"}}</td>
+      </tr>
+{{end}}    </tbody>
+  </table>
+{{end}}{{if .data.jurisdiction_stats}}
+  <h2>Jurisdiction Breakdown</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Jurisdiction</th>
+        <th>Total</th>
+        <th>Confirmed</th>
+        <th>Rejected</th>
+        <th>Overdue</th>
+        <th>Confirmation Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+{{range .data.jurisdiction_stats}}      <tr>
+        <td><strong>{{.jurisdiction}}</strong></td>
+        <td>{{.total}}</td>
+        <td>{{.confirmed}}</td>
+        <td>{{.rejected}}</td>
+        <td>{{.overdue}}</td>
+        <td>{{.confirmation_rate}}%</td>
+      </tr>
+{{end}}    </tbody>
+  </table>
+{{end}}{{if .data.timeline}}
+  <h2>Timeline</h2>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Events</th><th>Details</th></tr>
+    </thead>
+    <tbody>
+{{range .data.timeline}}      <tr>
+        <td>{{.date}}</td>
+        <td>{{.total_events}}</td>
+        <td style="font-size:0.7rem;">{{join .events ", "}}</td>
+      </tr>
+{{end}}    </tbody>
+  </table>
+{{end}}
+  <div class="footer">
+    Generated by Symaira EraseMe &mdash; {{datefmt .now "%Y-%m-%d %H:%M UTC"}}
+  </div>
+</div>
+</body>
+</html>
