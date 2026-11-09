@@ -16,6 +16,7 @@ REVISIONS = (
     'e61132f85b89580c96d95d098289f7238e810255',  # webpki distrusted-roots native dependency refresh
     'e2cf176337f6f90e64f76b5f39d3a859e87774ea',  # ctutils/tokio RUSTSEC native dependency refresh
     '433622f6e6c884694a304f483ae481f93069b455',  # minor-patch group native dependency refresh
+    'c129252f76e28cc9d0bdd7fe25152f9e63db3840',  # supported-target (macOS arm64, Linux) native refresh
 )
 REPOSITORY = 'https://github.com/danieljustus/symaira-eraseme.git'
 

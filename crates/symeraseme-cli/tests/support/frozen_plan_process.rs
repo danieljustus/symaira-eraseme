@@ -1,4 +1,4 @@
-//! Complete actual native Linux/Windows Go plan processes and persisted effects.
+//! Complete actual native Go plan processes and persisted effects (macOS arm64, Linux).
 use base64::Engine;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -9,7 +9,7 @@ use std::process::{Command, Output};
 mod go_source_pin;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const REVISION: &str = "433622f6e6c884694a304f483ae481f93069b455";
+const REVISION: &str = "c129252f76e28cc9d0bdd7fe25152f9e63db3840";
 
 fn digest(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
@@ -67,22 +67,7 @@ fn verify(raw: &[u8], expected: &str, case: &str, target: &str) -> Value {
         if retired {
             go_source_pin::assert_retired_generator_matches_archive(ROOT, name, &archive.stdout);
         }
-        // These three archived generators were measured as an actual Git
-        // autocrlf checkout on both Windows producers. Preserve the recorded
-        // digest and reproduce only that independently verified transform.
-        let bytes = if target.starts_with("windows/") {
-            assert!(!archive.stdout.windows(2).any(|bytes| bytes == b"\r\n"));
-            let mut bytes = Vec::with_capacity(archive.stdout.len());
-            for byte in archive.stdout {
-                if byte == b'\n' {
-                    bytes.push(b'\r');
-                }
-                bytes.push(byte);
-            }
-            bytes
-        } else {
-            archive.stdout
-        };
+        let bytes = archive.stdout;
         assert_eq!(pin["bytes"], bytes.len());
         assert_eq!(pin["sha256"], digest(&bytes));
         // Retired producers were independently authenticated above. Other
@@ -125,25 +110,16 @@ pub fn observation(case: &str) -> (Output, Value) {
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
         ("linux", "aarch64") => "linux/arm64",
-        ("windows", "x86_64") => "windows/amd64",
-        ("windows", "aarch64") => "windows/arm64",
-        ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
         _ => panic!("no recorded plan process for this target; live Go is retired"),
     };
     let (raw, pin) = match (target, case) {
-        ("darwin/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/darwin-arm64/web-form.json").as_slice(), "a0f1ed8ffea1759f6af5ce086f1db31e4b53bc6e71dabfd44d48b76ddd97a8c6"),
-        ("darwin/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/darwin-arm64/senderless-email.json").as_slice(), "6ad91859e185a5fdf95d5157a536141f3226c453c7f20f0808a0f8671fabfbdb"),
-        ("darwin/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/darwin-amd64/web-form.json").as_slice(), "efb491f77fc33eaf7b86cfeb5a83e5b303eebe1ffa3f2f927ad58085d28dcdcd"),
-        ("darwin/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/darwin-amd64/senderless-email.json").as_slice(), "1e925d45edac05a291c98869d7a3c9bd1b3c9e3582bd179e7305cd723eaa328a"),
-        ("windows/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/windows-amd64/web-form.json").as_slice(), "f26d563bfebe97e535c47c4f4e7f8e7129b37db327485d740235ffdf8ae8afa0"),
-        ("windows/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/windows-amd64/senderless-email.json").as_slice(), "e646db81750dc3181fbfe6ce6b756ab6f54152cd12f99cda5bd01902ab33f00c"),
-        ("windows/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/windows-arm64/web-form.json").as_slice(), "6cba7e0eac77b893b92691c24fa6de143cccd0fad245c7cfa6781115968c674a"),
-        ("windows/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/windows-arm64/senderless-email.json").as_slice(), "82530c0c7b54b1ffc149726ba4cb940fce1db8bf5cfd1e9afee58c9ceeb20eca"),
-        ("linux/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/linux-arm64/web-form.json").as_slice(), "8587f08f062eef2468f9c96789844743fc9c510969b372067fa614fdff60a0d0"),
-        ("linux/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/linux-arm64/senderless-email.json").as_slice(), "508179bba80d376000825195863ac18c45bdbddb8b57dbf346e3e35d01e1622a"),
-        ("linux/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/linux-amd64/web-form.json").as_slice(), "33437c5d73b981a1d06baf111aceb4e33e7139c81c56ea84ec2c45d80783a252"),
-        ("linux/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-433622f6/plan-processes/linux-amd64/senderless-email.json").as_slice(), "46e12d6167acb09df81a52470d43a90248e005e36e333ab4ee476df922903809"),
+        ("darwin/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/darwin-arm64/web-form.json").as_slice(), "55b6080cb8e64123f53e1c6b953d3be128bcec7401dfd3dd1002ccd223d8997a"),
+        ("darwin/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/darwin-arm64/senderless-email.json").as_slice(), "cc5ec3f966ac68a122553ee2b93aa47dc5bf8110c3f17506e619cbcc0616abf9"),
+        ("linux/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/linux-arm64/web-form.json").as_slice(), "e6e2d65285908b24b1d87c98fe94f7f6910084ed35c74ea14486a30b096f0b45"),
+        ("linux/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/linux-arm64/senderless-email.json").as_slice(), "83a40ff8fcb01e2c0fb977b8885dc1d253b1fdef7d0276a004cb8e9446d0d650"),
+        ("linux/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/linux-amd64/web-form.json").as_slice(), "5c7a3a571784e5a55a95fe312283d9615835bdfe8dc6c9c40afb49b9f66bf6da"),
+        ("linux/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/linux-amd64/senderless-email.json").as_slice(), "c907c252846d94ff418ae8a71e587c1f3d95213aad29d98c8948f6b36404c7e3"),
         _ => panic!("unrecorded plan process cannot receive a cached answer"),
     };
     let record = verify(raw, pin, case, target);
@@ -162,14 +138,8 @@ pub fn observation(case: &str) -> (Output, Value) {
         ))
         .is_err()
     );
-    #[cfg(unix)]
     let status = {
         use std::os::unix::process::ExitStatusExt;
-        std::process::ExitStatus::from_raw(0)
-    };
-    #[cfg(windows)]
-    let status = {
-        use std::os::windows::process::ExitStatusExt;
         std::process::ExitStatus::from_raw(0)
     };
     let output = Output {

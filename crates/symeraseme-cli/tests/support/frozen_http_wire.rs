@@ -12,35 +12,27 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
-        "darwin/amd64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "d6b95ecf18c7c3ee4f5d9919234b1fd0d9bb306d6c8724a2278b4c005f70fdfa",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/http-wire/darwin-amd64/wire.json"
-        ),
-    ),
-    (
         "darwin/arm64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "ab9005a7936cac9430f71babef2dddf79d46a59bb7c2148bf18e6f96a7041ef7",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "0d347874707e1dfa7056988c4e3e5cb66b5772bf28feda22212a9e616a51b266",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/http-wire/darwin-arm64/wire.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/http-wire/darwin-arm64/wire.json"
         ),
     ),
     (
         "linux/amd64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "c5efa3fdf207fc5dd9969f407f810b0c49a676f31b411801fdb41beea7df29cb",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "2e94220e2513fc2472818092356605b3be2490d7a792fc7659341cfaa69bb3b6",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/http-wire/linux-amd64/wire.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/http-wire/linux-amd64/wire.json"
         ),
     ),
     (
         "linux/arm64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "5fb6873a049353f15db135a57b4f69668ff7d3c76f59dedb04cdead7dc0169a5",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "4c0cce6cd328a9e0f4b8017ff0f4c73098f608570317429e830452b24720d635",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/http-wire/linux-arm64/wire.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/http-wire/linux-arm64/wire.json"
         ),
     ),
 ];
@@ -153,7 +145,6 @@ pub fn observations() -> Corpus {
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
         ("linux", "aarch64") => "linux/arm64",
-        ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
         _ => panic!("no recorded native HTTP wire capture for this target; live Go is retired"),
     };

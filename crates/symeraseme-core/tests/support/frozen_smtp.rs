@@ -12,111 +12,57 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
 const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
     (
-        "darwin/amd64",
-        "campaign",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "c4ed4dc4bfbbca22e76b03090d6104787f4910aca334b4142fee8eebc99d119a",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/darwin-amd64/campaign.json"
-        ),
-    ),
-    (
-        "darwin/amd64",
-        "transport",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "eae2da931bc042c3fa8c18821b735a01883212c805dce897dcc2b8f6b6266a1e",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/darwin-amd64/transport.json"
-        ),
-    ),
-    (
         "darwin/arm64",
         "campaign",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "79db975d7a9e90847fd63c18194d7dbd347a26eaa6c15f6ec5598de92dd0b41f",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "75eff6df8c263434b1f0f47a2ea5cc1af866420cb59cce235b379b5b1257fc45",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/darwin-arm64/campaign.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/smtp/darwin-arm64/campaign.json"
         ),
     ),
     (
         "darwin/arm64",
         "transport",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "977fc8c0c46fae652f37439a09bd904f466243405bcbd35032f9435d529b3022",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "8c9dd3bda1bfd04549081d758d9fea63839b3b96c86038d9eb814ae0e7dda862",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/darwin-arm64/transport.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/smtp/darwin-arm64/transport.json"
         ),
     ),
     (
         "linux/amd64",
         "campaign",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "e5fa9a0b614d1d0959975973c2ac8c6f70b807c473e201e759048e6341fa4473",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "4f5c20fb770d68733a087fdacaba4d9a3345f281f8cf5ebf35da3a41ab1f30f6",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/linux-amd64/campaign.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/smtp/linux-amd64/campaign.json"
         ),
     ),
     (
         "linux/amd64",
         "transport",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "23773a55e3810e28c69a2973778412fc23d38e89168435670e0c18ad747f1eff",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "a7c48d72f4ac07b4180fe6aed4d4999fcaeef061d862112c6758f9d25029b582",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/linux-amd64/transport.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/smtp/linux-amd64/transport.json"
         ),
     ),
     (
         "linux/arm64",
         "campaign",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "e132b20350d9f1337112c5d3a0a0198e5bde39ea05926d36abef7e1e1c97e2af",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "bcd27cbe13da2c2869e1341219ba8ecf0cf641ae8648ee0702c586b6919d1939",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/linux-arm64/campaign.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/smtp/linux-arm64/campaign.json"
         ),
     ),
     (
         "linux/arm64",
         "transport",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "8386e0a300b1d814d82088e36c8c72fe72b118c07f33f748225c5736d7b0035e",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "69ee2ec744b2e6998ddc88d63b456eae486b6c0389e3b1703433ad208a157993",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/linux-arm64/transport.json"
-        ),
-    ),
-    (
-        "windows/amd64",
-        "campaign",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "f72d69ee3cd17fc4511289a94230c302ef754112028d2e77ec15fb8e6445ee97",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/windows-amd64/campaign.json"
-        ),
-    ),
-    (
-        "windows/amd64",
-        "transport",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "cbd7a4bc9ae21d3589b03dbc23746f34c639870f09fad9eb62a73ad493d2c4a4",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/windows-amd64/transport.json"
-        ),
-    ),
-    (
-        "windows/arm64",
-        "campaign",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "946b497403bc5c4833207594b77a6b0957cc325ca03242b9ea4143ad40a0023b",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/windows-arm64/campaign.json"
-        ),
-    ),
-    (
-        "windows/arm64",
-        "transport",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "a90b143c2a4b9dd3651476351c5e41895d66accd75b54227c68ada7764ea9b5e",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/smtp/windows-arm64/transport.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/smtp/linux-arm64/transport.json"
         ),
     ),
 ];
@@ -181,20 +127,7 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str, family: &str) -> 
                     &archive.stdout,
                 );
             }
-            let archived_bytes = if field == "archived_generators" && target.starts_with("windows/")
-            {
-                assert!(!archive.stdout.windows(2).any(|bytes| bytes == b"\r\n"));
-                let mut transformed = Vec::new();
-                for byte in archive.stdout {
-                    if byte == b'\n' {
-                        transformed.push(b'\r');
-                    }
-                    transformed.push(byte);
-                }
-                transformed
-            } else {
-                archive.stdout
-            };
+            let archived_bytes = archive.stdout;
             assert_eq!(recorded["bytes"], archived_bytes.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archived_bytes), "{name}");
             if !retired_producer && go_source_pin::current_tree_bound(name) {
@@ -288,9 +221,6 @@ pub fn observations(family: &str) -> Corpus {
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
         ("linux", "aarch64") => "linux/arm64",
-        ("windows", "x86_64") => "windows/amd64",
-        ("windows", "aarch64") => "windows/arm64",
-        ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
         _ => panic!("no recorded native SMTP capture for this target; live Go is retired"),
     };

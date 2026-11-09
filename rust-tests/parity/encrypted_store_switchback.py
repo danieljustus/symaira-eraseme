@@ -69,11 +69,9 @@ def mcp_command(root, label, argv, env, stdin_bytes, timeout=30):
     return record
 
 
-def run(go, rust, output, sandbox_control=None):
-    gate.require(sys.platform in ("darwin", "win32") or sys.platform.startswith("linux"),
-                 "unsupported: switchback confinement is available on macOS, Linux and Windows")
-    gate.require((sandbox_control is not None) == (sys.platform == "win32"),
-                 "the compiled sandbox control is required on, and only on, Windows")
+def run(go, rust, output):
+    gate.require(sys.platform == "darwin" or sys.platform.startswith("linux"),
+                 "unsupported: switchback confinement is available on macOS and Linux")
     if sys.platform.startswith("linux"):
         gate.require(os.getuid() != 0 and os.getgid() != 0,
                      "Linux sandbox runner must start as an unprivileged user")
@@ -103,7 +101,7 @@ def run(go, rust, output, sandbox_control=None):
         gate.require(report["artifacts"]["go"]["sha256"] != report["artifacts"]["rust"]["sha256"],
                      "Go and Rust artifacts must differ")
         shutil.copyfile(FIXTURE, database)
-        active = output / ("bin/symeraseme" + (".exe" if goos == "windows" else ""))
+        active = output / "bin/symeraseme"
         key_hex = MASTER_KEY.hex()
         env = {"HOME": str(output / "home"), "USERPROFILE": str(output / "home"),
                "XDG_CONFIG_HOME": str(output / "config"), "XDG_DATA_HOME": str(output / "data"),
@@ -114,13 +112,7 @@ def run(go, rust, output, sandbox_control=None):
                "SYMERASEME_DB_DIR": str(output / "data"),
                "SYMERASEME_ENCRYPT_DB": "true",
                "SYMERASEME_IDENTITY_MASTER_KEY": key_hex}
-        gate.native_env(output, env)
-        if goos == "windows":
-            policy = gate.record_windows_policy(output, active)
-            report["native_confinement_controls"] = gate.windows_controls(output, env, sandbox_control)
-        else:
-            policy = gate.sandbox(output, active.resolve())
-        gate.save(output / "sandbox-policy.json", policy)
+        gate.save(output / "sandbox-policy.json", gate.sandbox(output, active.resolve()))
         if os.sys.platform.startswith("linux"):
             python = Path(os.sys.executable).resolve()
             probes = {}
@@ -232,10 +224,8 @@ def main():
     parser.add_argument("--go", type=Path, required=True)
     parser.add_argument("--rust", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--sandbox-control", type=Path,
-                        help="compiled Windows denial control (required on Windows)")
     args = parser.parse_args()
-    result = run(args.go, args.rust, args.output_dir, args.sandbox_control)
+    result = run(args.go, args.rust, args.output_dir)
     print(json.dumps({"status": result["status"], "scope": result["scope"],
                       "executed_cases": len(result["steps"])}))
 

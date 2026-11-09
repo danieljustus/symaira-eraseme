@@ -12,51 +12,27 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
-        "darwin/amd64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "07b89236c4deb1bb4160d630d103dd61fdd46953c569f72de00dd7a32e562c75",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/agent-error/darwin-amd64/agent-error.json"
-        ),
-    ),
-    (
         "darwin/arm64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "53f3af9479929a97817fb82a8a118401695c086805f8ee60b3765cec900c0b39",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "f1464fc2cd75b994d0fe6a8543f49fc0c34260b23c8dd87c71078805ec62ace1",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/agent-error/darwin-arm64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/agent-error/darwin-arm64/agent-error.json"
         ),
     ),
     (
         "linux/amd64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "72c9ef7b546eec00ee65bc64df9ac472a20800ed5ff993a4412f72c0256c8b3a",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "f1ce82f1d1bd4fafaea81266fd3a5720ec7ace75ee3f4716d4ac951ea6c246b9",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/agent-error/linux-amd64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/agent-error/linux-amd64/agent-error.json"
         ),
     ),
     (
         "linux/arm64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "46099b6f9460149924530289e2edf8c5a121563463811283ee720d81fdb75e60",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "81c57737891deabe3b839fc9465f88e1ab0cfa07fb1dbe2ee22aa14a9b4a4e5d",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/agent-error/linux-arm64/agent-error.json"
-        ),
-    ),
-    (
-        "windows/amd64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "3b01294ea0473115af26c1c1a8a610496048eb18ca697ba29dfcb102f7045364",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/agent-error/windows-amd64/agent-error.json"
-        ),
-    ),
-    (
-        "windows/arm64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "6d4ab34fc8747e00e21192ac7d33f1683adf402edd1c903da7a57e3baa58d9e6",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/agent-error/windows-arm64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/agent-error/linux-arm64/agent-error.json"
         ),
     ),
 ];
@@ -214,10 +190,7 @@ pub fn observations() -> Corpus {
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
         ("linux", "aarch64") => "linux/arm64",
-        ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
-        ("windows", "x86_64") => "windows/amd64",
-        ("windows", "aarch64") => "windows/arm64",
         _ => panic!("unrecorded native agent-error target"),
     };
     let (_, revision, pin, raw) = RECORDS

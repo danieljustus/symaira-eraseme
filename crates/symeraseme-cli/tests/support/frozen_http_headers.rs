@@ -12,51 +12,27 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
-        "darwin/amd64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "19dc14f45483559c55e47bfedbd6e81898b28814b870cb9f9c605d11b8963b62",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/http-headers/darwin-amd64/headers.json"
-        ),
-    ),
-    (
         "darwin/arm64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "ebbe1e87ecddc2f45ce3288cf1350e6537030df5b31da1823395e7c97d2b057f",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "b705969f1330d21b86e237e6030d3070a6e4df5a430d3932f0cef49c68195b43",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/http-headers/darwin-arm64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/http-headers/darwin-arm64/headers.json"
         ),
     ),
     (
         "linux/amd64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "b7bd4e45a51e67353a499431f7e40ae03ff755f4d0ad27f54ab0fc92e14a4a26",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "cccb8d02282a95c714534a6b07f8f1b168943804a0c451aeef33b6d7250bba2d",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/http-headers/linux-amd64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/http-headers/linux-amd64/headers.json"
         ),
     ),
     (
         "linux/arm64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "1e79391bf3dc5d9bedd063548a979a8d9a5323461890894a9ddbcae620c6017a",
+        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
+        "04d0c0550728e6c4d63ad6c398000aa5d80391612d9c1fde8048a7c163e784ce",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/http-headers/linux-arm64/headers.json"
-        ),
-    ),
-    (
-        "windows/amd64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "63290bd83793e444a6c239363277373c88a2e0cd008ee8cc4d32d66c5788f014",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/http-headers/windows-amd64/headers.json"
-        ),
-    ),
-    (
-        "windows/arm64",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "907699677e96b9136cd11d0e726411f42b366eb3a8687fb6528d90157d85a7f7",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/http-headers/windows-arm64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-c129252f/http-headers/linux-arm64/headers.json"
         ),
     ),
 ];
@@ -117,20 +93,7 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
                     &archive.stdout,
                 );
             }
-            let archived_bytes = if field == "archived_generators" && target.starts_with("windows/")
-            {
-                assert!(!archive.stdout.windows(2).any(|bytes| bytes == b"\r\n"));
-                let mut transformed = Vec::new();
-                for byte in archive.stdout {
-                    if byte == b'\n' {
-                        transformed.push(b'\r');
-                    }
-                    transformed.push(byte);
-                }
-                transformed
-            } else {
-                archive.stdout
-            };
+            let archived_bytes = archive.stdout;
             assert_eq!(recorded["bytes"], archived_bytes.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archived_bytes), "{name}");
             if !retired_producer && go_source_pin::current_tree_bound(name) {
@@ -185,9 +148,6 @@ pub fn observations() -> Corpus {
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
         ("linux", "aarch64") => "linux/arm64",
-        ("windows", "x86_64") => "windows/amd64",
-        ("windows", "aarch64") => "windows/arm64",
-        ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
         _ => panic!("no recorded native HTTP header capture for this target; live Go is retired"),
     };
