@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [v0.15.1] - 2026-11-10
+
+Canary patch prerelease on the Rust-only 0.15 line. It ships the bundled
+SQLite fix for RUSTSEC-2026-0459; supported targets are unchanged (macOS on
+Apple Silicon, Linux amd64/arm64). Stable promotion and Homebrew distribution
+still require separately verified acceptance.
+
 ### Changed
 
 - Dependency refreshes of the frozen native evidence bind to the supported
