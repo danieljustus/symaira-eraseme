@@ -1,5 +1,5 @@
-//! Consented live \`plan execute\` parity against recorded native Go results.
-//! Synthetic web-form and senderless email requests stay offline.
+//! Consented live \`plan execute\` parity against the Go CLI built from this
+//! checkout. Synthetic web-form and senderless email requests stay offline.
 
 use serde_json::{Map, Value, json};
 use std::fs;
@@ -10,6 +10,8 @@ use symeraseme_core::storage::{
     types::{EventType, Source},
 };
 
+#[path = "support/capture_plan_process.rs"]
+mod capture_plan_process;
 #[path = "support/frozen_plan_process.rs"]
 mod frozen_plan_process;
 
@@ -100,6 +102,34 @@ fn prepare(root: &Path, email: bool) -> (PathBuf, PathBuf, PathBuf, String) {
         .issue_token("execute", 600)
         .expect("private execute consent");
     (home, data, cwd, token)
+}
+
+fn build_go_cli(root: &Path) -> PathBuf {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let output = root.join("symeraseme-go");
+    let cache = root.join("go-cache");
+    fs::create_dir_all(&cache).expect("internal temporary Go cache");
+    let go = std::env::var_os("SYMERASEME_GO")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("go"));
+    let built = Command::new(go)
+        .current_dir(repo)
+        .env("GOWORK", "off")
+        .env("GOPROXY", "off")
+        .env("GOSUMDB", "off")
+        .env("GOCACHE", cache)
+        .env("GOTOOLCHAIN", "go1.26.6")
+        .args(["build", "-o"])
+        .arg(&output)
+        .arg("./cmd/symeraseme")
+        .output()
+        .expect("build source-bound Go CLI");
+    assert!(
+        built.status.success(),
+        "source-bound Go CLI build failed:\n{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    output
 }
 
 fn run(
@@ -219,13 +249,26 @@ fn persisted_effects(data: &Path) -> (String, Vec<EventRow>, Vec<TaskRow>) {
 #[test]
 fn consented_live_plan_execute_matches_source_bound_go_process() {
     let root = tempfile::tempdir().expect("temporary root");
-    let (go_output, effects) = frozen_plan_process::observation("web-form");
-    let go_effects: (String, Vec<EventRow>, Vec<TaskRow>) =
-        serde_json::from_value(effects).unwrap();
+    let frozen = frozen_plan_process::observation("web-form");
+    let go = frozen.is_none().then(|| build_go_cli(root.path()));
+    let go_root = root.path().join("go");
     let rust_root = root.path().join("rust");
+    fs::create_dir_all(&go_root).expect("Go fixture root");
     fs::create_dir_all(&rust_root).expect("Rust fixture root");
+    let (go_home, go_data, go_cwd, go_token) = prepare(&go_root, false);
     let (rust_home, rust_data, rust_cwd, rust_token) = prepare(&rust_root, false);
-    let resources = rust_root.join("resources");
+    let resources = go_root.join("resources");
+
+    let (go_output, go_effects) = frozen.map_or_else(
+        || {
+            let go = go.as_ref().unwrap();
+            let output = run(go, &go_home, &go_data, &go_cwd, &resources, &go_token);
+            let effects = persisted_effects(&go_data);
+            capture_plan_process::record("web-form", go, &output, &effects);
+            (output, effects)
+        },
+        |(output, effects)| (output, serde_json::from_value(effects).unwrap()),
+    );
     let rust_output = run(
         Path::new(env!("CARGO_BIN_EXE_symeraseme-rust")),
         &rust_home,
@@ -266,15 +309,31 @@ fn consented_live_plan_execute_matches_source_bound_go_process() {
 #[test]
 fn consented_live_plan_execute_without_email_sender_matches_go_process() {
     let root = tempfile::tempdir().expect("temporary root");
-    let (go_output, effects) = frozen_plan_process::observation("senderless-email");
-    let go_effects: (String, Vec<EventRow>, Vec<TaskRow>) =
-        serde_json::from_value(effects).unwrap();
+    let frozen = frozen_plan_process::observation("senderless-email");
+    let go = frozen.is_none().then(|| build_go_cli(root.path()));
+    let go_root = root.path().join("go-email");
     let rust_root = root.path().join("rust-email");
+    fs::create_dir_all(&go_root).expect("Go email fixture root");
     fs::create_dir_all(&rust_root).expect("Rust email fixture root");
+    let (go_home, go_data, go_cwd, go_token) = prepare(&go_root, true);
     let (rust_home, rust_data, rust_cwd, rust_token) = prepare(&rust_root, true);
-    let resources = rust_root.join("resources");
+    let resources = go_root.join("resources");
     let rust = Path::new(env!("CARGO_BIN_EXE_symeraseme-rust"));
+    if let Some(go) = &go {
+        init_profile(go, &go_home, &go_data, &go_cwd);
+    }
     init_profile(rust, &rust_home, &rust_data, &rust_cwd);
+
+    let (go_output, go_effects) = frozen.map_or_else(
+        || {
+            let go = go.as_ref().unwrap();
+            let output = run(go, &go_home, &go_data, &go_cwd, &resources, &go_token);
+            let effects = persisted_effects(&go_data);
+            capture_plan_process::record("senderless-email", go, &output, &effects);
+            (output, effects)
+        },
+        |(output, effects)| (output, serde_json::from_value(effects).unwrap()),
+    );
     let rust_output = run(
         rust,
         &rust_home,
@@ -332,42 +391,4 @@ fn consented_live_plan_execute_without_email_sender_matches_go_process() {
         go_effects.2.is_empty(),
         "email failure creates no manual task"
     );
-}
-
-#[test]
-fn retired_plan_capture_controls_fail_closed() {
-    let root = tempfile::tempdir().unwrap();
-    for (variable, value, message) in [
-        (
-            "SYMERASEME_PARITY_LIVE_GO",
-            "1",
-            "live Go execution is retired",
-        ),
-        (
-            "SYMERASEME_CAPTURE_PLAN_PROCESSES",
-            "",
-            "live Go capture is retired",
-        ),
-        (
-            "SYMERASEME_CAPTURE_PLAN_PROCESSES",
-            "requested",
-            "live Go capture is retired",
-        ),
-    ] {
-        let output = Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "consented_live_plan_execute_matches_source_bound_go_process",
-                "--nocapture",
-            ])
-            .env_remove("SYMERASEME_PARITY_LIVE_GO")
-            .env_remove("SYMERASEME_CAPTURE_PLAN_PROCESSES")
-            .env(variable, value)
-            .env("PATH", root.path())
-            .current_dir(root.path())
-            .output()
-            .unwrap();
-        assert!(!output.status.success());
-        assert!(String::from_utf8_lossy(&output.stderr).contains(message));
-    }
 }
