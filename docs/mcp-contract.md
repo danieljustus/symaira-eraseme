@@ -324,12 +324,14 @@ Parameters:
 
 ### `get_dashboard_data`
 
-Return aggregated dashboard data: campaigns, request status counts, broker status, and recent events.
+Return aggregated dashboard data: campaigns, request status counts (totals and `by_status`), broker status, and recent events. Compact by default: the 20 brokers needing the most attention and no per-campaign request lists (post-cutover change #1296, recorded in `docs/rust-port-contract-matrix.md`; the frozen Go baseline took no parameters).
 
 Required: `—`
 
 Parameters:
-    - (none)
+    -   `limit` (integer, default 20): Most brokers in `broker_status`, chosen by overdue then pending then total requests; `0` lists every broker. Negative values are rejected.
+    -   `summary_only` (boolean, default false): Return only totals, `by_status` and campaign counters: no `broker_status`, `recent_events` or `requests`
+    -   `include_requests` (boolean, default false): Include every request under its campaign (can be very large)
 
 ### `list_requests`
 
