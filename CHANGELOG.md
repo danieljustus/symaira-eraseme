@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `symeraseme plan delete --campaign <id> [--dry-run]` removes a campaign
+  created by mistake together with its requests and events. It refuses unless
+  every request is still PLANNED and no reply, draft, manual task or other
+  event is attached, deletes in one transaction, and prints the row counts
+  (`--output json` for a machine-readable object). `--dry-run` counts without
+  deleting (#1297).
+
 ### Changed
 
 - MCP `get_dashboard_data` (and `symeraseme dashboard`) is compact by default:
@@ -12,6 +21,12 @@ All notable changes to this project are documented in this file.
   `limit` (`0` = all brokers), `summary_only` and `include_requests` resize it.
   A store with 9134 requests no longer returns ~2 MB. `generate-dashboard` is
   unchanged (#1296).
+- User-facing leftovers of the Go port are retired: `symeraseme --help` and
+  `migrate` describe the current CLI, `status` / `plan status` print
+  `Total: 9134 requests, 9134 open, 0 resolved` instead of Go's map formatting
+  (JSON unchanged), and the MCP `initialize` response reports the product
+  version instead of `dev`. Recorded as a post-cutover contract change in
+  `docs/rust-port-contract-matrix.md` (#1295).
 
 ### Fixed
 

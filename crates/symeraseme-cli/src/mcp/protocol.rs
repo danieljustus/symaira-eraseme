@@ -212,7 +212,7 @@ pub(crate) fn initialize_cancellable(
             protocol_version: "2025-06-18",
             server_info: ServerInfo {
                 name: "symeraseme",
-                version: "dev",
+                version: env!("CARGO_PKG_VERSION"),
             },
         };
         InitializeOutcome::Response(encode_response(&Response {
@@ -976,6 +976,7 @@ fn expand_decimal(mantissa: &str, exponent: i32) -> String {
 mod tests {
     use super::*;
     use crate::mcp::handler::test_support::no_backend_handler;
+    use crate::mcp::post_cutover_1295::server_info_version;
     use serde::Deserialize;
 
     #[derive(Deserialize)]
@@ -1078,15 +1079,15 @@ mod tests {
     fn initialize_response_is_byte_stable_and_lexically_ordered() {
         assert_eq!(
             response(r#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#),
-            go_json(
+            go_json(&server_info_version(
                 r#"{"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"protocolVersion":"2025-06-18","serverInfo":{"name":"symeraseme","version":"dev"}},"id":1}"#,
-            )
+            ))
         );
         assert_eq!(
             response(r#"{"jsonrpc":"2.0","id":1.0,"method":"initialize","params":null}"#),
-            go_json(
+            go_json(&server_info_version(
                 r#"{"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"protocolVersion":"2025-06-18","serverInfo":{"name":"symeraseme","version":"dev"}},"id":1}"#,
-            )
+            ))
         );
     }
 
@@ -1182,7 +1183,12 @@ mod tests {
                 }
             };
             if !case.parse_error {
-                assert_eq!(actual, case.response, "{}", case.name);
+                assert_eq!(
+                    actual,
+                    case.response.as_deref().map(server_info_version),
+                    "{}",
+                    case.name
+                );
             }
         }
     }
@@ -1233,7 +1239,12 @@ mod tests {
                 }
             };
             if !case.parse_error {
-                assert_eq!(actual, case.response, "{}", case.name);
+                assert_eq!(
+                    actual,
+                    case.response.as_deref().map(server_info_version),
+                    "{}",
+                    case.name
+                );
             }
         }
     }

@@ -1,5 +1,6 @@
 //! The production SQLite connection and event-store seams.
 
+pub mod campaign_delete;
 pub mod encrypted_store;
 pub mod encryption;
 pub mod locking;
@@ -8,6 +9,9 @@ pub mod repository;
 pub mod store;
 pub mod types;
 
+pub use campaign_delete::{
+    CampaignDeleteCounts, CampaignDeleteError, CampaignDeleteResult, delete_never_sent_campaign,
+};
 pub use encrypted_store::{
     CheckpointError, EncryptedStoreError, MasterKeyProvider, STALE_SCAVENGE_AGE,
     atomic_transition_with_recovery, checkpoint_wal_conn, clear_master_key, current_master_key,

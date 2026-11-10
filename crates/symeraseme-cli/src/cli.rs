@@ -578,6 +578,7 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             campaign_status(parsed, &campaign)
         }
         "plan create" => plan_create(parsed),
+        "plan delete" => plan_delete(parsed),
         "plan show" => plan_show(parsed),
         "plan execute" => plan_execute(parsed),
         "plan status" => plan_status(parsed),
@@ -967,6 +968,54 @@ fn plan_create(parsed: &Parsed) -> Outcome {
     })
 }
 
+/// `plan delete` — post-cutover addition (#1297), no Go counterpart.
+///
+/// Deletes a campaign whose requests are all still PLANNED and carry no
+/// evidence; see [`symeraseme_core::storage::delete_never_sent_campaign`].
+/// `--output` is validated before the store is touched.
+fn plan_delete(parsed: &Parsed) -> Outcome {
+    let campaign_id = string_flag(parsed, "campaign");
+    if campaign_id.is_empty() {
+        return Outcome::Stderr(b"--campaign is required\n".to_vec());
+    }
+    let format = match output_format(parsed) {
+        Ok(format) => format.to_owned(),
+        Err(outcome) => return outcome,
+    };
+    let dry_run = bool_flag(parsed, "dry-run");
+    let store = match open_store() {
+        Ok(store) => store,
+        Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+    };
+    with_store_outcome(store, |store| {
+        let result = match symeraseme_core::storage::delete_never_sent_campaign(
+            store,
+            &campaign_id,
+            dry_run,
+        ) {
+            Ok(result) => result,
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        if format == "json" {
+            return match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            };
+        }
+        let counts = &result.counts;
+        let rows = format!(
+            "{} request(s), {} event(s), {} state row(s), {} campaign row(s)",
+            counts.removal_requests, counts.request_events, counts.request_state, counts.campaigns
+        );
+        let line = if result.dry_run {
+            format!("dry run: would delete campaign {campaign_id}: {rows}\n")
+        } else {
+            format!("deleted campaign {campaign_id}: {rows}\n")
+        };
+        Outcome::Stdout(line.into_bytes())
+    })
+}
+
 /// `plan show` — Go's `campaign.GetPlan` behind the `show` subcommand.
 fn plan_show(parsed: &Parsed) -> Outcome {
     let store = match open_store() {
@@ -1108,7 +1157,17 @@ fn campaign_status(parsed: &Parsed, campaign_id: &str) -> Outcome {
                 Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
             };
         }
-        Outcome::Stdout(format!("Total: {}\n", go_value(&result["totals"])).into_bytes())
+        // Post-cutover (#1295): was Go's `map[open:A requests:B resolved:C]`.
+        let totals = &result["totals"];
+        Outcome::Stdout(
+            format!(
+                "Total: {} requests, {} open, {} resolved\n",
+                go_value(&totals["requests"]),
+                go_value(&totals["open"]),
+                go_value(&totals["resolved"]),
+            )
+            .into_bytes(),
+        )
     })
 }
 
@@ -2723,7 +2782,8 @@ mod tests {
     #[test]
     fn actual_clap_tree_matches_frozen_inventory() {
         let command = clap_surface();
-        assert_eq!(count_commands(&command), 51);
+        // 51 frozen Go nodes plus the post-cutover `plan delete` (#1297).
+        assert_eq!(count_commands(&command), 51 + 1);
         assert_eq!(command.get_subcommands().count(), 31);
         let serve = command
             .get_subcommands()

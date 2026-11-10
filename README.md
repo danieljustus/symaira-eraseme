@@ -126,6 +126,9 @@ symeraseme plan create --campaign initial --max 5
 symeraseme plan show --campaign initial
 symeraseme plan execute --campaign initial --dry-run
 
+# Created a campaign by mistake? Delete it while nothing was sent
+symeraseme plan delete --campaign initial --dry-run
+
 # Track deadlines and view reports
 symeraseme tick --dry-run
 symeraseme generate-report

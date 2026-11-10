@@ -4,6 +4,9 @@ mod migration_oracle;
 #[path = "../../../rust-tests/dashboard_compact.rs"]
 mod dashboard_compact;
 
+#[path = "support/post_cutover_1295.rs"]
+mod post_cutover_1295;
+
 #[path = "support/frozen_review_oracle.rs"]
 mod frozen_review_oracle;
 
@@ -688,7 +691,10 @@ fn source_bound_status_and_tick_match_the_go_oracle() {
             Some(case["exit_code"].as_i64().expect("exit code") as i32),
             "{id} exit code"
         );
-        let expected_stdout = decode_base64(case["stdout_base64"].as_str().expect("stdout"));
+        // Post-cutover contract change #1295: only the `Total:` line wording.
+        let expected_stdout = post_cutover_1295::status_total_line(&decode_base64(
+            case["stdout_base64"].as_str().expect("stdout"),
+        ));
         let actual_stdout = match case["normalized_fields"].as_array() {
             Some(fields) if fields.iter().any(|field| field == "as_of") => {
                 mask_wall_clock(&output.stdout)
@@ -918,6 +924,15 @@ fn frozen_command_surface_matches_phase_two_contract() {
                 &decode_base64(case["stdout_base64"].as_str().unwrap()),
                 None,
             ),
+            // Post-cutover contract change #1295: only root.long and
+            // migrate.short differ from the recorded Go help text.
+            "help-root" | "operate-help" | "help-migrate" => post_cutover_1295::help_wording(
+                &decode_base64(case["stdout_base64"].as_str().unwrap()),
+            ),
+            // Post-cutover addition #1297: the `plan delete` row.
+            "help-plan" => post_cutover_1295::plan_help_with_delete(&decode_base64(
+                case["stdout_base64"].as_str().unwrap(),
+            )),
             _ => decode_base64(case["stdout_base64"].as_str().unwrap()),
         };
         // `plan status` reports a wall clock, so its value is masked before the

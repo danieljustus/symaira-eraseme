@@ -2,6 +2,8 @@
 
 #[path = "support/go_source_pin.rs"]
 mod go_source_pin;
+#[path = "support/post_cutover_1295.rs"]
+mod post_cutover_1295;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
@@ -169,7 +171,8 @@ fn stdio_answers_each_request_before_eof_without_stdout_pollution() {
         "../../../tests/fixtures/mcp-contract/mcp-stream/cases.json"
     ))
     .unwrap();
-    let expected = fixture["cases"][0]["response"].as_str().unwrap();
+    let expected =
+        post_cutover_1295::server_info_version(fixture["cases"][0]["response"].as_str().unwrap());
     let expected: Vec<_> = expected.lines().collect();
     assert_eq!(expected.len(), 2);
 
@@ -282,7 +285,7 @@ fn malformed_stdio_process_matches_go_errors() {
         );
         assert_eq!(
             output.stdout,
-            case["stdout"].as_str().unwrap().as_bytes(),
+            post_cutover_1295::server_info_version(case["stdout"].as_str().unwrap()).as_bytes(),
             "{name}: stdout"
         );
         assert_eq!(
@@ -339,7 +342,7 @@ fn stdio_process_matches_go_initialize_id_and_params_corpus() {
         input.extend_from_slice(&request);
         request_count += 1;
         if let Some(response) = case["response"].as_str() {
-            expected.extend_from_slice(response.as_bytes());
+            expected.extend_from_slice(post_cutover_1295::server_info_version(response).as_bytes());
         }
     }
     assert_eq!(request_count, 72, "selected Go request corpus size");

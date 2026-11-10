@@ -3,6 +3,9 @@
 #[path = "support/go_source_pin.rs"]
 mod go_source_pin;
 
+#[path = "support/post_cutover_1295.rs"]
+mod post_cutover_1295;
+
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -248,9 +251,11 @@ fn malformed_and_boundary_stdio_matches_source_bound_go_process() {
         );
         assert_eq!(
             result.1,
-            STANDARD
-                .decode(case["stdout_base64"].as_str().unwrap())
-                .unwrap(),
+            post_cutover_1295::server_info_version_bytes(
+                &STANDARD
+                    .decode(case["stdout_base64"].as_str().unwrap())
+                    .unwrap()
+            ),
             "{name}: stdout bytes"
         );
         assert_eq!(

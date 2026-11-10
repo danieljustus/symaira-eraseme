@@ -28,7 +28,7 @@ pub fn all() -> Vec<CommandSpec> {
             path: "",
             use_line: "symeraseme",
             short: "Automated data broker removal tool",
-            long: "symeraseme is the Go-port command-line entrypoint of Symaira EraseMe. The CLI vocabulary is settled in docs/mcp-contract.md §5; commands land as their port issues are implemented.",
+            long: "symeraseme is the command-line interface of Symaira EraseMe, which plans, sends and tracks data broker removal requests. Run `symeraseme registry validate` and `symeraseme config show` to check the broker registry and your configuration; `symeraseme <command> --help` describes every command.",
             hidden: false,
             args_required: false,
             positionals: &[],
@@ -675,7 +675,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "migrate",
             use_line: "migrate",
-            short: "Migrate a Python-era installation to the Go layout",
+            short: "Migrate a Python-era installation to the current layout",
             long: "",
             hidden: false,
             args_required: false,
@@ -833,6 +833,30 @@ pub fn all() -> Vec<CommandSpec> {
                     kind: "string",
                     default: "active",
                     usage: "broker status filter",
+                },
+            ],
+        },
+        // Post-cutover addition (#1297): not part of the frozen Go surface.
+        CommandSpec {
+            path: "plan delete",
+            use_line: "delete",
+            short: "Delete a never-sent campaign",
+            long: "Delete a campaign whose requests are all still PLANNED, together with its requests and events. Refuses when any request was sent or has replies, drafts, manual tasks or other evidence. Use --dry-run to count the rows without deleting.",
+            hidden: false,
+            args_required: false,
+            positionals: &[],
+            flags: &[
+                FlagSpec {
+                    name: "campaign",
+                    kind: "string",
+                    default: "",
+                    usage: "campaign identifier",
+                },
+                FlagSpec {
+                    name: "dry-run",
+                    kind: "bool",
+                    default: "false",
+                    usage: "count the rows without deleting",
                 },
             ],
         },

@@ -143,6 +143,7 @@ fn syntax_error(input: &[u8]) -> Option<StreamError> {
 mod tests {
     use super::*;
     use crate::mcp::handler::test_support::no_backend_handler;
+    use crate::mcp::post_cutover_1295::server_info_version;
     use serde::Deserialize;
 
     #[derive(Deserialize)]
@@ -370,7 +371,7 @@ mod tests {
             assert!(result.is_ok(), "{} unexpectedly aborted", case.name);
             assert_eq!(
                 String::from_utf8(output).expect("responses are UTF-8"),
-                case.response.unwrap_or_default(),
+                server_info_version(&case.response.unwrap_or_default()),
                 "{}",
                 case.name
             );
@@ -417,9 +418,11 @@ mod tests {
                 continue;
             };
             let input = STANDARD.decode(encoded).unwrap();
-            let expected_out = STANDARD
-                .decode(case["stdout_base64"].as_str().unwrap())
-                .unwrap();
+            let expected_out = crate::mcp::post_cutover_1295::server_info_version_bytes(
+                &STANDARD
+                    .decode(case["stdout_base64"].as_str().unwrap())
+                    .unwrap(),
+            );
             let expected_err = STANDARD
                 .decode(case["stderr_base64"].as_str().unwrap())
                 .unwrap();

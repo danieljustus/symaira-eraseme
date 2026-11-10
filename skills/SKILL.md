@@ -94,6 +94,7 @@ initialize the configured store.
 |---------|-------------|
 | `symeraseme plan create --campaign <id>` | Create a removal campaign plan |
 | `symeraseme plan show` | View the current plan |
+| `symeraseme plan delete --campaign <id> [--dry-run]` | Delete a campaign created by mistake. Refuses unless every request is still PLANNED with no replies, drafts, manual tasks or other evidence; `--dry-run` only counts the rows |
 | `symeraseme requests list` | List all removal requests |
 | `symeraseme events show <request_id>` | View event history for a request |
 

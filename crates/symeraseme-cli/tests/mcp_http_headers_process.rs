@@ -15,6 +15,8 @@ use mcp_http_port::{
 
 #[path = "support/frozen_http_headers.rs"]
 mod frozen_http_headers;
+#[path = "support/post_cutover_1295.rs"]
+mod post_cutover_1295;
 
 struct Server(StartedChild);
 
@@ -416,7 +418,8 @@ fn native_http_complete_headers_and_bodies_match_go() {
         );
         let go_headers = headers(go_token);
         let request = frozen_http_headers::request(method, body, &go_headers);
-        let raw = frozen.reply(index, &request);
+        // Post-cutover contract change #1295: serverInfo.version only.
+        let raw = post_cutover_1295::http_response_server_info(&frozen.reply(index, &request));
         let go = parse_response(&raw);
         let expected_status = [405, 401, 403, 200, 200, 204, 200, 204, 200, 200][index];
         for reply in [&rust, &go] {

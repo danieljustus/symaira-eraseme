@@ -15,6 +15,8 @@ use symeraseme_core::storage::repository::Repository;
 
 #[path = "support/mcp_http_port.rs"]
 mod mcp_http_port;
+#[path = "support/post_cutover_1295.rs"]
+mod post_cutover_1295;
 use mcp_http_port::{StartedChild, accepts_token, free_port, spawn_with_handoff};
 
 #[path = "support/frozen_http_aux.rs"]
@@ -674,8 +676,13 @@ fn http_process_matches_core_contract_rotates_token_and_shuts_down_on_signals() 
     );
     assert_eq!(status, 200);
     assert_eq!(content_type, "application/json");
-    assert_eq!(body, br#"{"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"protocolVersion":"2025-06-18","serverInfo":{"name":"symeraseme","version":"dev"}},"id":1}
-"#);
+    assert_eq!(
+        body,
+        post_cutover_1295::server_info_version(
+            "{\"jsonrpc\":\"2.0\",\"result\":{\"capabilities\":{\"tools\":{}},\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"symeraseme\",\"version\":\"dev\"}},\"id\":1}\n"
+        )
+        .as_bytes()
+    );
 
     let (status, content_type, body) = exchange(
         port,
@@ -1173,7 +1180,13 @@ fn go_oracle_http_wire_transcripts_match() {
     ];
     for (index, (method, body, headers)) in cases.into_iter().enumerate() {
         let request = frozen_http_wire::request(method, body, &headers);
-        let go_reply = frozen.reply(index, &request);
+        // Post-cutover contract change #1295: serverInfo.version only.
+        let (status, content_type, body_bytes) = frozen.reply(index, &request);
+        let go_reply = (
+            status,
+            content_type,
+            post_cutover_1295::server_info_version_bytes(&body_bytes),
+        );
         let rust_headers: Vec<_> = headers
             .iter()
             .map(|(name, value)| {
