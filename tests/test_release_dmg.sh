@@ -34,7 +34,7 @@ SWIFT_BIN="$TEST_DIR/mock_swift_bin"
 mkdir -p "$SWIFT_BIN"
 touch "$SWIFT_BIN/SymairaEraseMe"
 chmod +x "$SWIFT_BIN/SymairaEraseMe"
-RESOURCE_DIR="$SWIFT_BIN/symaira-appkit_SymairaTheme.bundle/Contents/Resources"
+RESOURCE_DIR="$SWIFT_BIN/symaira-corekit_SymairaTheme.bundle/Contents/Resources"
 mkdir -p "$RESOURCE_DIR"
 for resource in GoogleSansFlex.ttf GoogleSansFlex-OFL.txt default.metallib; do
     printf 'packaging fixture: %s\n' "$resource" > "$RESOURCE_DIR/$resource"
@@ -210,8 +210,8 @@ test_package_dmg_modes() {
 
     local APP_BUNDLE="$STAGE_DIR/Symaira EraseMe.app"
     for resource in GoogleSansFlex.ttf GoogleSansFlex-OFL.txt default.metallib; do
-        cmp "$TEST_DIR/mock_swift_bin/symaira-appkit_SymairaTheme.bundle/Contents/Resources/$resource" \
-            "$APP_BUNDLE/Contents/Resources/symaira-appkit_SymairaTheme.bundle/Contents/Resources/$resource"
+        cmp "$TEST_DIR/mock_swift_bin/symaira-corekit_SymairaTheme.bundle/Contents/Resources/$resource" \
+            "$APP_BUNDLE/Contents/Resources/symaira-corekit_SymairaTheme.bundle/Contents/Resources/$resource"
     done
     test -d "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
     test -f "$APP_BUNDLE/Contents/Resources/AppIcon.icns"

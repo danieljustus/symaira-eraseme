@@ -7,15 +7,15 @@ let package = Package(
         .macOS(.v14)
     ],
     dependencies: [
-        .package(url: "https://github.com/danieljustus/symaira-appkit.git", exact: "0.18.1"),
+        .package(url: "https://github.com/danieljustus/symaira-corekit.git", exact: "0.20.0"),
     ],
     targets: [
         .executableTarget(
             name: "SymairaEraseMe",
             dependencies: [
-                .product(name: "SymairaTheme", package: "symaira-appkit"),
-                .product(name: "SymairaToolKit", package: "symaira-appkit"),
-                .product(name: "SymairaDaemonKit", package: "symaira-appkit"),
+                .product(name: "SymairaTheme", package: "symaira-corekit"),
+                .product(name: "SymairaToolKit", package: "symaira-corekit"),
+                .product(name: "SymairaDaemonKit", package: "symaira-corekit"),
             ],
             path: "Sources/SymairaEraseMe"
         ),

@@ -152,7 +152,7 @@ if [ "$DMG_ONLY" != "true" ]; then
         [ -d "$resource_bundle" ] || continue
         cp -R "$resource_bundle" "$APP_BUNDLE/Contents/Resources/"
     done
-    THEME_RESOURCES="$APP_BUNDLE/Contents/Resources/symaira-appkit_SymairaTheme.bundle"
+    THEME_RESOURCES="$APP_BUNDLE/Contents/Resources/symaira-corekit_SymairaTheme.bundle"
     if [ -d "$THEME_RESOURCES/Contents/Resources" ]; then
         THEME_RESOURCES="$THEME_RESOURCES/Contents/Resources"
     fi

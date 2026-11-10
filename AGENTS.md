@@ -321,13 +321,13 @@ To add support for a new agent:
 
 - SwiftUI SPM executable (`SymairaEraseMe`). Build: `cd app/SymairaEraseMe && swift build`
   (local builds need `DEVELOPER_DIR` pointing at a full Xcode installation).
-- Depends on the shared **symaira-appkit** package, pinned exact in
+- Depends on the shared **symaira-corekit** package, pinned exact in
   `Package.swift`: SymairaTheme and SymairaToolKit.
 - GUI work follows the Symaira Interface Guidelines shipped with
-  `symaira-appkit`: read its `GUIDELINES.md`, then `DESIGN.md` and
+  `symaira-corekit`: read its `GUIDELINES.md`, then `DESIGN.md` and
   `docs/workspace-foundation.md` (sibling checkout, or
-  `.build/checkouts/symaira-appkit` at a pin that ships them). Review a UI
-  change with `python3 <symaira-appkit>/scripts/gui-review.py
+  `.build/checkouts/symaira-corekit` at a pin that ships them). Review a UI
+  change with `python3 <symaira-corekit>/scripts/gui-review.py
   app/SymairaEraseMe/Sources/SymairaEraseMe` plus the manual checklist in
   GUIDELINES.md section 13. Pages and sheets use the shared AppKit
   scaffolds `SymairaPage`, `SymairaPageState`, `SymairaPageEmpty` and

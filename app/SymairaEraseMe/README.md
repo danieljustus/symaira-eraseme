@@ -112,8 +112,8 @@ protection regions; dense lists and Settings use a static canvas. Content
 cards are opaque shared `symairaCard` surfaces, not local glass copies.
 Shared controls honor the AppKit accessibility and older-macOS fallbacks.
 
-The manifest pins the exact AppKit release
-[`0.17.1`](https://github.com/danieljustus/symaira-appkit/releases/tag/0.17.1),
+The manifest pins the exact CoreKit release (AppKit module, merged into `symaira-corekit`)
+[`0.20.0`](https://github.com/danieljustus/symaira-corekit/releases/tag/v0.20.0),
 including the shared workspace, packaged resources and the `SymairaIcon` set.
 Sidebar, empty states, badges, notices and actions all use Symaira icons; no
 SF Symbols remain in the sidebar pages. Every page uses the shared `Page`
