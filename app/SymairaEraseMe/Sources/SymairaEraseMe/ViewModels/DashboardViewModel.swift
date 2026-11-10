@@ -17,6 +17,13 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
+    /// Reload when the server becomes reachable so a stale "Server
+    /// unreachable" error clears without a manual refresh.
+    func reachabilityChanged(_ reachable: Bool) async {
+        guard reachable, !isLoading else { return }
+        await refresh()
+    }
+
     var data: DashboardData? { state.value }
     var isLoading: Bool { state.isLoading }
     var errorMessage: String? { state.errorMessage }

@@ -4,6 +4,7 @@ import Charts
 
 /// Main dashboard view showing summary cards, status breakdown, campaigns, broker grid, and events.
 struct DashboardView: View {
+    @EnvironmentObject private var serverManager: ServerManager
     @StateObject private var vm = DashboardViewModel()
 
     var body: some View {
@@ -31,6 +32,9 @@ struct DashboardView: View {
             }
         }
         .task { await vm.refresh() }
+        .onChange(of: serverManager.mcpReachable) { _, reachable in
+            Task { await vm.reachabilityChanged(reachable) }
+        }
     }
 
     // MARK: - Summary Cards

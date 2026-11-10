@@ -12,6 +12,7 @@ struct SymairaEraseMeApp: App {
                 .environmentObject(serverManager)
                 .frame(minWidth: 900, minHeight: 600)
                 .onAppear { appearance.apply() }
+                .task { await serverManager.autoStartIfNeeded() }
                 .onChange(of: appearance) { _, value in value.apply() }
         }
         .symairaWorkspaceWindow()

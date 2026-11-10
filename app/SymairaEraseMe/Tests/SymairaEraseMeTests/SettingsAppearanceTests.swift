@@ -31,6 +31,9 @@ final class SettingsAppearanceTests: XCTestCase {
             MCPClient.configuredDataDir = previousDataDir
         }
         let manager = ServerManager(resourceURL: nil, executableURL: nil)
+        // The manager publishes its own address on init; re-pin the unused port.
+        MCPClient.configuredHost = "127.0.0.1"
+        MCPClient.configuredPort = 9
         let root = SettingsView(serverManager: manager)
             .environmentObject(manager)
             .defaultAppStorage(defaults)

@@ -3,6 +3,14 @@ import Darwin
 @testable import SymairaEraseMe
 
 final class RustBackendIntegrationTests: XCTestCase {
+    /// In-memory Keychain stand-in so the test never touches the real one.
+    private final class InMemoryAPIKeyStore: APIKeyStore, @unchecked Sendable {
+        private var value: String?
+        func read() throws -> String? { value }
+        func save(_ value: String) throws { self.value = value }
+        func delete() throws { value = nil }
+    }
+
     @MainActor
     func testExplicitRustBinaryLaunchAuthToolsAndShutdown() async throws {
         guard let binary = ProcessInfo.processInfo.environment["SYMERASEME_RUST_TEST_BINARY"],
@@ -31,20 +39,14 @@ final class RustBackendIntegrationTests: XCTestCase {
 
     @MainActor
     private func exerciseBackend(binary: String, resourceURL: URL?) async throws {
-        let defaults = UserDefaults.standard
-        let keys = [
-            "symeraseme_binary_path", "symeraseme_data_dir", "symeraseme_host",
-            "symeraseme_port", "symeraseme_anthropic_key"
-        ]
-        let previous = Dictionary(uniqueKeysWithValues: keys.compactMap { key in defaults.object(forKey: key).map { (key, $0) } })
+        // Dedicated suite: the test never touches the user's real preferences.
+        let suiteName = "com.symaira.eraseme.rust-backend-test.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         let previousHost = MCPClient.configuredHost
         let previousPort = MCPClient.configuredPort
         let previousDataDir = MCPClient.configuredDataDir
         defer {
-            for key in keys {
-                if let value = previous[key] { defaults.set(value, forKey: key) }
-                else { defaults.removeObject(forKey: key) }
-            }
+            defaults.removePersistentDomain(forName: suiteName)
             MCPClient.configuredHost = previousHost
             MCPClient.configuredPort = previousPort
             MCPClient.configuredDataDir = previousDataDir
@@ -55,7 +57,10 @@ final class RustBackendIntegrationTests: XCTestCase {
         try FileManager.default.createDirectory(at: dataDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dataDir) }
 
-        let manager = resourceURL.map { ServerManager(resourceURL: $0, executableURL: nil) } ?? ServerManager()
+        let store = InMemoryAPIKeyStore()
+        let manager = ServerManager(
+            resourceURL: resourceURL, executableURL: nil, apiKeyStore: store, defaults: defaults
+        )
         manager.binaryPath = resourceURL == nil ? binary : ""
         manager.dataDir = dataDir.path
         manager.host = "127.0.0.1"

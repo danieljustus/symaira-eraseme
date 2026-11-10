@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Combine
 import Darwin
@@ -18,7 +19,7 @@ final class ServerManager: ObservableObject {
 
     /// Configurable binary path (empty = auto-detect).
     @Published var binaryPath: String {
-        didSet { UserDefaults.standard.set(binaryPath, forKey: "symeraseme_binary_path") }
+        didSet { defaults.set(binaryPath, forKey: "symeraseme_binary_path") }
     }
 
     /// Data directory configured by the backend when no override is set.
@@ -26,7 +27,7 @@ final class ServerManager: ObservableObject {
 
     /// Configurable data directory.
     @Published var dataDir: String {
-        didSet { UserDefaults.standard.set(dataDir, forKey: "symeraseme_data_dir") }
+        didSet { defaults.set(dataDir, forKey: "symeraseme_data_dir") }
     }
 
     /// Configurable Anthropic API key, persisted in the Keychain (never in
@@ -40,12 +41,12 @@ final class ServerManager: ObservableObject {
 
     /// Server host.
     @Published var host: String {
-        didSet { UserDefaults.standard.set(host, forKey: "symeraseme_host") }
+        didSet { defaults.set(host, forKey: "symeraseme_host") }
     }
 
     /// Server port.
     @Published var port: Int {
-        didSet { UserDefaults.standard.set(port, forKey: "symeraseme_port") }
+        didSet { defaults.set(port, forKey: "symeraseme_port") }
     }
 
     /// Most recent stderr line from the server subprocess, for surfacing actionable diagnostics.
@@ -62,6 +63,11 @@ final class ServerManager: ObservableObject {
     private let resourceURL: URL?
     private let executableURL: URL?
     private var reachabilityTask: Task<Void, Never>?
+    private var autoStartAttempted = false
+
+    /// Address used when nothing valid is persisted.
+    nonisolated static let defaultHost = "127.0.0.1"
+    nonisolated static let defaultPort = 8000
 
     init(
         resourceURL: URL? = Bundle.main.resourceURL,
@@ -78,11 +84,51 @@ final class ServerManager: ObservableObject {
         let apiKey = APIKeyMigration.load(store: apiKeyStore, defaults: defaults)
         self.anthropicKey = apiKey.key
         self.apiKeyStorageError = apiKey.storageError
-        self.host = defaults.string(forKey: "symeraseme_host") ?? "127.0.0.1"
-        self.port = defaults.object(forKey: "symeraseme_port") as? Int ?? 8000
+        self.host = Self.validatedHost(defaults.string(forKey: "symeraseme_host"))
+        self.port = Self.validatedPort(defaults.object(forKey: "symeraseme_port") as? Int)
+
+        // Point the client at the address the UI shows and the server starts
+        // on, so the reachability poller never pings a stale default.
+        MCPClient.configuredHost = host
+        MCPClient.configuredPort = port
 
         setupSupervisor()
+        observeTermination()
         startReachabilityPolling()
+    }
+
+    /// Stop the server this manager launched when the app quits; otherwise
+    /// the child is orphaned (PPID 1) and keeps the port bound.
+    private func observeTermination() {
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stopForTermination() }
+        }
+    }
+
+    /// Terminate the launched child and wait briefly for it to exit, falling
+    /// back to SIGKILL. A no-op unless this manager started a process.
+    func stopForTermination() {
+        reachabilityTask?.cancel()
+        guard let pid else { return }
+        supervisor.stop()
+        let deadline = Date().addingTimeInterval(1.5)
+        while Date() < deadline, kill(pid, 0) == 0 {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if kill(pid, 0) == 0 { kill(pid, SIGKILL) }
+    }
+
+    /// Start the server once at app launch unless one is already running or
+    /// reachable (including an externally managed server). Safe to call from
+    /// every window; only the first call acts.
+    func autoStartIfNeeded() async {
+        guard !autoStartAttempted else { return }
+        autoStartAttempted = true
+        guard !isRunning else { return }
+        guard await refreshReachability() == .unreachable else { return }
+        start()
     }
 
     /// Writes the edited key to the Keychain. A failed save keeps the key in
@@ -164,6 +210,15 @@ final class ServerManager: ObservableObject {
         guard !isRunning else { return }
         lastError = nil
         lastStderrLine = nil
+
+        guard Self.isValidHost(host) else {
+            lastError = "Invalid server host \"\(host)\". Enter an IPv4/IPv6 address or a hostname in Settings."
+            return
+        }
+        guard Self.isValidPort(port) else {
+            lastError = "Invalid server port \(port). Enter a port between 1 and 65535 in Settings."
+            return
+        }
 
         let plan = resolveLaunchPlan()
         guard let executable = plan.executable else {
@@ -307,6 +362,42 @@ final class ServerManager: ObservableObject {
     }
 
     // MARK: - Testable pure helpers
+
+    /// Whether `host` is an IPv4/IPv6 literal or an RFC 1123 hostname.
+    /// Bare numerals such as "0" are rejected (the last label of a hostname
+    /// must contain a letter).
+    nonisolated static func isValidHost(_ host: String) -> Bool {
+        guard !host.isEmpty, host.utf8.count <= 253 else { return false }
+        var v4 = in_addr()
+        var v6 = in6_addr()
+        if inet_pton(AF_INET, host, &v4) == 1 || inet_pton(AF_INET6, host, &v6) == 1 {
+            return true
+        }
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        for label in labels {
+            guard (1...63).contains(label.utf8.count),
+                  label.first != "-", label.last != "-",
+                  label.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") })
+            else { return false }
+        }
+        return labels.last?.contains(where: \.isLetter) == true
+    }
+
+    nonisolated static func isValidPort(_ port: Int) -> Bool {
+        (1...65535).contains(port)
+    }
+
+    /// A persisted host if valid, else the default.
+    nonisolated static func validatedHost(_ host: String?) -> String {
+        let trimmed = host?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return isValidHost(trimmed) ? trimmed : defaultHost
+    }
+
+    /// A persisted port if in range, else the default.
+    nonisolated static func validatedPort(_ port: Int?) -> Int {
+        if let port, isValidPort(port) { return port }
+        return defaultPort
+    }
 
     /// Compose the failure banner message for a failed server transition.
     /// Returns the stderr text followed by the error when stderr is

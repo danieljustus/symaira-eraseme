@@ -33,6 +33,10 @@ All notable changes to this project are documented in this file.
 - The dashboard `overdue` KPI, campaign rows and broker rows use the same
   deadline-based rule as `symeraseme status` (`upcoming.overdue`): unresolved
   requests past their deadline, not only the `OVERDUE` status (#1296).
+- macOS app: persisted server host/port are validated (invalid values such as
+  host `0` fall back to `127.0.0.1:8000`), the bundled server starts
+  automatically at launch and is stopped on quit, and the Dashboard reloads
+  once the server becomes reachable (#1294).
 
 ## [v0.15.1] - 2026-11-10
 

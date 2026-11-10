@@ -40,6 +40,9 @@ final class NativeChromeTests: XCTestCase {
             MCPClient.configuredDataDir = previousDataDir
         }
         let manager = ServerManager(resourceURL: nil, executableURL: nil)
+        // The manager publishes its own address on init; re-pin the unused port.
+        MCPClient.configuredHost = "127.0.0.1"
+        MCPClient.configuredPort = 9
         let suite = "com.symaira.eraseme.chrome.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
