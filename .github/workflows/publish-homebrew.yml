@@ -175,6 +175,8 @@ jobs:
         run: |
           set -euo pipefail
           brew tap-new --no-git local/symeraseme-check
+          # Homebrew refuses formulae from untrusted non-official taps; trust only this disposable tap.
+          brew trust --tap local/symeraseme-check
           cp "$RUNNER_TEMP/formula/symeraseme.rb" "$(brew --repository local/symeraseme-check)/Formula/"
           brew audit --strict --formula local/symeraseme-check/symeraseme
           version="${RELEASE_TAG#v}"
