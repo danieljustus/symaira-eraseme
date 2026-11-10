@@ -13,26 +13,26 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
         "darwin/arm64",
-        "fc446060e4346a5896b2c80f5788a5a92be58992",
-        "633d46af7d709ad67e13e197210194fd631a3ab88ff753326c9843d1baaa0c72",
+        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
+        "ea5866d7baf79286f2c99f17c3b806f75459d47a88e22e0927a2bc1982b01c61",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-fc446060/agent-error/darwin-arm64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/agent-error/darwin-arm64/agent-error.json"
         ),
     ),
     (
         "linux/amd64",
-        "fc446060e4346a5896b2c80f5788a5a92be58992",
-        "206516db1a4341b1f361c9d382bf6f0ada1e6b719d2b61726e917117a9fb5cca",
+        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
+        "ffa06448ee21799bb42ab974f703ddadf7aec4d33190c1c747455cad08805354",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-fc446060/agent-error/linux-amd64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/agent-error/linux-amd64/agent-error.json"
         ),
     ),
     (
         "linux/arm64",
-        "fc446060e4346a5896b2c80f5788a5a92be58992",
-        "9e2e2eb8abfaee528ad53bf2b64f294dd1e08ff42a7cc42cb65f9de73f056692",
+        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
+        "614816aa403e914f6da5b32acd55be6a9a794ce4879e50c4d1a9f199953b0d0b",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-fc446060/agent-error/linux-arm64/agent-error.json"
+            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/agent-error/linux-arm64/agent-error.json"
         ),
     ),
 ];

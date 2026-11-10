@@ -27,6 +27,9 @@ All notable changes to this project are documented in this file.
   (JSON unchanged), and the MCP `initialize` response reports the product
   version instead of `dev`. Recorded as a post-cutover contract change in
   `docs/rust-port-contract-matrix.md` (#1295).
+- Update `aes` 0.9.3 to 0.9.4, `flate2` 1.1.10 to 1.1.11, and
+  `toml` 1.1.x to 1.2.0 (including `toml_datetime`, `toml_writer`, and
+  `toml_parser`); refresh native evidence as `refresh-2a7a5c1f` (#1300).
 
 ### Fixed
 
