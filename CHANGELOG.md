@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [v0.16.0] - 2026-11-10
+
+Canary prerelease on the Rust-only line. It adds `plan delete`, makes the MCP
+dashboard data compact by default and fixes the macOS app's server
+supervision; supported targets are unchanged (macOS on Apple Silicon, Linux
+amd64/arm64). Stable promotion and Homebrew distribution require separately
+verified acceptance. `v0.15.1` was promoted to stable and published to the
+Homebrew tap on 2026-11-10 after its acceptance checks; its notes below
+describe the canary as first published.
+
 ### Added
 
 - `symeraseme plan delete --campaign <id> [--dry-run]` removes a campaign

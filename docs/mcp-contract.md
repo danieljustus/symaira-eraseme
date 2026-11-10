@@ -8,7 +8,7 @@ contract, not a statement that the Go server is the current product runtime.
 The current source-tree implementation is Rust; Go remains only as a development
 oracle for conformance checks. The Rust-only package layout was introduced in the
 [`v0.14.0` canary prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
-The current source version is 0.15.1; see [GitHub releases](https://github.com/danieljustus/symaira-eraseme/releases)
+The current source version is 0.16.0; see [GitHub releases](https://github.com/danieljustus/symaira-eraseme/releases)
 for published versions and channels. The historical `v0.13.0` prerelease remains
 dual-backend and unchanged; `v0.12.1` is the last Go-only stable release. Canary publication does not complete
 stable acceptance, seven-day post-stable observation or separate Go-source
