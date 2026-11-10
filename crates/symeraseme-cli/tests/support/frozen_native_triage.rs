@@ -12,111 +12,57 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
 const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
     (
-        "darwin/amd64",
-        "cli",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "0ca09e6c673f5c4cb7aa428edb8f6442ba52d544d930db2abe1d0b66e8ce41f6",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/darwin-amd64/cli.json"
-        ),
-    ),
-    (
-        "darwin/amd64",
-        "mcp",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "27f39ef029373d9f0f2a572b240bcca46f4a4ac1c7f586573cace88b1ca6a473",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/darwin-amd64/mcp.json"
-        ),
-    ),
-    (
         "darwin/arm64",
         "cli",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "2d4b983f243cf65857e7b528c0fbe467d639503bfe636894b2ce1fc479198c5a",
+        "fc446060e4346a5896b2c80f5788a5a92be58992",
+        "96b26d99b69eb9488fd94b2d40740870e968fb0ff1c5cd8e328cca86425b74eb",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/darwin-arm64/cli.json"
+            "../../../../tests/fixtures/go-frozen/refresh-fc446060/native-triage/darwin-arm64/cli.json"
         ),
     ),
     (
         "darwin/arm64",
         "mcp",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "e62e7c9248a32e2f5452f0111e0644b8775676d02c550b2fcf6f51a015ec7ff9",
+        "fc446060e4346a5896b2c80f5788a5a92be58992",
+        "b59560dd6e7536169b01fd0760d9448f898dee5962af7367305f7fe79a0c6d3d",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/darwin-arm64/mcp.json"
+            "../../../../tests/fixtures/go-frozen/refresh-fc446060/native-triage/darwin-arm64/mcp.json"
         ),
     ),
     (
         "linux/amd64",
         "cli",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "17a49ffa5345b7d0e3e5e2834514ff60e5b5b2d113fe6919690468768044cac2",
+        "fc446060e4346a5896b2c80f5788a5a92be58992",
+        "e4940953a0a0934d43e62b4b93052c1f608cee1955a17795533aacb18c339f4b",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/linux-amd64/cli.json"
+            "../../../../tests/fixtures/go-frozen/refresh-fc446060/native-triage/linux-amd64/cli.json"
         ),
     ),
     (
         "linux/amd64",
         "mcp",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "bc25782248dee18240e83e4162e6f9698e2624c7b9f3aa945f9bff2cf9c992c5",
+        "fc446060e4346a5896b2c80f5788a5a92be58992",
+        "95a23de0cfe8a66d04f3c79869f836874e8baced698d5247040b21bdcb4c4d39",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/linux-amd64/mcp.json"
+            "../../../../tests/fixtures/go-frozen/refresh-fc446060/native-triage/linux-amd64/mcp.json"
         ),
     ),
     (
         "linux/arm64",
         "cli",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "d5b3faf1743db8b35812bbc4838dd04bda139dd4ba3bd1a09a5192ac2e6ce077",
+        "fc446060e4346a5896b2c80f5788a5a92be58992",
+        "2e420582d65a4bfd8a8e933e427922d284f1075566cbe83cd66de4b8b5713454",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/linux-arm64/cli.json"
+            "../../../../tests/fixtures/go-frozen/refresh-fc446060/native-triage/linux-arm64/cli.json"
         ),
     ),
     (
         "linux/arm64",
         "mcp",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "b8a29b906d287a80c6f11246a92f7c9c1f123c4f177f8d40cc92063460d45c50",
+        "fc446060e4346a5896b2c80f5788a5a92be58992",
+        "2c2bbb3e079e2b40712caf7c7bcd03b3c192f33ec563e9f3801deceefba1da78",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/linux-arm64/mcp.json"
-        ),
-    ),
-    (
-        "windows/amd64",
-        "cli",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "c6327218f98ab9845660d1df78f0bc8f6a5698783b0d5e5651b9fef3a09c591e",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/windows-amd64/cli.json"
-        ),
-    ),
-    (
-        "windows/amd64",
-        "mcp",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "89ec5dbf595928157c13dc8009d999e4234a42b1335652df947e3f8e8d32f504",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/windows-amd64/mcp.json"
-        ),
-    ),
-    (
-        "windows/arm64",
-        "cli",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "a5e214b7458cec77958381cdcffb8f2fa2f1d50f3a3305d76bdc160cfdf35e0b",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/windows-arm64/cli.json"
-        ),
-    ),
-    (
-        "windows/arm64",
-        "mcp",
-        "433622f6e6c884694a304f483ae481f93069b455",
-        "d7b7d69b744bb8775732614c735a0d96ccbd9cdc25618b347e9df675bec710a4",
-        include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-433622f6/native-triage/windows-arm64/mcp.json"
+            "../../../../tests/fixtures/go-frozen/refresh-fc446060/native-triage/linux-arm64/mcp.json"
         ),
     ),
 ];
@@ -279,10 +225,7 @@ pub fn observations(family: &str) -> Corpus {
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
         ("linux", "aarch64") => "linux/arm64",
-        ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
-        ("windows", "x86_64") => "windows/amd64",
-        ("windows", "aarch64") => "windows/arm64",
         _ => panic!("no recorded native triage capture for this target; live Go is retired"),
     };
     let (_, _, revision, pin, raw) = RECORDS

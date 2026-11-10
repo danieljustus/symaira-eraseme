@@ -10,7 +10,12 @@ for the four local release-version labels is unchanged.
 1. Freeze a clean candidate commit including the proposed dependency update.
    Dispatch Rust CI on that exact branch with `capture_frozen_oracles=true`.
    The existing producers capture actual Go 1.26.6 service and process results
-   on Linux, macOS and Windows, each on amd64 and arm64.
+   on the supported targets: macOS arm64 (`macos-15`), Linux amd64
+   (`ubuntu-24.04`) and Linux arm64 (`ubuntu-24.04-arm`). The capture snapshot
+   is the candidate plus the retired producer files byte-identical to
+   `22615ae`, with the capture workflow and script of the previous snapshot tag
+   and only the candidate constant changed; keep it reachable with the tag
+   `frozen-go-captures/dependency-refresh-<revision>`.
 2. Preserve the raw artifacts and GitHub artifact IDs, ZIP digests, run ID and
    full source revision. Validate every applicable target/family, recorded
    source and generator bytes, native build identity and complete cases before
@@ -76,3 +81,32 @@ is retained after Go retirement. Narrowing to a named input set was evaluated an
 not adopted: the Rust producers import dependencies whose versions can shape
 recorded bytes, and no provable reachability closure exists. Full record and
 reviewer checklist: `docs/rust-port/decisions/1263-lock-binding.md`.
+
+## Supported-target binding (#1282)
+
+Maintainer decision (2026-11-06): dependency refreshes bind to the supported
+targets only, macOS arm64, Linux amd64 and Linux arm64 (#1274). Windows and
+macOS Intel are no longer supported, and the product source no longer builds
+for Windows after #1281.
+
+- Every existing Windows and macOS Intel record stays unchanged as historical
+  evidence under its original provenance. Readers no longer require new
+  records for those targets; the latest refresh carries the three supported
+  targets only, and an unsupported host has no record and cannot receive a
+  cached answer.
+- The strict whole-`Cargo.lock` binding (#1263) and every rejection control
+  are unchanged for the supported targets.
+- `refresh-433622f6` is the last six-target refresh. `refresh-fc446060` is the
+  first three-target refresh: capture snapshot
+  `fc446060e4346a5896b2c80f5788a5a92be58992` (tag
+  `frozen-go-captures/dependency-refresh-fc446060`) for product candidate
+  `640b26152d4961decc510f5de2c60d46636a35c8`. Its lockfile drops the unused
+  Windows-only `schannel`/`windows-sys` edges and moves `rusqlite` 0.40.2 to
+  0.41.1 (`libsqlite3-sys` 0.39.1, RUSTSEC-2026-0459, #1291) through corekit
+  `b72cbc5`. Capture run `42726667101`; artifacts `13723637089` (macOS arm64),
+  `13723482097` (Linux amd64) and `13722148769` (Linux arm64) match their API
+  digests and yield the 48 records of the predecessor's three-target
+  inventory, imported byte for byte. Against the earlier, never merged capture
+  `c129252f` (run `42198638836`) the records differ only in source revision,
+  build info, the `Cargo.lock` digest, timestamps (HTTP `Date`, SMTP headers,
+  elapsed times) and Go map order in one provider list.

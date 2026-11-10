@@ -20,7 +20,6 @@ class ReleaseWorkflowControls(unittest.TestCase):
             self.assertNotRegex(workflow, r'\bgo (?:build|mod)\b')
             self.assertNotIn("if: runner.os == 'Windows'", workflow)
             self.assertIn("'--published-go-release'", workflow)
-            self.assertIn("'--sandbox-control'", workflow)
             self.assertIn('if: always()', workflow)
         self.assertIn('--tag v0.13.0', stores)
         self.assertIn("'--published-go-tag', 'v0.13.0'", stores)

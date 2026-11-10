@@ -159,7 +159,7 @@ fn busy_writer_waits_for_a_real_lock_release_then_commits() {
             [],
         )
         .expect("create contention table");
-    let waiter = open(&database).expect("open waiting writer");
+    let mut waiter = open(&database).expect("open waiting writer");
 
     holder
         .execute_batch("BEGIN IMMEDIATE")

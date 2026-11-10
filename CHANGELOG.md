@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Dependency refreshes of the frozen native evidence bind to the supported
+  targets only (macOS arm64, Linux amd64 and arm64), so `Cargo.lock` updates
+  can pass the frozen readers again. Historical Windows and macOS Intel records
+  stay unchanged. The unused Windows-only dependency declarations, the Windows
+  sandbox control and the Windows branches of the parity harness are removed
+  (#1282).
+
+### Security
+
+- `rusqlite` 0.41.1 (bundled `libsqlite3-sys` 0.39.1) fixes RUSTSEC-2026-0459
+  in the bundled C SQLite; `symaira-core-sqlite` moves to corekit `b72cbc5`
+  (#1291).
+
 ### Fixed
 
 - The release publication step expects exactly the three supported archives;

@@ -4,17 +4,14 @@ Build/download preparation runs outside the CLI confinement boundary. Extraction
 copies only the verified regular top-level executable; no archive paths are used.
 """
 import argparse
-import ctypes
 import hashlib
 import json
 import os
 from pathlib import Path
 import platform
-import stat
 import tarfile
 import urllib.request
 import urllib.error
-import zipfile
 
 import backup_restore_rehearsal as rehearsal
 
@@ -32,17 +29,6 @@ class NoCredentialRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def native_architecture():
-    if platform.system() == 'Windows':
-        # ARM runners may invoke Python under x64 emulation. Select the actual
-        # kernel architecture, then execute that archive on the native host.
-        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
-        kernel.GetCurrentProcess.restype = ctypes.c_void_p
-        kernel.IsWow64Process2.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ushort), ctypes.POINTER(ctypes.c_ushort)]
-        kernel.IsWow64Process2.restype = ctypes.c_int
-        process, native = ctypes.c_ushort(), ctypes.c_ushort()
-        rehearsal.require(kernel.IsWow64Process2(kernel.GetCurrentProcess(), ctypes.byref(process), ctypes.byref(native)),
-                          'cannot establish Windows native kernel architecture')
-        return {0xaa64: 'arm64', 0x8664: 'amd64'}.get(native.value)
     return {'x86_64': 'amd64', 'arm64': 'arm64', 'aarch64': 'arm64'}.get(platform.machine())
 
 
@@ -67,11 +53,10 @@ def prepare(destination):
     destination = Path(destination)
     rehearsal.require(not destination.is_symlink(), 'release input directory must not be a symlink')
     destination.mkdir(parents=True, exist_ok=False)
-    system = {'Windows': 'windows', 'Linux': 'linux', 'Darwin': 'darwin'}.get(platform.system())
+    system = {'Linux': 'linux', 'Darwin': 'darwin'}.get(platform.system())
     arch = native_architecture()
     rehearsal.require(system and arch, 'unsupported native release platform')
-    extension = '.zip' if system == 'windows' else '.tar.gz'
-    name = 'symeraseme_0.12.1_' + system + '_' + arch + extension
+    name = 'symeraseme_0.12.1_' + system + '_' + arch + '.tar.gz'
     release = json.loads(fetch(RELEASE_METADATA_URL, 1024 * 1024))
     rehearsal.require(release['tag_name'] == RELEASE and not release['draft'] and not release['prerelease'],
                       'historical release identity changed')
@@ -93,23 +78,14 @@ def prepare(destination):
     rehearsal.require(hashlib.sha256(raw).hexdigest() == matches[0], 'archive checksum differs')
     archive = destination / name
     archive.write_bytes(raw)
-    member = 'symeraseme.exe' if system == 'windows' else 'symeraseme'
-    if system == 'windows':
-        with zipfile.ZipFile(archive) as container:
-            entries = [entry for entry in container.infolist() if entry.filename == member]
-            rehearsal.require(len(entries) == 1 and not entries[0].is_dir()
-                              and stat.S_IFMT(entries[0].external_attr >> 16) in (0, stat.S_IFREG),
-                              'archive executable must be a single regular member')
-            rehearsal.require(0 < entries[0].file_size <= 32 * 1024 * 1024, 'executable size exceeded bound')
-            binary = container.read(entries[0])
-    else:
-        with tarfile.open(archive) as container:
-            entries = [entry for entry in container.getmembers() if entry.name == member]
-            rehearsal.require(len(entries) == 1 and entries[0].isfile(), 'archive executable must be regular')
-            rehearsal.require(0 < entries[0].size <= 32 * 1024 * 1024, 'executable size exceeded bound')
-            with container.extractfile(entries[0]) as stream:
-                binary = stream.read(32 * 1024 * 1024 + 1)
-    executable = destination / ('retained-go.exe' if system == 'windows' else 'retained-go')
+    member = 'symeraseme'
+    with tarfile.open(archive) as container:
+        entries = [entry for entry in container.getmembers() if entry.name == member]
+        rehearsal.require(len(entries) == 1 and entries[0].isfile(), 'archive executable must be regular')
+        rehearsal.require(0 < entries[0].size <= 32 * 1024 * 1024, 'executable size exceeded bound')
+        with container.extractfile(entries[0]) as stream:
+            binary = stream.read(32 * 1024 * 1024 + 1)
+    executable = destination / 'retained-go'
     executable.write_bytes(binary)
     executable.chmod(0o700)
     verified = rehearsal.verify_go_archive(archive, executable)
