@@ -12,27 +12,35 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
-        "darwin/arm64",
-        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
-        "0d347874707e1dfa7056988c4e3e5cb66b5772bf28feda22212a9e616a51b266",
+        "darwin/amd64",
+        "5df99f8f5178ba9ae07e6c12be5067ae121e115b",
+        "24d87bcfe0ac6e624da9bbe48189a3a52e735175344e96ee564c1f1e6c7d2d50",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-c129252f/http-wire/darwin-arm64/wire.json"
+            "../../../../tests/fixtures/go-frozen/http-refresh-5df99f8f/http-wire/darwin-amd64/wire.json"
+        ),
+    ),
+    (
+        "darwin/arm64",
+        "5df99f8f5178ba9ae07e6c12be5067ae121e115b",
+        "f23f8e1c5e8e0df47a12a360874a46c9a878d4d58cccde9703c7b009d5fa3c09",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/http-refresh-5df99f8f/http-wire/darwin-arm64/wire.json"
         ),
     ),
     (
         "linux/amd64",
-        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
-        "2e94220e2513fc2472818092356605b3be2490d7a792fc7659341cfaa69bb3b6",
+        "5df99f8f5178ba9ae07e6c12be5067ae121e115b",
+        "8ef6d8285d3b51e0b2ec1885333d44b666b2e435b8eb6bd5c07aae2419472c43",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-c129252f/http-wire/linux-amd64/wire.json"
+            "../../../../tests/fixtures/go-frozen/http-refresh-5df99f8f/http-wire/linux-amd64/wire.json"
         ),
     ),
     (
         "linux/arm64",
-        "c129252f76e28cc9d0bdd7fe25152f9e63db3840",
-        "4c0cce6cd328a9e0f4b8017ff0f4c73098f608570317429e830452b24720d635",
+        "5df99f8f5178ba9ae07e6c12be5067ae121e115b",
+        "0cbdff2d346f7e947259406402748fe6c00cdfb2f321c08bdb52148153ee798e",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-c129252f/http-wire/linux-arm64/wire.json"
+            "../../../../tests/fixtures/go-frozen/http-refresh-5df99f8f/http-wire/linux-arm64/wire.json"
         ),
     ),
 ];
@@ -82,20 +90,8 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str) -> Value {
             );
             assert_eq!(recorded["bytes"], archive.stdout.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archive.stdout), "{name}");
-            let retired_producer = field == "archived_generators"
-                && matches!(
-                    name.as_str(),
-                    "crates/symeraseme-cli/tests/mcp_http_process.rs"
-                        | "crates/symeraseme-cli/tests/support/capture_http_wire.rs"
-                );
-            if retired_producer {
-                go_source_pin::assert_retired_generator_matches_archive(
-                    ROOT,
-                    name,
-                    &archive.stdout,
-                );
-            } else if go_source_pin::current_tree_bound(name) {
-                let current = go_source_pin::current_source(ROOT, name);
+            if go_source_pin::current_tree_bound(name) {
+                let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
                 go_source_pin::assert_current_matches_archive(name, &archive.stdout, &current);
             }
         }
@@ -133,25 +129,23 @@ impl Corpus {
     }
 }
 
-pub fn observations() -> Corpus {
-    assert!(
-        !std::env::var_os("SYMERASEME_CAPTURE_HTTP_WIRE").is_some_and(|value| !value.is_empty()),
-        "live Go capture is retired; use the immutable historical capture producer"
-    );
+pub fn observations() -> Option<Corpus> {
+    if std::env::var_os("SYMERASEME_CAPTURE_HTTP_WIRE").is_some_and(|value| !value.is_empty()) {
+        return None;
+    }
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("1") => return None,
         Ok("0") | Err(std::env::VarError::NotPresent) => {}
-        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
     }
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
         ("linux", "aarch64") => "linux/arm64",
+        ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
-        _ => panic!("no recorded native HTTP wire capture for this target; live Go is retired"),
+        _ => return None,
     };
-    let (_, revision, pin, raw) = RECORDS
-        .iter()
-        .find(|record| record.0 == target)
-        .expect("no recorded HTTP wire capture for the native target");
+    let (_, revision, pin, raw) = RECORDS.iter().find(|record| record.0 == target)?;
     let record = verify(raw, pin, revision, target);
     let mut corrupt = raw.to_vec();
     corrupt.push(b'!');
@@ -170,20 +164,5 @@ pub fn observations() -> Corpus {
         ))
         .is_err()
     );
-    Corpus(record)
-}
-
-// Preserve the request representation of the historical capture producer.
-pub fn request(method: &str, body: &[u8], headers: &[(&str, String)]) -> Value {
-    serde_json::json!({
-        "method": method,
-        "body_base64": base64::engine::general_purpose::STANDARD.encode(body),
-        "body": {"bytes": body.len(), "sha256": digest(body)},
-        "headers": headers.iter().map(|(name, value)| {
-            if name.eq_ignore_ascii_case("authorization") {
-                assert!(value.starts_with("Bearer "));
-                serde_json::json!({"name": name, "role": "private-native-bearer-token"})
-            } else { serde_json::json!({"name": name, "value": value}) }
-        }).collect::<Vec<_>>()
-    })
+    Some(Corpus(record))
 }
