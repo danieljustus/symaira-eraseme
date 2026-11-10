@@ -210,8 +210,13 @@ fn marks_for(count: usize) -> String {
 
 /// Go's `countStatuses`: upper-cased, empty becomes PLANNED, absent stays absent.
 pub(crate) fn count_statuses(rows: &[RequestRow]) -> BTreeMap<String, i64> {
+    count_statuses_of(rows)
+}
+
+fn count_statuses_of<R: std::borrow::Borrow<RequestRow>>(rows: &[R]) -> BTreeMap<String, i64> {
     let mut counts: BTreeMap<String, i64> = BTreeMap::new();
     for row in rows {
+        let row: &RequestRow = row.borrow();
         let status = row.current_status.to_uppercase();
         let status = if status.is_empty() {
             "PLANNED".to_owned()
@@ -267,10 +272,10 @@ pub fn get_campaign_status(
             resolved += 1;
             continue;
         }
+        if is_past_deadline(request, now) {
+            overdue += 1;
+        }
         if let Some(deadline) = parse_time(&request.deadline_at) {
-            if deadline <= now {
-                overdue += 1;
-            }
             if deadline >= now && deadline <= now + chrono::Duration::days(7) {
                 due7 += 1;
             }
@@ -501,6 +506,18 @@ fn dashboard_request_map(request: &RequestRow) -> Value {
     })
 }
 
+/// The one overdue rule: an unresolved request whose deadline has passed.
+///
+/// `get_campaign_status` (`upcoming.overdue`, i.e. `symeraseme status`) and the
+/// dashboard KPI, campaign rows and broker rows all count through this helper,
+/// so the numbers cannot drift apart again (#1296). It deliberately ignores
+/// `current_status`: a request that is still `AWAITING_ACK` after its deadline
+/// is overdue even before the tick engine has moved it to `OVERDUE`.
+pub(crate) fn is_past_deadline(request: &RequestRow, now: DateTime<Utc>) -> bool {
+    request.resolved_at.is_empty()
+        && parse_time(&request.deadline_at).is_some_and(|deadline| deadline <= now)
+}
+
 fn count_of(counts: &BTreeMap<String, i64>, key: &str) -> i64 {
     counts.get(key).copied().unwrap_or(0)
 }
@@ -666,20 +683,58 @@ fn broker_leaderboard_value(requests: &[RequestRow]) -> Vec<Value> {
 }
 
 /// Go's `brokerDashboard`: the leaderboard without the rate fields.
-fn broker_dashboard(requests: &[RequestRow]) -> Vec<Value> {
-    broker_leaderboard(requests)
+///
+/// `overdue` uses the shared deadline rule ([`is_past_deadline`]). With a
+/// `limit`, the brokers that most need attention are selected (overdue
+/// descending, pending descending, total descending, `broker_id` ascending)
+/// and then presented in the leaderboard order (total descending, `broker_id`
+/// ascending), so the selection is a function of the data alone and the
+/// presentation order does not depend on the limit. Returns the rows and the
+/// number of brokers before the limit.
+fn broker_dashboard(
+    requests: &[RequestRow],
+    now: DateTime<Utc>,
+    limit: Option<usize>,
+) -> (Vec<Value>, usize) {
+    let mut overdue: BTreeMap<&str, i64> = BTreeMap::new();
+    for request in requests {
+        if is_past_deadline(request, now) {
+            *overdue.entry(request.broker_id.as_str()).or_insert(0) += 1;
+        }
+    }
+    let stats = broker_leaderboard(requests);
+    let total = stats.len();
+    let overdue_of = |stat: &BrokerStat| overdue.get(stat.broker_id.as_str()).copied().unwrap_or(0);
+    let mut selected: Vec<usize> = (0..total).collect();
+    if let Some(limit) = limit
+        && limit < total
+    {
+        selected.sort_by(|&left, &right| {
+            let (left, right) = (&stats[left], &stats[right]);
+            overdue_of(right)
+                .cmp(&overdue_of(left))
+                .then_with(|| right.pending.cmp(&left.pending))
+                .then_with(|| right.total.cmp(&left.total))
+                .then_with(|| left.broker_id.cmp(&right.broker_id))
+        });
+        selected.truncate(limit);
+        selected.sort_unstable();
+    }
+    let rows = selected
         .into_iter()
-        .map(|stat| {
+        .map(|index| {
+            let stat = &stats[index];
             json!({
                 "broker_id": stat.broker_id,
                 "total": stat.total,
                 "confirmed": stat.confirmed,
                 "rejected": stat.rejected,
-                "overdue": stat.overdue,
+                "overdue": overdue_of(stat),
                 "pending": stat.pending,
             })
         })
-        .collect()
+        .collect();
+    (rows, total)
 }
 
 /// Go's `jurisdictionBreakdown`, ordered by total descending.
@@ -905,11 +960,73 @@ fn recent_events(store: &Store, limit: i64) -> rusqlite::Result<Vec<Value>> {
     rows.collect()
 }
 
-/// Mirrors Go's `GetDashboardData`.
+/// Brokers returned by default from the compact dashboard (#1296).
+pub const DEFAULT_DASHBOARD_BROKER_LIMIT: usize = 20;
+
+/// What [`get_dashboard_data_with`] includes.
+///
+/// The default is the compact shape for agent clients: totals, `by_status`,
+/// campaign counters and the top [`DEFAULT_DASHBOARD_BROKER_LIMIT`] brokers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DashboardOptions {
+    /// Most brokers in `broker_status`; `None` lists every broker.
+    pub broker_limit: Option<usize>,
+    /// Only totals, `by_status` and campaign counters: no `broker_status`, no
+    /// `recent_events`, no per-campaign `requests`.
+    pub summary_only: bool,
+    /// Include every request under each campaign (`requests`).
+    pub include_requests: bool,
+}
+
+impl Default for DashboardOptions {
+    fn default() -> Self {
+        Self {
+            broker_limit: Some(DEFAULT_DASHBOARD_BROKER_LIMIT),
+            summary_only: false,
+            include_requests: false,
+        }
+    }
+}
+
+impl DashboardOptions {
+    /// Every broker and every request: the pre-#1296 shape.
+    pub const fn full() -> Self {
+        Self {
+            broker_limit: None,
+            summary_only: false,
+            include_requests: true,
+        }
+    }
+}
+
+/// Mirrors Go's `GetDashboardData`: the full dashboard, as the HTML template
+/// consumes it. `overdue` follows the shared deadline rule (#1296).
 pub fn get_dashboard_data(
     store: &Store,
     campaign_id: &str,
     now: DateTime<Utc>,
+) -> rusqlite::Result<Value> {
+    build_dashboard(store, campaign_id, now, DashboardOptions::full(), false)
+}
+
+/// The dashboard as the `get_dashboard_data` tool serves it: the legacy keys
+/// plus `by_status`, `broker_total` and `broker_status_truncated`, sized by
+/// `options`.
+pub fn get_dashboard_data_with(
+    store: &Store,
+    campaign_id: &str,
+    now: DateTime<Utc>,
+    options: DashboardOptions,
+) -> rusqlite::Result<Value> {
+    build_dashboard(store, campaign_id, now, options, true)
+}
+
+fn build_dashboard(
+    store: &Store,
+    campaign_id: &str,
+    now: DateTime<Utc>,
+    options: DashboardOptions,
+    extras: bool,
 ) -> rusqlite::Result<Value> {
     let campaigns = load_campaigns(store, campaign_id, campaign_id.is_empty())?;
     let ids: Vec<String> = campaigns.iter().map(|row| row.id.clone()).collect();
@@ -918,25 +1035,24 @@ pub fn get_dashboard_data(
     } else {
         load_requests(store, &ids)?
     };
-    let mut by_campaign: BTreeMap<String, Vec<RequestRow>> = BTreeMap::new();
+    let mut by_campaign: BTreeMap<String, Vec<&RequestRow>> = BTreeMap::new();
     for request in &requests {
         by_campaign
             .entry(request.campaign_id.clone())
             .or_default()
-            .push(request.clone());
+            .push(request);
     }
+    let with_requests = options.include_requests && !options.summary_only;
     let campaign_values: Vec<Value> = campaigns
         .iter()
         .map(|campaign| {
             let empty = Vec::new();
             let scoped = by_campaign.get(&campaign.id).unwrap_or(&empty);
-            let counts = count_statuses(scoped);
-            let request_values: Vec<Value> = scoped.iter().map(dashboard_request_map).collect();
-            json!({
+            let counts = count_statuses_of(scoped);
+            let mut value = json!({
                 "id": campaign.id,
                 "created_at": campaign.created_at,
                 "kind": campaign.kind,
-                "requests": request_values,
                 "total": scoped.len() as i64,
                 "planned": count_of(&counts, "PLANNED"),
                 "sent": count_of(&counts, "SENT"),
@@ -944,13 +1060,25 @@ pub fn get_dashboard_data(
                 "awaiting_response": count_of(&counts, "AWAITING_RESPONSE"),
                 "confirmed": count_of(&counts, "CONFIRMED"),
                 "rejected": count_of(&counts, "REJECTED_FINAL"),
-                "overdue": count_of(&counts, "OVERDUE"),
-            })
+                "overdue": scoped.iter().filter(|request| is_past_deadline(request, now)).count() as i64,
+            });
+            if with_requests {
+                value["requests"] = Value::Array(
+                    scoped
+                        .iter()
+                        .map(|request| dashboard_request_map(request))
+                        .collect(),
+                );
+            }
+            value
         })
         .collect();
-    let events = recent_events(store, 50)?;
     let counts = count_statuses(&requests);
-    Ok(go_map_order(json!({
+    let overdue = requests
+        .iter()
+        .filter(|request| is_past_deadline(request, now))
+        .count() as i64;
+    let mut dashboard = json!({
         "campaigns": campaign_values,
         "total_requests": requests.len() as i64,
         "planned": count_of(&counts, "PLANNED"),
@@ -959,11 +1087,28 @@ pub fn get_dashboard_data(
         "awaiting_response": count_of(&counts, "AWAITING_RESPONSE"),
         "confirmed": count_of(&counts, "CONFIRMED"),
         "rejected": count_of(&counts, "REJECTED_FINAL"),
-        "overdue": count_of(&counts, "OVERDUE"),
-        "broker_status": broker_dashboard(&requests),
-        "recent_events": events,
+        "overdue": overdue,
         "generated_at": iso(now),
-    })))
+    });
+    let limit = if options.summary_only {
+        Some(0)
+    } else {
+        options.broker_limit
+    };
+    let (brokers, broker_total) = broker_dashboard(&requests, now, limit);
+    if !options.summary_only {
+        dashboard["broker_status"] = Value::Array(brokers);
+        dashboard["recent_events"] = Value::Array(recent_events(store, 50)?);
+    }
+    if extras {
+        dashboard["by_status"] = counts_to_value(&counts);
+        dashboard["broker_total"] = json!(broker_total as i64);
+        if !options.summary_only {
+            dashboard["broker_status_truncated"] =
+                json!(dashboard["broker_status"].as_array().map_or(0, Vec::len) < broker_total);
+        }
+    }
+    Ok(go_map_order(dashboard))
 }
 
 /// Go's `GenerateDashboard`: render the dashboard template over the dashboard

@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- MCP `get_dashboard_data` (and `symeraseme dashboard`) is compact by default:
+  at most 20 brokers needing attention and no per-campaign request lists, plus
+  `by_status`, `broker_total` and `broker_status_truncated`. New arguments
+  `limit` (`0` = all brokers), `summary_only` and `include_requests` resize it.
+  A store with 9134 requests no longer returns ~2 MB. `generate-dashboard` is
+  unchanged (#1296).
+
+### Fixed
+
+- The dashboard `overdue` KPI, campaign rows and broker rows use the same
+  deadline-based rule as `symeraseme status` (`upcoming.overdue`): unresolved
+  requests past their deadline, not only the `OVERDUE` status (#1296).
+
 ## [v0.15.1] - 2026-11-10
 
 Canary patch prerelease on the Rust-only 0.15 line. It ships the bundled

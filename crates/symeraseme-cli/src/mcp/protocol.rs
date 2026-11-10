@@ -1127,9 +1127,12 @@ mod tests {
         const RESPONSE: &[u8] = include_bytes!(
             "../../../../tests/fixtures/mcp-contract/mcp-002/tools-list.response.json"
         );
+        // Recorded bytes, except the compact `get_dashboard_data` entry (#1296).
         assert_eq!(
             initialize(REQUEST, &no_backend_handler()),
-            InitializeOutcome::Response(RESPONSE.to_vec())
+            InitializeOutcome::Response(
+                crate::mcp::handler::dashboard_compact::with_compact_dashboard_tool(RESPONSE)
+            )
         );
     }
 

@@ -9,6 +9,9 @@
 //! Go's switch default.
 
 #[cfg(test)]
+#[path = "../../../../rust-tests/dashboard_compact.rs"]
+pub(crate) mod dashboard_compact;
+#[cfg(test)]
 #[path = "../../tests/support/frozen_mcp_runtime.rs"]
 mod frozen_mcp_runtime;
 #[cfg(test)]
@@ -1066,11 +1069,28 @@ impl ContractHandler {
     /// a non-positive value for either before it queries. The count keeps Go's
     /// asymmetry: it filters by campaign and status, never by broker, so a
     /// broker filter narrows the rows but not `total`.
-    /// Go's `get_dashboard_data`: the whole dashboard for every campaign.
-    fn dashboard_data(&self) -> Result<Value, ToolError> {
+    /// `get_dashboard_data`: the dashboard for every campaign. Since #1296 the
+    /// default is compact (the top 20 brokers, no per-campaign requests);
+    /// `limit` sizes the broker list (0 lists all), `summary_only` drops the
+    /// broker list, recent events and requests, and `include_requests` adds
+    /// every request under its campaign again.
+    fn dashboard_data(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
+        let limit = get_int(
+            arguments,
+            "limit",
+            reporting::DEFAULT_DASHBOARD_BROKER_LIMIT as i64,
+        );
+        if limit < 0 {
+            return Err(ToolError("limit must be 0 or greater".to_owned()));
+        }
+        let options = reporting::DashboardOptions {
+            broker_limit: (limit > 0).then_some(limit as usize),
+            summary_only: get_bool(arguments, "summary_only", false),
+            include_requests: get_bool(arguments, "include_requests", false),
+        };
         self.with_open_store(|store| {
             let now = self.recorded_instant()?;
-            reporting::get_dashboard_data(store, "", now)
+            reporting::get_dashboard_data_with(store, "", now, options)
                 .map_err(|error| ToolError(error.to_string()))
         })
     }
@@ -1572,7 +1592,7 @@ impl ContractHandler {
             "execute" => self.execute_campaign(arguments),
             "plan_show" => self.plan_show(arguments),
             "list_requests" => self.list_requests(arguments),
-            "get_dashboard_data" => self.dashboard_data(),
+            "get_dashboard_data" => self.dashboard_data(arguments),
             "get_calendar" => self.calendar(arguments),
             "get_events" => self.get_events(arguments),
             "list_brokers" => self.list_brokers(arguments),
@@ -3199,14 +3219,33 @@ mod tests {
             let actual = handler
                 .call(&case.tool, &case.arguments)
                 .unwrap_or_else(|error| panic!("{}: {error}", case.name));
-            assert_eq!(actual, case.result, "{}", case.name);
+            // #1296: the recorded `get_dashboard_data` results are compared
+            // through the documented override of exactly the changed fields
+            // (compact default shape, deadline-based overdue); the response
+            // bytes come from the same envelope that reproduces the recorded
+            // bytes for the unchanged result. Every other case stays exact.
+            let (expected_result, expected_wire) = if case.tool == "get_dashboard_data" {
+                let id = serde_json::from_str::<Value>(&case.request).expect("request JSON")["id"]
+                    .clone();
+                assert_eq!(
+                    crate::mcp::envelope::result_response(&id, Some(&case.result)),
+                    case.response.as_bytes(),
+                    "{} the envelope reproduces the recorded dashboard bytes",
+                    case.name
+                );
+                let result = dashboard_compact::compact_default_result(&case.result, Some(now));
+                let wire = crate::mcp::envelope::result_response(&id, Some(&result));
+                (result, wire)
+            } else {
+                (case.result.clone(), case.response.clone().into_bytes())
+            };
+            assert_eq!(actual, expected_result, "{}", case.name);
             let wire = match initialize(case.request.as_bytes(), &handler) {
                 InitializeOutcome::Response(bytes) => bytes,
                 other => panic!("{} expected a complete response, got {other:?}", case.name),
             };
             assert_eq!(
-                wire,
-                case.response.as_bytes(),
+                wire, expected_wire,
                 "{} complete current-Go response bytes",
                 case.name
             );
@@ -4348,6 +4387,115 @@ mod tests {
             .and_then(|messages| messages.first())
             .expect("message entry");
         assert_eq!(first["Message"]["Subject"], serde_json::json!(""));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// #1296: `get_dashboard_data` is compact by default, sized by `limit` and
+    /// `summary_only`, validated against the advertised schema, and its
+    /// overdue KPI follows the deadline rule that `status` reports.
+    #[test]
+    fn get_dashboard_data_arguments_size_the_response_through_tools_call() {
+        use symeraseme_core::config::ConfigContext;
+        let root = workspace("dashboard-compact");
+        let data_dir = root.join("data");
+        fs::create_dir_all(&data_dir).expect("data dir");
+        let store = Store::open(data_dir.join("symeraseme.db")).expect("open store");
+        let mut sql = String::from(
+            "INSERT INTO campaigns (id, created_at, kind, notes) VALUES \
+             ('alpha', '2026-08-01T12:00:00+00:00', 'initial', NULL);\n",
+        );
+        for index in 1..=30 {
+            // Brokers 1..=3 are AWAITING_ACK past their deadline; the rest wait
+            // for an answer within their deadline.
+            let (status, deadline) = if index <= 3 {
+                ("AWAITING_ACK", "2026-08-04T12:00:00+00:00")
+            } else {
+                ("AWAITING_RESPONSE", "2026-09-01T12:00:00+00:00")
+            };
+            sql.push_str(&format!(
+                "INSERT INTO removal_requests (id, broker_id, channel, campaign_id, created_at, jurisdiction, template_id) \
+                 VALUES ({index}, 'broker-{index:02}', 'email', 'alpha', '2026-08-01T13:00:00+00:00', 'DE', '');\n\
+                 INSERT INTO request_state (request_id, current_status, last_event_at, sent_at, resolved_at, deadline_at, next_action_at, reminders_sent, escalation_level) \
+                 VALUES ({index}, '{status}', '2026-08-01T13:00:00+00:00', '2026-08-01T13:00:00+00:00', NULL, '{deadline}', NULL, 0, 0);\n"
+            ));
+        }
+        store.connection().execute_batch(&sql).expect("seed");
+        store.close().expect("close seed store");
+        let now = DateTime::parse_from_rfc3339("2026-08-05T12:00:00+00:00")
+            .expect("fixed instant")
+            .with_timezone(&Utc);
+        let mut environment = std::collections::BTreeMap::new();
+        environment.insert(
+            "SYMERASEME_DATA_DIR".to_owned(),
+            data_dir.to_string_lossy().into_owned(),
+        );
+        let handler = ContractHandler::new(&root).with_store(
+            ConfigContext::new(root.clone(), root.clone(), environment),
+            now,
+        );
+        let call = |arguments: &str| -> Value {
+            let request = format!(
+                r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"get_dashboard_data","arguments":{arguments}}}}}"#
+            );
+            let InitializeOutcome::Response(bytes) = initialize(request.as_bytes(), &handler)
+            else {
+                panic!("expected a response for {arguments}");
+            };
+            serde_json::from_slice(&bytes).expect("response JSON")
+        };
+        let result = |response: &Value| -> Value {
+            serde_json::from_str(
+                response["result"]["content"][0]["text"]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("tool result text in {response}")),
+            )
+            .expect("tool result JSON")
+        };
+
+        let default = result(&call("{}"));
+        assert_eq!(default["broker_status"].as_array().unwrap().len(), 20);
+        assert_eq!(default["broker_total"], 30);
+        assert_eq!(default["broker_status_truncated"], true);
+        assert_eq!(default["by_status"]["AWAITING_ACK"], 3);
+        assert!(default["campaigns"][0].get("requests").is_none());
+        // All three overdue brokers are inside the 20 returned.
+        let overdue: Vec<&Value> = default["broker_status"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|broker| broker["overdue"] == 1)
+            .collect();
+        assert_eq!(overdue.len(), 3);
+        // The KPI is the deadline rule `status` reports as upcoming.overdue.
+        assert_eq!(default["overdue"], 3);
+        assert_eq!(default["campaigns"][0]["overdue"], 3);
+
+        let limited = result(&call(r#"{"limit":2}"#));
+        assert_eq!(limited["broker_status"].as_array().unwrap().len(), 2);
+        let everything = result(&call(r#"{"limit":0,"include_requests":true}"#));
+        assert_eq!(everything["broker_status"].as_array().unwrap().len(), 30);
+        assert_eq!(everything["broker_status_truncated"], false);
+        assert_eq!(
+            everything["campaigns"][0]["requests"]
+                .as_array()
+                .unwrap()
+                .len(),
+            30
+        );
+        let summary = result(&call(r#"{"summary_only":true}"#));
+        assert!(summary.get("broker_status").is_none());
+        assert_eq!(summary["total_requests"], 30);
+        assert_eq!(summary["broker_total"], 30);
+
+        // Invalid arguments are rejected before the handler runs, or by it.
+        let negative = call(r#"{"limit":-1}"#);
+        assert_eq!(negative["error"]["code"], -32603, "{negative}");
+        let mistyped = call(r#"{"summary_only":"yes"}"#);
+        assert_eq!(mistyped["error"]["code"], -32602, "{mistyped}");
+        assert_eq!(
+            mistyped["error"]["message"],
+            "invalid parameter type: summary_only"
+        );
         let _ = fs::remove_dir_all(&root);
     }
 }

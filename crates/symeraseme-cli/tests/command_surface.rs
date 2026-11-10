@@ -1,5 +1,8 @@
 #[path = "support/migration_oracle.rs"]
 mod migration_oracle;
+// #1296: the recorded `dashboard` output is compared through a narrow override.
+#[path = "../../../rust-tests/dashboard_compact.rs"]
+mod dashboard_compact;
 
 #[path = "support/frozen_review_oracle.rs"]
 mod frozen_review_oracle;
@@ -909,6 +912,12 @@ fn frozen_command_surface_matches_phase_two_contract() {
             .into_bytes(),
             "config-show" => b"data_dir=~/.local/share/symeraseme\nport=8000\n".to_vec(),
             "config-show-json" | "operate-config-show" => b"{\"config\":{\"data_dir\":\"~/.local/share/symeraseme\",\"db_dir\":\"\",\"encrypt_db\":false,\"port\":8000,\"allow_remote\":false},\"success\":true}\n".to_vec(),
+            // The recorded dashboard is an empty store (no deadlines), so only
+            // the shape fields change (#1296).
+            "dashboard-json" | "operate-dashboard" => dashboard_compact::compact_default_bytes(
+                &decode_base64(case["stdout_base64"].as_str().unwrap()),
+                None,
+            ),
             _ => decode_base64(case["stdout_base64"].as_str().unwrap()),
         };
         // `plan status` reports a wall clock, so its value is masked before the

@@ -11,6 +11,55 @@ tracked separately in #1276. Historical rows below preserve what was measured
 and must not be edited to erase those observations. Remove a Windows-only
 fixture only after checking its replay and provenance consumers.
 
+## Post-cutover contract change: compact dashboard data and one overdue definition (2026-11-10, #1296)
+
+The MCP tool `get_dashboard_data` (and the CLI `dashboard` command, which calls
+it without arguments) answered ~2 MB on a store with 9134 requests, and its
+`overdue` KPI disagreed with `symeraseme status`. Go is removed (CUT-005), so
+the change is recorded in #1296 instead of changing Go first. Frozen records
+stay unchanged history; the tests compare them through a narrow override of
+exactly the changed fields (`rust-tests/dashboard_compact.rs`), never through
+broad normalization.
+
+- **Compact default.** The tool takes `limit` (integer, default 20, `0` lists
+  every broker), `summary_only` (boolean) and `include_requests` (boolean). The
+  default result has no per-campaign `requests` (the bulk of the 2 MB), at most
+  20 entries in `broker_status`, and three new fields: `by_status` (status ->
+  count), `broker_total` (all brokers) and `broker_status_truncated`.
+  `limit` selects the brokers needing attention first (overdue, then pending,
+  then total requests descending, then `broker_id`) and presents them in the
+  unchanged leaderboard order (total descending, `broker_id`), so the order of
+  a list that fits does not move. `summary_only` drops `broker_status`,
+  `recent_events` and `requests`. `limit: 0` plus `include_requests: true`
+  restores the pre-#1296 content. A negative `limit` is an error.
+- **One overdue rule.** `reporting::is_past_deadline` (unresolved and
+  `deadline_at <= now`) is the single definition behind `status`
+  `upcoming.overdue` and the dashboard `overdue` at all three levels (top-level
+  KPI, per campaign, per broker). The dashboard used to count the `OVERDUE`
+  status, which the tick engine only sets later, so `AWAITING_ACK` requests past
+  their deadline were missed. The report's `overdue_rate` and leaderboard
+  `overdue` (Report, not dashboard) still count the status and are unchanged.
+- **`tools/list`.** The `get_dashboard_data` entry carries the new
+  `inputSchema` and description, applied over `internal/mcp/tools.json` in
+  `tools_list.rs` (the recorded catalogue and `tools/list` records are not
+  edited). The same list validates call argument types.
+- **Unchanged.** `generate-dashboard` / `generate_dashboard` keep rendering the
+  full data through `reporting::get_dashboard_data` (all brokers, requests
+  included) and the golden DOM-003 comparisons of the Go-recorded aggregations
+  stay byte-exact; only the deadline-based `overdue` replaces the status count
+  there, which is equal on the recorded fixtures.
+
+Overrides (each documented in its test): the recorded `tools/list` response
+swaps the one tool entry (`mcp_tools_list.rs`, `protocol.rs` shared-entry test);
+the recorded clock-fixture `get_dashboard_data` results and the CLI
+`dashboard-json` / `operate-dashboard` recordings derive the compact default
+(`mcp::handler` clock test, `command_surface.rs`). New behaviour is pinned by
+`crates/symeraseme-core/tests/dashboard_compact.rs` (300 brokers x 10 requests:
+bounded size, `limit`, `summary_only`, `include_requests`, KPI equal to
+`status`) and the `tools/call` test in `mcp::handler`. Affected rows: DOM-003
+(`GetDashboardData` shape and `overdue`), CLI-018 (dashboard JSON) and the MCP
+`tools/list` / `get_dashboard_data` rows.
+
 ## Post-cutover contract change: HTML exports (2026-10-20, #1259)
 
 The dashboard and HTML report exports use the Symaira Liquid Topography

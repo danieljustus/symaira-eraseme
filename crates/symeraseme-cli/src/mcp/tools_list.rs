@@ -76,9 +76,52 @@ pub(crate) fn tools_list(raw: &[u8]) -> ToolsListOutcome {
         return response_error(id, -32602, "invalid params");
     }
 
-    let catalogue = serde_json::from_slice::<Catalogue>(TOOL_CATALOGUE)
+    response_tools(id, catalogue_tools())
+}
+
+/// The tools the server lists and validates calls against: the embedded
+/// catalogue with the post-cutover contract changes applied on top of it.
+///
+/// The recorded catalogue (`internal/mcp/tools.json`) and the frozen
+/// `tools/list` records stay untouched history; each post-cutover change is an
+/// explicit, narrow override here (#1296: the compact `get_dashboard_data`).
+pub(crate) fn catalogue_tools() -> Vec<Value> {
+    let mut catalogue = serde_json::from_slice::<Catalogue>(TOOL_CATALOGUE)
         .expect("Go MCP catalogue is valid JSON");
-    response_tools(id, catalogue.tools)
+    for tool in &mut catalogue.tools {
+        if tool.get("name").and_then(Value::as_str) == Some("get_dashboard_data") {
+            *tool = compact_dashboard_tool();
+        }
+    }
+    catalogue.tools
+}
+
+/// `get_dashboard_data` since #1296: compact by default, sized by arguments.
+fn compact_dashboard_tool() -> Value {
+    serde_json::json!({
+        "name": "get_dashboard_data",
+        "description": "Return aggregated dashboard data: campaigns, request status counts (totals and by_status), broker status, and recent events. Compact by default: the 20 brokers needing the most attention and no per-campaign request lists. Use limit, summary_only and include_requests to resize.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Most brokers in broker_status, chosen by overdue then pending then total requests; 0 lists every broker",
+                    "default": 20
+                },
+                "summary_only": {
+                    "type": "boolean",
+                    "description": "Return only totals, by_status and campaign counters: no broker_status, recent_events or requests",
+                    "default": false
+                },
+                "include_requests": {
+                    "type": "boolean",
+                    "description": "Include every request under its campaign (can be very large)",
+                    "default": false
+                }
+            }
+        }
+    })
 }
 
 #[derive(serde::Deserialize)]

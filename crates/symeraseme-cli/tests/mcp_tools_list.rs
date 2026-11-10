@@ -4,6 +4,9 @@
 mod envelope;
 #[path = "../src/mcp/tools_list.rs"]
 mod tools_list;
+// #1296: the one changed tool is compared through a narrow, documented override.
+#[path = "../../../rust-tests/dashboard_compact.rs"]
+mod dashboard_compact;
 
 use tools_list::{ToolsListOutcome, tools_list};
 
@@ -26,7 +29,11 @@ fn tools_list_matches_source_bound_response_shape() {
     let ToolsListOutcome::Response(response) = tools_list(LIST_REQUEST) else {
         panic!("tools/list request did not return a response");
     };
-    assert_eq!(response, LIST_RESPONSE);
+    // Recorded bytes, except the compact `get_dashboard_data` entry (#1296).
+    assert_eq!(
+        response,
+        dashboard_compact::with_compact_dashboard_tool(LIST_RESPONSE)
+    );
     let document = serde_json::from_slice::<serde_json::Value>(&response).expect("response JSON");
     let names = document
         .get("result")

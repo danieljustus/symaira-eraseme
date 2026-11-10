@@ -85,12 +85,7 @@ pub(crate) fn tools_call_cancellable(
         Some(_) => return response_error(id, -32602, "invalid params"),
     };
 
-    let catalogue =
-        serde_json::from_slice::<Value>(TOOL_CATALOGUE).expect("Go MCP catalogue is valid JSON");
-    let tools = catalogue
-        .get("tools")
-        .and_then(Value::as_array)
-        .expect("Go MCP catalogue has a tools array");
+    let tools = super::tools_list::catalogue_tools();
     let tool = tools
         .iter()
         .find(|tool| tool.get("name").and_then(Value::as_str) == Some(name));
