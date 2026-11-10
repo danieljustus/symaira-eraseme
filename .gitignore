@@ -87,6 +87,8 @@ ARCHITEKTUR.md
 /target/
 __pycache__/
 /coverage.out
+# LLVM default profiles written by test subprocesses during `make coverage`
+*.profraw
 
 # Local agent/tool run state (not source)
 .omo/
