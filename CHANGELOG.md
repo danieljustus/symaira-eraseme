@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Update `aes` 0.9.3 to 0.9.4, `flate2` 1.1.10 to 1.1.11, and
+  `toml` 1.1.x to 1.2.0 (including `toml_datetime`, `toml_writer`, and
+  `toml_parser`); refresh native evidence as `refresh-2a7a5c1f` (#1300).
+
 ## [v0.15.1] - 2026-11-10
 
 Canary patch prerelease on the Rust-only 0.15 line. It ships the bundled

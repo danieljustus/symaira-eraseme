@@ -110,3 +110,12 @@ for Windows after #1281.
   `c129252f` (run `42198638836`) the records differ only in source revision,
   build info, the `Cargo.lock` digest, timestamps (HTTP `Date`, SMTP headers,
   elapsed times) and Go map order in one provider list.
+
+- `refresh-2a7a5c1f` captures candidate `84b375d5a79a52a9aa3f126c0c39845b3debbd5f`
+  at snapshot `2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca` (tag
+  `frozen-go-captures/dependency-refresh-2a7a5c1f`), run `42865070685`;
+  artifacts `13787482743` (macOS arm64), `13786888468` (Linux amd64),
+  and `13786663104` (Linux arm64). The Go module pseudo-version change in
+  embedded build info is permitted source-revision volatility: Go derives it
+  from the revision, commit time, and nearest reachable tag (`v0.15.1` was
+  tagged after the preceding capture).
