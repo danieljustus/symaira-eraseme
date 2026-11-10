@@ -62,7 +62,7 @@ final class NativeChromeTests: XCTestCase {
 
         let toolbar = try XCTUnwrap(window.toolbar, "The real native window must own the toolbar")
         XCTAssertEqual(toolbar.items.count, 2, "Exactly one sidebar toggle and one settings menu")
-        XCTAssertEqual(toolbar.items.last?.label, "Settings")
+        XCTAssertEqual(toolbar.items.last?.label, symairaThemeString("settings.title", "Settings"))
         let toggle = try XCTUnwrap(toolbar.items.first?.view)
         let gear = try XCTUnwrap(toolbar.items.last?.view)
         // macOS 26 sizes toolbar items to their symbol width (sidebar.left > gearshape); only the row height is shared.
@@ -92,6 +92,7 @@ final class NativeChromeTests: XCTestCase {
         XCTAssertFalse(nodes.contains { text($0, "accessibilityIdentifier") == "eraseme-nav-Settings" })
         var firstRefreshY: CGFloat?
         var firstFailureY: CGFloat?
+        let retry = symairaThemeString("common.retry", "Retry")
         for item in ContentView.NavItem.sidebarItems {
             try press(identifier: "eraseme-nav-\(item.id)", in: window)
             try await Task.sleep(for: .milliseconds(100))
@@ -123,7 +124,7 @@ final class NativeChromeTests: XCTestCase {
                     let node = $0 as! NSObject
                     return text(node, "accessibilityIdentifier") == "symaira.page.retry"
                         || (text(node, "accessibilityRole") == NSAccessibility.Role.button.rawValue
-                            && [text(node, "accessibilityLabel"), text(node, "accessibilityTitle")].contains("Retry"))
+                            && [text(node, "accessibilityLabel"), text(node, "accessibilityTitle")].contains(retry))
                 }
                 if failure == nil { try await Task.sleep(for: .milliseconds(100)) }
             }
@@ -157,6 +158,18 @@ extension XCTestCase {
         let selector = NSSelectorFromString("accessibilitySetEnhancedUserInterfaceAttribute:")
         _ = NSApp.perform(selector, with: NSNumber(value: true))
         return { _ = NSApp.perform(selector, with: NSNumber(value: false)) }
+    }
+
+    /// SymairaTheme's shared labels follow the system language (#1298). Resolve them
+    /// from its resource bundle exactly like the component does, so a German host
+    /// expects "Einstellungen" instead of failing on the English text.
+    func symairaThemeString(_ key: String, _ english: String) -> String {
+        let directory = Bundle(for: NativeChromeTests.self).bundleURL.deletingLastPathComponent()
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        guard let name = names.first(where: { $0.hasSuffix("_SymairaTheme.bundle") }),
+              let bundle = Bundle(url: directory.appendingPathComponent(name))
+        else { return english }
+        return bundle.localizedString(forKey: key, value: english, table: nil)
     }
 
     @MainActor
