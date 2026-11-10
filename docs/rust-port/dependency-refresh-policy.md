@@ -96,13 +96,17 @@ for Windows after #1281.
   cached answer.
 - The strict whole-`Cargo.lock` binding (#1263) and every rejection control
   are unchanged for the supported targets.
-- `refresh-433622f6` is the last six-target refresh. `refresh-c129252f` is the
+- `refresh-433622f6` is the last six-target refresh. `refresh-fc446060` is the
   first three-target refresh: capture snapshot
-  `c129252f76e28cc9d0bdd7fe25152f9e63db3840` (tag
-  `frozen-go-captures/dependency-refresh-c129252f`) for product candidate
-  `a3b78798d33f5e79bfcb5a004889496e545e0c5f`, whose only lockfile change drops
-  the unused Windows-only `schannel`/`windows-sys` dependency edges. Capture run
-  `42198638836`; artifacts `13493254394` (macOS arm64), `13492448485` (Linux
-  amd64) and `13492274556` (Linux arm64) match their API digests and yield the
-  48 records of the predecessor's three-target inventory, imported byte for
-  byte.
+  `fc446060e4346a5896b2c80f5788a5a92be58992` (tag
+  `frozen-go-captures/dependency-refresh-fc446060`) for product candidate
+  `640b26152d4961decc510f5de2c60d46636a35c8`. Its lockfile drops the unused
+  Windows-only `schannel`/`windows-sys` edges and moves `rusqlite` 0.40.2 to
+  0.41.1 (`libsqlite3-sys` 0.39.1, RUSTSEC-2026-0459, #1291) through corekit
+  `b72cbc5`. Capture run `42726667101`; artifacts `13723637089` (macOS arm64),
+  `13723482097` (Linux amd64) and `13722148769` (Linux arm64) match their API
+  digests and yield the 48 records of the predecessor's three-target
+  inventory, imported byte for byte. Against the earlier, never merged capture
+  `c129252f` (run `42198638836`) the records differ only in source revision,
+  build info, the `Cargo.lock` digest, timestamps (HTTP `Date`, SMTP headers,
+  elapsed times) and Go map order in one provider list.

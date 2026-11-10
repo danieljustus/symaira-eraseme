@@ -9,7 +9,7 @@ use std::process::{Command, Output};
 mod go_source_pin;
 
 const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
-const REVISION: &str = "c129252f76e28cc9d0bdd7fe25152f9e63db3840";
+const REVISION: &str = "fc446060e4346a5896b2c80f5788a5a92be58992";
 
 fn digest(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
@@ -114,12 +114,12 @@ pub fn observation(case: &str) -> (Output, Value) {
         _ => panic!("no recorded plan process for this target; live Go is retired"),
     };
     let (raw, pin) = match (target, case) {
-        ("darwin/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/darwin-arm64/web-form.json").as_slice(), "55b6080cb8e64123f53e1c6b953d3be128bcec7401dfd3dd1002ccd223d8997a"),
-        ("darwin/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/darwin-arm64/senderless-email.json").as_slice(), "cc5ec3f966ac68a122553ee2b93aa47dc5bf8110c3f17506e619cbcc0616abf9"),
-        ("linux/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/linux-arm64/web-form.json").as_slice(), "e6e2d65285908b24b1d87c98fe94f7f6910084ed35c74ea14486a30b096f0b45"),
-        ("linux/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/linux-arm64/senderless-email.json").as_slice(), "83a40ff8fcb01e2c0fb977b8885dc1d253b1fdef7d0276a004cb8e9446d0d650"),
-        ("linux/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/linux-amd64/web-form.json").as_slice(), "5c7a3a571784e5a55a95fe312283d9615835bdfe8dc6c9c40afb49b9f66bf6da"),
-        ("linux/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-c129252f/plan-processes/linux-amd64/senderless-email.json").as_slice(), "c907c252846d94ff418ae8a71e587c1f3d95213aad29d98c8948f6b36404c7e3"),
+        ("darwin/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-fc446060/plan-processes/darwin-arm64/web-form.json").as_slice(), "f828878c4c8cfe276ac80c14304b32519a04df33396db6669e6aff0505e8c0c6"),
+        ("darwin/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-fc446060/plan-processes/darwin-arm64/senderless-email.json").as_slice(), "569d5ac80bb9f4ab77044107c3547849e2ccc45fba17c854b6f0303e7df11b56"),
+        ("linux/arm64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-fc446060/plan-processes/linux-arm64/web-form.json").as_slice(), "d16d7e5d74c39e7491dc2634ab831b6740e0c30175bd3f0dc4a87eb0e297bc44"),
+        ("linux/arm64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-fc446060/plan-processes/linux-arm64/senderless-email.json").as_slice(), "9e7593a46c82c827296dc59150645b7ccd2ddb45f58dbbede355030947053450"),
+        ("linux/amd64", "web-form") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-fc446060/plan-processes/linux-amd64/web-form.json").as_slice(), "bf2ee0f4354929ccb31fdcee6c212ba0921cd54000b5d7a63630acc4cdd739bf"),
+        ("linux/amd64", "senderless-email") => (include_bytes!("../../../../tests/fixtures/go-frozen/refresh-fc446060/plan-processes/linux-amd64/senderless-email.json").as_slice(), "5d10e07812585ca7e9c0510cf8ffd526e1bc6cf48b35dbd370508038c16b6369"),
         _ => panic!("unrecorded plan process cannot receive a cached answer"),
     };
     let record = verify(raw, pin, case, target);
