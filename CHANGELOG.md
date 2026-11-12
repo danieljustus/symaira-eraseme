@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- MCP file reads no longer accept the filesystem root as their workspace. A
+  server started with `/` as its working directory (the macOS app's bundled
+  server, GUI-launched stdio clients) now answers `redact_file` with
+  `workspace root is unavailable` instead of reading any user-readable file
+  (#1319).
+
 ### Changed
 
 - The MCP servers decode the embedded broker registry once per process
