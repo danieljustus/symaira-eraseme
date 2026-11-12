@@ -12,6 +12,13 @@ All notable changes to this project are documented in this file.
   (#1302).
 - Every command and subcommand now has a description in `--help` (#1303).
 
+### Fixed
+
+- Secret-provider commands no longer hang when a timed-out or exited provider
+  leaves background descendants holding stdout or stderr open. On Unix the
+  owned process group is terminated and output-reader waits are bounded;
+  timeout, failure and redaction behavior is preserved (#1307).
+
 ## [v0.16.0] - 2026-11-10
 
 Canary prerelease on the Rust-only line. It adds `plan delete`, makes the MCP
