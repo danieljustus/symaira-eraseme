@@ -45,6 +45,12 @@ impl WorkspaceRoot {
         // Go's ReadWorkspaceFile wraps root resolution and capability-open
         // failures in workspaceReadError, so preserve its opaque display.
         let canonical = std::fs::canonicalize(path).map_err(WorkspaceRootError::Io)?;
+        // The filesystem root confines nothing. GUI-launched servers inherit
+        // `/` as their working directory, so refuse it instead of exposing
+        // every user-readable file.
+        if canonical.parent().is_none() {
+            return Err(WorkspaceRootError::RootUnavailable);
+        }
         let probe = Dir::open_ambient_dir(&canonical, cap_std::ambient_authority())
             .map_err(WorkspaceRootError::Io)?;
         let pre_open = probe.metadata(".").map_err(WorkspaceRootError::Io)?;
@@ -332,5 +338,28 @@ mod tests {
             root.read("bad\0name.txt"),
             Err(WorkspaceRootError::NullByte)
         ));
+    }
+
+    /// A GUI-launched server inherits `/` as its working directory. Treating
+    /// the filesystem root as the workspace would let `redact_file` read any
+    /// file the user can read, so the root itself is never a workspace.
+    #[test]
+    fn filesystem_root_is_not_a_workspace() {
+        let temp = tempfile::tempdir().expect("temporary directory");
+        let outside = temp.path().join("private.txt");
+        fs::write(&outside, b"must stay unreadable").expect("fixture file");
+        let absolute = fs::canonicalize(&outside).expect("canonical fixture path");
+
+        let result = read_workspace_file(&absolute, Some(Path::new("/")));
+        assert!(
+            matches!(result, Err(WorkspaceRootError::RootUnavailable)),
+            "the filesystem root must not be accepted as a workspace"
+        );
+
+        // A real directory still works as a workspace for the same file.
+        assert_eq!(
+            read_workspace_file(&absolute, Some(temp.path())).expect("legitimate read"),
+            b"must stay unreadable"
+        );
     }
 }
