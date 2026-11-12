@@ -7,7 +7,6 @@ final class CalendarViewModel: ObservableObject {
 
     @Published var weeks: Int = 4
 
-    var calendarData: CalendarData? { state.value }
     var isLoading: Bool { state.isLoading }
     var errorMessage: String? { state.errorMessage }
 

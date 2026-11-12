@@ -247,12 +247,14 @@ impl ContractHandler {
         }
     }
 
+    #[cfg(test)]
     /// Adds the data directory the artifact tools operate on.
     pub fn with_data_dir(mut self, data_dir: impl Into<PathBuf>) -> Self {
         self.data_dir = Some(data_dir.into());
         self
     }
 
+    #[cfg(test)]
     /// Adds the configuration the store-backed tools resolve their database
     /// from, plus the instant they record.
     pub fn with_store(mut self, config: ConfigContext, now: DateTime<Utc>) -> Self {
@@ -270,12 +272,14 @@ impl ContractHandler {
         self
     }
 
+    #[cfg(test)]
     /// Adds the IMAP dialer for the `poll_inbox` tool.
     pub fn with_imap_dialer(mut self, dialer: std::sync::Arc<dyn ImapDialer>) -> Self {
         self.imap_dialer = Some(dialer);
         self
     }
 
+    #[cfg(test)]
     /// Adds the HWM store for the `poll_inbox` tool.
     pub fn with_hwm_store(mut self, store: std::sync::Arc<dyn HwmStore>) -> Self {
         self.hwm_store = Some(store);
@@ -335,26 +339,6 @@ impl ContractHandler {
         self.now.ok_or_else(|| {
             ToolError("this tool needs an injected instant and none was supplied".to_owned())
         })
-    }
-
-    /// Go's `Result` marshalling: `success`, `error` and the flattened data keys
-    /// go through a Go map, so they are emitted in sorted key order — a
-    /// `message` is dropped when an error is present. The crate builds JSON
-    /// objects in insertion order (`serde_json/preserve_order`, needed for the
-    /// struct-ordered payloads nested inside), so this one sorts explicitly.
-    fn result_payload(success: bool, error: Option<String>, data: Vec<(&str, Value)>) -> Value {
-        let mut entries: Vec<(String, Value)> = vec![("success".to_owned(), json!(success))];
-        if let Some(error) = &error {
-            entries.push(("error".to_owned(), json!(error)));
-        }
-        for (key, value) in data {
-            if error.is_some() && key == "message" {
-                continue;
-            }
-            entries.push((key.to_owned(), value));
-        }
-        entries.sort_by(|left, right| left.0.cmp(&right.0));
-        Value::Object(entries.into_iter().collect::<Map<String, Value>>())
     }
 
     /// Go's `HandleList`.
@@ -3548,46 +3532,6 @@ mod tests {
         assert_eq!(
             error.message,
             "operation failed; eventstore: close: eventstore I/O error: disk is gone"
-        );
-    }
-
-    /// The Go marshalling contract: sorted keys, and a `message` field is
-    /// dropped when an error is present.
-    #[test]
-    fn result_payload_sorts_go_map_keys_and_drops_message_on_error() {
-        let success = ContractHandler::result_payload(
-            true,
-            None,
-            vec![
-                ("zeta", serde_json::json!(1)),
-                ("alpha", serde_json::json!(2)),
-            ],
-        );
-        let object = success.as_object().expect("object payload");
-        assert_eq!(
-            object.keys().cloned().collect::<Vec<_>>(),
-            vec!["alpha", "success", "zeta"]
-        );
-        assert_eq!(success["success"], serde_json::json!(true));
-
-        let failure = ContractHandler::result_payload(
-            false,
-            Some("boom".to_owned()),
-            vec![
-                ("message", serde_json::json!("ignored")),
-                ("code", serde_json::json!("invalid_spec")),
-            ],
-        );
-        let object = failure.as_object().expect("object payload");
-        assert_eq!(failure["error"], serde_json::json!("boom"));
-        assert_eq!(failure["code"], serde_json::json!("invalid_spec"));
-        assert!(
-            !object.contains_key("message"),
-            "message is suppressed when an error is present: {failure}"
-        );
-        assert_eq!(
-            object.keys().cloned().collect::<Vec<_>>(),
-            vec!["code", "error", "success"]
         );
     }
 

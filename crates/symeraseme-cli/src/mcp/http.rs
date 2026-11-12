@@ -336,6 +336,7 @@ fn origin_header_allowed(origin: Option<&http::HeaderValue>) -> bool {
     origin.is_none_or(|origin| origin.is_empty() || origin.to_str().is_ok_and(allowed_origin))
 }
 
+#[cfg(test)]
 fn protocol_reply(body: &[u8], handler: &dyn ToolHandler) -> HttpReply {
     protocol_reply_cancellable(body, handler, &CancellationToken::default())
 }

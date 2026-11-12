@@ -3,7 +3,6 @@
 mod cli;
 mod command_surface;
 mod commands;
-#[allow(dead_code)]
 mod mcp;
 mod store;
 mod text_render;

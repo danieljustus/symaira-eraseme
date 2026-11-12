@@ -41,9 +41,8 @@ impl std::fmt::Display for StreamError {
 /// `output`. Notifications contribute nothing, and a malformed stream aborts
 /// without a fabricated response for the offending value.
 ///
-/// ponytail: the whole input is buffered instead of read incrementally; the
-/// streaming reader arrives with the real `serve` command, which is what decides
-/// when a value is complete on a live pipe.
+/// The buffered oracle the tests compare [`serve_stdio`] against.
+#[cfg(test)]
 pub(crate) fn serve_stream(
     input: &[u8],
     output: &mut Vec<u8>,

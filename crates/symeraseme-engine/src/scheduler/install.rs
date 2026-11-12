@@ -278,14 +278,6 @@ fn unit_short_names() -> [&'static str; 3] {
 /// Go's `ErrLegacyUnits` text.
 pub const ERR_LEGACY_UNITS: &str = "legacy scheduler units detected; replacement was not requested";
 
-/// Go's `ErrLegacyUnits` text is also what the handler surfaces, so the port
-/// needs the same message rather than a new error variant.
-impl SchedulerError {
-    pub fn legacy_units() -> Self {
-        SchedulerError::LegacyUnitsDetected
-    }
-}
-
 /// Resolves the platform the way Go does for Install/Status/Uninstall: the raw
 /// name a caller supplied wins (empty auto-detects, unknown is rejected),
 /// otherwise the typed config value, otherwise auto-detection.

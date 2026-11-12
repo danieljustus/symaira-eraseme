@@ -23,6 +23,7 @@ pub(crate) enum ToolsCallOutcome {
 }
 
 /// Handles one JSON-RPC `tools/call` request without transport concerns.
+#[cfg(test)]
 pub(crate) fn tools_call(raw: &[u8], handler: &dyn ToolHandler) -> ToolsCallOutcome {
     tools_call_cancellable(
         raw,

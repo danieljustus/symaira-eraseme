@@ -301,11 +301,6 @@ pub fn list_template_names() -> Vec<&'static str> {
     names
 }
 
-/// Alias retained for callers that use the Python/Go surface name.
-pub fn list_templates() -> Vec<&'static str> {
-    list_template_names()
-}
-
 // MiniJinja 2 used Rust debug quoting inside collections. Preserve it for
 // collection-valued extra overrides without changing their map/list behavior.
 struct LegacyDebug<'a>(&'a Value);
@@ -746,15 +741,6 @@ pub fn embedded_template_sources() -> impl Iterator<Item = (&'static str, &'stat
     TEMPLATES
         .iter()
         .map(|template| (template.name, template.source))
-}
-
-/// Internal HTML classification used by the drift-contract tests.
-#[doc(hidden)]
-pub fn is_html_template(name: &str) -> bool {
-    TEMPLATES
-        .iter()
-        .find(|template| template.name == name)
-        .is_some_and(|template| template.html)
 }
 
 #[cfg(test)]

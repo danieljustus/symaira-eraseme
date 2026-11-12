@@ -40,12 +40,6 @@ impl ConfigContext {
             environment,
         }
     }
-
-    /// Returns a copy with one environment variable set.
-    pub fn with_env(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.environment.insert(name.into(), value.into());
-        self
-    }
 }
 
 /// Effective persistent configuration.

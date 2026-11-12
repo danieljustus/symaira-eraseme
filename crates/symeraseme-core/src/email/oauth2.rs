@@ -315,29 +315,6 @@ impl OAuthStateStore {
     }
 }
 
-/// Path Go would use: `$XDG_DATA_HOME/symeraseme/oauth2_state.json`, else
-/// `~/.local/share/symeraseme/oauth2_state.json`.
-pub fn default_state_path() -> PathBuf {
-    match std::env::var_os("XDG_DATA_HOME") {
-        Some(base) if !base.is_empty() => PathBuf::from(base)
-            .join("symeraseme")
-            .join("oauth2_state.json"),
-        _ => {
-            let home = std::env::var_os("HOME").filter(|value| !value.is_empty());
-            match home {
-                Some(home) => PathBuf::from(home)
-                    .join(".local")
-                    .join("share")
-                    .join("symeraseme")
-                    .join("oauth2_state.json"),
-                None => PathBuf::from(".")
-                    .join(".symeraseme")
-                    .join("oauth2_state.json"),
-            }
-        }
-    }
-}
-
 pub struct OAuth2Client {
     pub states: OAuthStateStore,
     pub timeout: Duration,

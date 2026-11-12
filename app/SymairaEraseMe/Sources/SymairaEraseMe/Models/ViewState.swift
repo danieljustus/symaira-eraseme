@@ -17,11 +17,6 @@ enum ViewState<T> {
         return nil
     }
 
-    var isLoaded: Bool {
-        if case .loaded = self { return true }
-        return false
-    }
-
     var isLoading: Bool {
         if case .loading = self { return true }
         return false

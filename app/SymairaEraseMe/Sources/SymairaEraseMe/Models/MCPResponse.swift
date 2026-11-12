@@ -133,14 +133,6 @@ struct AnyCodable: Codable {
             try container.encodeNil()
         }
     }
-
-    /// Convenience accessors
-    var asInt: Int? { value as? Int }
-    var asDouble: Double? { value as? Double }
-    var asString: String? { value as? String }
-    var asBool: Bool? { value as? Bool }
-    var asArray: [Any]? { value as? [Any] }
-    var asDict: [String: Any]? { value as? [String: Any] }
 }
 
 // MARK: - MCPClient Errors
