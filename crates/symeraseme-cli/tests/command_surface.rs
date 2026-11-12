@@ -6,6 +6,8 @@ mod dashboard_compact;
 
 #[path = "support/post_cutover_1295.rs"]
 mod post_cutover_1295;
+#[path = "support/post_cutover_1302.rs"]
+mod post_cutover_1302;
 
 #[path = "support/frozen_review_oracle.rs"]
 mod frozen_review_oracle;
@@ -935,6 +937,20 @@ fn frozen_command_surface_matches_phase_two_contract() {
             )),
             _ => decode_base64(case["stdout_base64"].as_str().unwrap()),
         };
+        // Post-cutover contract change #1303: the changed command descriptions.
+        let expected_stdout = if id.starts_with("help-") || id == "operate-help" {
+            // `operate-help` records the bare `help` command, which prints the
+            // root help.
+            let command = argv
+                .iter()
+                .copied()
+                .filter(|arg| *arg != "--help")
+                .filter(|_| id != "operate-help")
+                .collect::<Vec<_>>();
+            post_cutover_1295::help_descriptions(&expected_stdout, &command)
+        } else {
+            expected_stdout
+        };
         // `plan status` reports a wall clock, so its value is masked before the
         // comparison — the format itself is still asserted by the masker.
         let actual_stdout =
@@ -1520,6 +1536,18 @@ fn schedule_commands_match_the_go_oracle() {
         // oracle does; that keeps the generated wrappers comparable.
         let output = run(&argv, &home, &case_root, &capture, index);
         let expected_stdout = decode_base64(case["stdout_base64"].as_str().expect("stdout"));
+        // Post-cutover contract change #1302: text-mode `schedule status` lists
+        // the units the same scenario's recorded JSON payload carries.
+        let expected_stdout = if id == "status-launchd-without-launchctl" {
+            let json_case = cases
+                .iter()
+                .find(|other| other["id"] == "status-launchd-json")
+                .expect("recorded status JSON case");
+            let recorded_json = decode_base64(json_case["stdout_base64"].as_str().expect("stdout"));
+            post_cutover_1302::schedule_status_text(&expected_stdout, &recorded_json)
+        } else {
+            expected_stdout
+        };
         let expected_stderr = decode_base64(case["stderr_base64"].as_str().expect("stderr"));
         let expected_code = case["exit_code"].as_i64().expect("exit code");
 
@@ -1896,9 +1924,21 @@ fn manual_tasks_populated_paths_match_the_go_bodies() {
         "cleanup removed the file"
     );
 
-    // Go's text mode prints the contract's `success` line for all three.
+    // #1302: text mode prints the task detail for the read-only `show`.
+    let shown = run_with_data_dir(
+        &["manual-tasks", "show", "1"],
+        &home,
+        &cwd,
+        &capture,
+        907,
+        &data_dir,
+        &[],
+    );
+    assert_eq!(shown.stdout, format!("{after_message}\n").into_bytes());
+    assert_eq!(shown.status.code(), Some(0), "show text status");
+
+    // The mutating commands keep the contract's `success` line.
     for argv in [
-        vec!["manual-tasks", "show", "1"],
         vec!["manual-tasks", "complete", "1"],
         vec!["manual-tasks", "cleanup", "--dry-run"],
     ] {
@@ -2410,11 +2450,16 @@ fn events_and_grant_populated_paths_match_live_go() {
         b"null\n",
         "events show unknown request stdout"
     );
-    // Text mode never renders the list.
+    // #1302: text mode renders the event list instead of `success`.
     assert_eq!(
         go(&["events", "show", "1"], 924).stdout,
-        b"success\n",
+        b"Events (2):\n  #1 2026-08-07T08:59:00Z PLANNED (system)\n  #2 2026-08-07T09:00:00Z SENT (user)\n",
         "events show text stdout"
+    );
+    assert_eq!(
+        go(&["events", "show", "9"], 990).stdout,
+        b"No events found.\n",
+        "events show unknown request text stdout"
     );
     // Go's `intArgument` rejects a non-numeric positional before the handler.
     let invalid = go(&["events", "show", "abc", "--output", "json"], 925);
