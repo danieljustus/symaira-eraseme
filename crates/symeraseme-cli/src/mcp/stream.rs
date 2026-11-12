@@ -41,8 +41,9 @@ impl std::fmt::Display for StreamError {
 /// `output`. Notifications contribute nothing, and a malformed stream aborts
 /// without a fabricated response for the offending value.
 ///
-/// The buffered oracle the tests compare [`serve_stdio`] against.
-#[cfg(test)]
+/// The buffered oracle the tests compare [`serve_stdio`] against; the
+/// `mcp_stdio` fuzz target also drives it, so it stays outside `cfg(test)`.
+#[allow(dead_code, reason = "used by tests and fuzz/fuzz_targets/mcp_stdio.rs")]
 pub(crate) fn serve_stream(
     input: &[u8],
     output: &mut Vec<u8>,
@@ -131,7 +132,7 @@ pub(crate) fn serve_stdio(
     }
 }
 
-#[cfg(test)]
+#[allow(dead_code, reason = "only serve_stream calls it")]
 fn syntax_error(input: &[u8]) -> Option<StreamError> {
     scan_json_value(input, 0, false)
         .err()
