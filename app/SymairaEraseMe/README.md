@@ -178,5 +178,5 @@ the actual packaged/backend authentication, tool catalogue and shutdown paths.
   `build.sh`, which uses Python 3 to locate the compiler output. Running the staged
   Rust backend requires no Go or Python runtime. This does not describe the already-published dual-backend
   `v0.13.0` prerelease assets.
-- No external Swift dependencies beyond the Symaira AppKit packages declared
-  in `Package.swift`.
+- No external Swift dependencies beyond the SymairaTheme, SymairaToolKit and
+  SymairaAppKit packages declared in `Package.swift`.
