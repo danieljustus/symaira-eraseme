@@ -11,7 +11,8 @@ use super::keyring::{KeyringBackend, OsKeyring};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{self, Read};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
+use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -397,6 +398,25 @@ fn valid_symvault_path(path: &str) -> bool {
         && !path.chars().any(char::is_control)
 }
 
+/// Upper bound for the output readers to see EOF once the provider's process
+/// tree has been killed. Only a descendant that escaped the owned process
+/// group (for example via `setsid`) can still hold a pipe open this long.
+const READER_GRACE: Duration = Duration::from_secs(1);
+
+/// Kills the provider and every descendant that is still in its process group.
+///
+/// On Unix the provider is spawned as the leader of a fresh process group, so a
+/// group-wide `SIGKILL` also reaches background children that inherited the
+/// output pipes. Elsewhere only the direct child can be terminated.
+fn kill_process_tree(child: &mut Child) {
+    #[cfg(unix)]
+    if let Ok(pid) = i32::try_from(child.id()) {
+        let _ =
+            nix::sys::signal::killpg(nix::unistd::Pid::from_raw(pid), nix::sys::signal::SIGKILL);
+    }
+    let _ = child.kill();
+}
+
 fn run_secret_command(
     mut command: Command,
     timeout: Duration,
@@ -404,27 +424,30 @@ fn run_secret_command(
     timeout_error: SecretBackendError,
 ) -> Result<String, SecretBackendError> {
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut command, 0);
     let mut child = command.spawn().map_err(|_| failure)?;
     let Some(stdout) = child.stdout.take() else {
-        let _ = child.kill();
+        kill_process_tree(&mut child);
         let _ = child.wait();
         return Err(failure);
     };
     let Some(stderr) = child.stderr.take() else {
-        let _ = child.kill();
+        kill_process_tree(&mut child);
         let _ = child.wait();
         return Err(failure);
     };
 
-    let stdout_reader = thread::spawn(move || {
+    let (stdout_tx, stdout_rx) = mpsc::channel();
+    thread::spawn(move || {
         let mut stdout = stdout;
         let mut output = Vec::new();
-        stdout.read_to_end(&mut output).map(|_| output)
+        let _ = stdout_tx.send(stdout.read_to_end(&mut output).map(|_| output));
     });
-    let stderr_reader = thread::spawn(move || {
+    let (stderr_tx, stderr_rx) = mpsc::channel();
+    thread::spawn(move || {
         let mut stderr = stderr;
-        let mut sink = io::sink();
-        io::copy(&mut stderr, &mut sink)
+        let _ = stderr_tx.send(io::copy(&mut stderr, &mut io::sink()));
     });
 
     let deadline = Instant::now() + timeout;
@@ -432,30 +455,330 @@ fn run_secret_command(
         match child.try_wait() {
             Ok(Some(status)) => break status,
             Ok(None) if Instant::now() >= deadline => {
-                let _ = child.kill();
+                // The group is killed before the leader is reaped so its id
+                // cannot be recycled in between. The readers end on their own
+                // once the last pipe holder is gone; they are not joined.
+                kill_process_tree(&mut child);
                 let _ = child.wait();
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
                 return Err(timeout_error);
             }
             Ok(None) => thread::sleep(Duration::from_millis(5)),
             Err(_) => {
-                let _ = child.kill();
+                kill_process_tree(&mut child);
                 let _ = child.wait();
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
                 return Err(failure);
             }
         }
     };
 
-    let stdout = stdout_reader.join().ok().and_then(Result::ok);
-    let _ = stderr_reader.join();
+    // The leader is gone, but a background descendant may still own the pipes.
+    // Clean it up before waiting for EOF so the reads below are bounded.
+    kill_process_tree(&mut child);
     if !status.success() {
         return Err(failure);
     }
-    let Some(stdout) = stdout else {
-        return Err(failure);
+    let Ok(Ok(stdout)) = stdout_rx.recv_timeout(READER_GRACE) else {
+        return Err(timeout_error);
     };
+    let _ = stderr_rx.recv_timeout(READER_GRACE);
     Ok(String::from_utf8_lossy(&stdout).trim().to_owned())
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::Path;
+
+    /// Unique marker a failing provider prints; it must never reach an error.
+    const MARKER: &str = "RUNNER-FAILURE-MARKER-7f3a9c";
+    const FAILURE: SecretBackendError = SecretBackendError::KeychainUnavailable;
+    const TIMEOUT: SecretBackendError = SecretBackendError::SymvaultTimedOut;
+
+    fn sh(script: &str) -> Command {
+        let mut command = Command::new("sh");
+        command.args(["-c", script]);
+        command
+    }
+
+    fn run(script: &str, timeout: Duration) -> Result<String, SecretBackendError> {
+        run_secret_command(sh(script), timeout, FAILURE, TIMEOUT)
+    }
+
+    fn assert_error_is_redacted<E: fmt::Display + fmt::Debug>(error: &E) {
+        let display = error.to_string();
+        let debug = format!("{error:?}");
+        assert!(
+            !display.contains(MARKER),
+            "display leaked marker: {display}"
+        );
+        assert!(!debug.contains(MARKER), "debug leaked marker: {debug}");
+    }
+
+    fn dir_entries(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = fs::read_dir(dir)
+            .expect("read fixture dir")
+            .map(|entry| {
+                entry
+                    .expect("dir entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into()
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Backend that routes lookups through the real runner with fake `sh`
+    /// providers; it never touches a real keychain, keyring or vault.
+    struct ScriptBackend {
+        script: &'static str,
+        timeout: Duration,
+    }
+
+    impl SecretBackend for ScriptBackend {
+        fn resolve_keychain(&self, _: &str, _: &str) -> Result<String, SecretBackendError> {
+            run_secret_command(sh(self.script), self.timeout, FAILURE, FAILURE)
+        }
+
+        fn resolve_symvault(&self, _: &str) -> Result<String, SecretBackendError> {
+            run_secret_command(
+                sh(self.script),
+                self.timeout,
+                SecretBackendError::SymvaultUnavailable,
+                TIMEOUT,
+            )
+        }
+
+        fn get_keyring(&self, _: &str, _: &str) -> Result<Option<String>, SecretBackendError> {
+            Ok(None)
+        }
+    }
+
+    #[test]
+    fn success_trims_surrounding_whitespace() {
+        let secret = run(
+            "printf '  \\n\\t s3cret value \\n\\n'",
+            Duration::from_secs(5),
+        );
+        assert_eq!(secret, Ok("s3cret value".to_owned()));
+    }
+
+    #[test]
+    fn success_ignores_stderr_and_allows_empty_output() {
+        let secret = run(
+            &format!("echo {MARKER} >&2; printf ok"),
+            Duration::from_secs(5),
+        );
+        assert_eq!(secret, Ok("ok".to_owned()));
+        assert_eq!(run("exit 0", Duration::from_secs(5)), Ok(String::new()));
+    }
+
+    #[test]
+    fn non_zero_exit_returns_failure_category_without_output() {
+        let script = format!("echo {MARKER}; echo {MARKER} >&2; exit 3");
+        let error = run(&script, Duration::from_secs(5)).expect_err("non-zero exit must fail");
+        assert_eq!(error, FAILURE);
+        assert_error_is_redacted(&error);
+    }
+
+    #[test]
+    fn missing_executable_returns_failure_category() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let missing = dir.path().join(format!("no-such-{MARKER}"));
+        let error = run_secret_command(
+            Command::new(&missing),
+            Duration::from_secs(5),
+            FAILURE,
+            TIMEOUT,
+        )
+        .expect_err("spawn failure must fail");
+        assert_eq!(error, FAILURE);
+        assert_error_is_redacted(&error);
+        assert!(dir_entries(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn timeout_returns_timeout_category_and_reaps_child() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pid_file = dir.path().join("pid");
+        // `exec` keeps the recorded pid equal to the killed process so no
+        // grandchild can keep the output pipes open.
+        let script = format!(
+            "echo $$ > '{}'; echo {MARKER}; echo {MARKER} >&2; exec sleep 30",
+            pid_file.display()
+        );
+
+        let started = Instant::now();
+        let error = run(&script, Duration::from_millis(750)).expect_err("timeout must fail");
+        let elapsed = started.elapsed();
+
+        assert_eq!(error, TIMEOUT);
+        assert_ne!(error, FAILURE, "timeout must not use the failure category");
+        assert_error_is_redacted(&error);
+        assert!(elapsed < Duration::from_secs(2), "took {elapsed:?}");
+
+        let pid = fs::read_to_string(&pid_file).expect("child recorded its pid");
+        let alive = sh(&format!("kill -0 {}", pid.trim()))
+            .stderr(Stdio::null())
+            .status()
+            .expect("probe kill -0")
+            .success();
+        assert!(!alive, "timed-out child {} is still running", pid.trim());
+        assert_eq!(dir_entries(dir.path()), ["pid"], "unexpected residue");
+    }
+
+    /// Reads the pid a provider script recorded, waiting for the atomic rename
+    /// that publishes it.
+    fn recorded_pid(path: &Path) -> Option<i32> {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            if let Ok(text) = fs::read_to_string(path) {
+                return text.trim().parse().ok();
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        None
+    }
+
+    fn process_exists(pid: i32) -> bool {
+        nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_ok()
+    }
+
+    fn wait_until_dead(pid: i32) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            if !process_exists(pid) {
+                return true;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        false
+    }
+
+    /// Runs a provider whose non-exec shell starts a background `sleep` that
+    /// inherits stdout/stderr and publishes its pid in `bg`. The runner runs on
+    /// a helper thread under an outer deadline so a regression fails instead of
+    /// hanging; a leaked descendant is killed by its recorded pid.
+    fn run_with_background_sleep(
+        body: &str,
+        timeout: Duration,
+    ) -> (Result<String, SecretBackendError>, Duration, i32) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let bg = dir.path().join("bg");
+        let tmp = dir.path().join("bg.tmp");
+        let script = format!(
+            "sleep 30 & echo $! > '{tmp}' && mv '{tmp}' '{bg}'; {body}",
+            tmp = tmp.display(),
+            bg = bg.display(),
+        );
+        let (tx, rx) = mpsc::channel();
+        let started = Instant::now();
+        thread::spawn(move || {
+            let _ = tx.send(run(&script, timeout));
+        });
+        let outcome = rx.recv_timeout(Duration::from_secs(8));
+        let elapsed = started.elapsed();
+        let pid = recorded_pid(&bg).expect("background sleep published its pid");
+        let Ok(result) = outcome else {
+            let _ =
+                nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), nix::sys::signal::SIGKILL);
+            panic!("run_secret_command did not return within 8s: descendant holds the pipes");
+        };
+        (result, elapsed, pid)
+    }
+
+    #[test]
+    fn timeout_kills_background_descendant_holding_the_pipes() {
+        let body = format!("echo {MARKER}; echo {MARKER} >&2; wait");
+        let (result, elapsed, pid) = run_with_background_sleep(&body, Duration::from_millis(750));
+        let error = result.expect_err("timeout must fail");
+        assert_eq!(error, TIMEOUT);
+        assert_error_is_redacted(&error);
+        assert!(elapsed < Duration::from_secs(3), "took {elapsed:?}");
+        assert!(
+            wait_until_dead(pid),
+            "descendant {pid} survived the timeout"
+        );
+    }
+
+    #[test]
+    fn leader_exit_does_not_wait_for_background_descendant_holding_the_pipes() {
+        let body = format!("echo s3cret; echo {MARKER} >&2; exit 0");
+        let (result, elapsed, pid) = run_with_background_sleep(&body, Duration::from_secs(5));
+        assert_eq!(result, Ok("s3cret".to_owned()));
+        assert!(elapsed < Duration::from_secs(3), "took {elapsed:?}");
+        assert!(wait_until_dead(pid), "descendant {pid} survived the leader");
+    }
+
+    #[test]
+    fn failing_leader_with_background_descendant_returns_failure_without_hanging() {
+        let body = format!("echo {MARKER}; echo {MARKER} >&2; exit 4");
+        let (result, elapsed, pid) = run_with_background_sleep(&body, Duration::from_secs(5));
+        let error = result.expect_err("non-zero exit must fail");
+        assert_eq!(error, FAILURE);
+        assert_error_is_redacted(&error);
+        assert!(elapsed < Duration::from_secs(3), "took {elapsed:?}");
+        assert!(wait_until_dead(pid), "descendant {pid} survived the leader");
+    }
+
+    #[test]
+    fn resolver_returns_err_for_failing_keychain_provider_without_leak() {
+        let backend = ScriptBackend {
+            script: "echo RUNNER-FAILURE-MARKER-7f3a9c; echo RUNNER-FAILURE-MARKER-7f3a9c >&2; exit 1",
+            timeout: Duration::from_secs(5),
+        };
+        let resolver = SecretResolver::new(backend);
+        let error = resolver
+            .resolve("keychain://service/account")
+            .expect_err("failing provider must be an error");
+        assert_eq!(error, SecretResolutionError::Backend(FAILURE));
+        assert_error_is_redacted(&error);
+        assert!(!format!("{resolver:?}").contains(MARKER));
+    }
+
+    #[test]
+    fn resolver_returns_err_for_timed_out_and_failing_symvault_without_leak() {
+        let timed_out = ScriptBackend {
+            script: "echo RUNNER-FAILURE-MARKER-7f3a9c; echo RUNNER-FAILURE-MARKER-7f3a9c >&2; exec sleep 30",
+            timeout: Duration::from_millis(500),
+        };
+        let failing = ScriptBackend {
+            script: "echo RUNNER-FAILURE-MARKER-7f3a9c; exit 2",
+            timeout: Duration::from_secs(5),
+        };
+        for backend in [timed_out, failing] {
+            let resolver = SecretResolver::new(backend).with_env_fallback("UNSET_FALLBACK");
+            let error = resolver
+                .resolve("symvault://part/key")
+                .expect_err("failed vault lookup must exhaust fallbacks");
+            assert!(matches!(
+                error,
+                SecretResolutionError::VaultFallbackExhausted { .. }
+            ));
+            assert_error_is_redacted(&error);
+        }
+    }
+
+    #[test]
+    fn os_backend_rejects_unsafe_symvault_paths_without_spawning() {
+        let backend = OsSecretBackend;
+        for path in ["", "-flag", "a\0b", "a\nb"] {
+            assert_eq!(
+                backend.resolve_symvault(path),
+                Err(SecretBackendError::SymvaultUnavailable),
+                "path {path:?}"
+            );
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn os_backend_keychain_is_unavailable_off_macos() {
+        assert_eq!(
+            OsSecretBackend.resolve_keychain("service", "account"),
+            Err(SecretBackendError::KeychainUnavailable)
+        );
+    }
 }

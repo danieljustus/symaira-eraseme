@@ -42,7 +42,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "auto-confirm",
             use_line: "auto-confirm REQUEST_ID",
-            short: "",
+            short: "Create a manual confirmation task for a broker reply",
             long: "",
             hidden: false,
             args_required: false,
@@ -144,7 +144,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "calendar",
             use_line: "calendar",
-            short: "",
+            short: "Show upcoming deadlines and next actions by week",
             long: "",
             hidden: false,
             args_required: false,
@@ -173,7 +173,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "classify-reply",
             use_line: "classify-reply REQUEST_ID",
-            short: "",
+            short: "Classify a broker reply via LLM",
             long: "",
             hidden: false,
             args_required: false,
@@ -243,7 +243,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "dashboard",
             use_line: "dashboard",
-            short: "",
+            short: "Show aggregated campaign and request status",
             long: "",
             hidden: false,
             args_required: false,
@@ -263,7 +263,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "events show",
             use_line: "show REQUEST_ID",
-            short: "",
+            short: "Show the event history of a request",
             long: "",
             hidden: false,
             args_required: false,
@@ -286,7 +286,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "generate-dashboard",
             use_line: "generate-dashboard",
-            short: "",
+            short: "Generate an HTML dashboard file",
             long: "",
             hidden: false,
             args_required: false,
@@ -321,7 +321,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "generate-rebuttal",
             use_line: "generate-rebuttal REQUEST_ID",
-            short: "",
+            short: "Generate a rebuttal for a rejection",
             long: "",
             hidden: false,
             args_required: false,
@@ -356,7 +356,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "generate-report",
             use_line: "generate-report",
-            short: "",
+            short: "Generate a campaign report file",
             long: "",
             hidden: false,
             args_required: false,
@@ -397,7 +397,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "generate-scheduler",
             use_line: "generate-scheduler",
-            short: "",
+            short: "Generate scheduler files for periodic runs",
             long: "",
             hidden: false,
             args_required: false,
@@ -462,7 +462,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "grant",
             use_line: "grant [COMMAND]",
-            short: "",
+            short: "Issue or revoke consent tokens for non-dry execution",
             long: "",
             hidden: false,
             args_required: false,
@@ -564,7 +564,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "manual-tasks cleanup",
             use_line: "cleanup",
-            short: "",
+            short: "Remove leftover manual task artifacts",
             long: "",
             hidden: false,
             args_required: false,
@@ -579,7 +579,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "manual-tasks complete",
             use_line: "complete TASK_ID",
-            short: "",
+            short: "Mark a manual task as done",
             long: "",
             hidden: false,
             args_required: false,
@@ -602,7 +602,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "manual-tasks list",
             use_line: "list",
-            short: "",
+            short: "List manual fallback tasks",
             long: "",
             hidden: false,
             args_required: false,
@@ -625,7 +625,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "manual-tasks show",
             use_line: "show TASK_ID",
-            short: "",
+            short: "Show manual task details",
             long: "",
             hidden: false,
             args_required: false,
@@ -958,7 +958,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "poll-inbox",
             use_line: "poll-inbox",
-            short: "",
+            short: "Fetch and match inbox replies",
             long: "",
             hidden: false,
             args_required: false,
@@ -1092,7 +1092,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "requests list",
             use_line: "list",
-            short: "",
+            short: "List removal requests",
             long: "",
             hidden: false,
             args_required: false,
@@ -1133,7 +1133,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "review",
             use_line: "review FILE",
-            short: "",
+            short: "Redact personal data in a file",
             long: "",
             hidden: false,
             args_required: false,
@@ -1148,7 +1148,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "run-web-form",
             use_line: "run-web-form BROKER_ID",
-            short: "",
+            short: "Preview or queue a broker's manual form opt-out",
             long: "",
             hidden: false,
             args_required: false,
@@ -1199,7 +1199,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "schedule install",
             use_line: "install",
-            short: "",
+            short: "Install the scheduler units",
             long: "",
             hidden: false,
             args_required: false,
@@ -1240,7 +1240,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "schedule status",
             use_line: "status",
-            short: "",
+            short: "Show scheduler installation status",
             long: "",
             hidden: false,
             args_required: false,
@@ -1255,7 +1255,7 @@ pub fn all() -> Vec<CommandSpec> {
         CommandSpec {
             path: "schedule uninstall",
             use_line: "uninstall",
-            short: "",
+            short: "Remove the scheduler units",
             long: "",
             hidden: false,
             args_required: false,
@@ -1376,4 +1376,31 @@ pub fn children<'a>(specs: &'a [CommandSpec], path: &[&str]) -> Vec<&'a CommandS
                 && (prefix.is_empty() || spec.path.starts_with(&(prefix.clone() + " ")))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::all;
+
+    /// #1303: every command and subcommand of the surface has a one-line
+    /// description, so `--help` never lists a bare command name.
+    #[test]
+    fn every_command_has_a_description() {
+        let missing = all()
+            .iter()
+            .filter(|spec| spec.short.trim().is_empty())
+            .map(|spec| spec.path)
+            .collect::<Vec<_>>();
+        assert!(
+            missing.is_empty(),
+            "commands without a description: {missing:?}"
+        );
+        for spec in all() {
+            assert!(
+                !spec.short.contains('\n') && !spec.short.ends_with('.'),
+                "{:?}: the description is one line without a trailing period",
+                spec.path
+            );
+        }
+    }
 }

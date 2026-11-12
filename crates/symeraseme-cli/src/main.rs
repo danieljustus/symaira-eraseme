@@ -6,6 +6,7 @@ mod commands;
 #[allow(dead_code)]
 mod mcp;
 mod store;
+mod text_render;
 
 use std::io::Write;
 

@@ -110,6 +110,94 @@ pub fn help_wording(recorded: &[u8]) -> Vec<u8> {
         .into_bytes()
 }
 
+/// Post-cutover contract change #1303: the 21 commands whose cobra `Short` was
+/// empty in the frozen Go surface now carry a description (command path, text).
+pub const HELP_DESCRIPTIONS: [(&str, &str); 21] = [
+    (
+        "auto-confirm",
+        "Create a manual confirmation task for a broker reply",
+    ),
+    (
+        "calendar",
+        "Show upcoming deadlines and next actions by week",
+    ),
+    ("classify-reply", "Classify a broker reply via LLM"),
+    ("dashboard", "Show aggregated campaign and request status"),
+    ("events show", "Show the event history of a request"),
+    ("generate-dashboard", "Generate an HTML dashboard file"),
+    ("generate-rebuttal", "Generate a rebuttal for a rejection"),
+    ("generate-report", "Generate a campaign report file"),
+    (
+        "generate-scheduler",
+        "Generate scheduler files for periodic runs",
+    ),
+    (
+        "grant",
+        "Issue or revoke consent tokens for non-dry execution",
+    ),
+    (
+        "manual-tasks cleanup",
+        "Remove leftover manual task artifacts",
+    ),
+    ("manual-tasks complete", "Mark a manual task as done"),
+    ("manual-tasks list", "List manual fallback tasks"),
+    ("manual-tasks show", "Show manual task details"),
+    ("poll-inbox", "Fetch and match inbox replies"),
+    ("requests list", "List removal requests"),
+    ("review", "Redact personal data in a file"),
+    (
+        "run-web-form",
+        "Preview or queue a broker's manual form opt-out",
+    ),
+    ("schedule install", "Install the scheduler units"),
+    ("schedule status", "Show scheduler installation status"),
+    ("schedule uninstall", "Remove the scheduler units"),
+];
+
+/// Overrides exactly the changed descriptions in one recorded `--help` output.
+/// `command` is the help target's path (`[]` for the root). Two things change
+/// and nothing else: a leaf with a new description gains the leading
+/// `<short>\n\n` block that cobra prints above `Usage:`, and each row of the
+/// `Available Commands:` list that recorded an empty description gains it.
+pub fn help_descriptions(recorded: &[u8], command: &[&str]) -> Vec<u8> {
+    let Ok(text) = std::str::from_utf8(recorded) else {
+        return recorded.to_vec();
+    };
+    let path = command.join(" ");
+    let mut text = text.to_owned();
+    if let Some((_, short)) = HELP_DESCRIPTIONS.iter().find(|(own, _)| *own == path)
+        && text.starts_with("Usage:\n")
+    {
+        text = format!("{short}\n\n{text}");
+    }
+    let Some(start) = text.find("Available Commands:\n") else {
+        return text.into_bytes();
+    };
+    let end = text[start..]
+        .find("\n\n")
+        .map_or(text.len(), |at| start + at);
+    let block = text[start..end]
+        .split('\n')
+        .map(|line| {
+            let Some(name) = line.strip_prefix("  ").map(str::trim_end) else {
+                return line.to_owned();
+            };
+            let child = if path.is_empty() {
+                name.to_owned()
+            } else {
+                format!("{path} {name}")
+            };
+            match HELP_DESCRIPTIONS.iter().find(|(own, _)| *own == child) {
+                // A row that already has a description never equals the bare name.
+                Some((_, short)) => format!("{line}{short}"),
+                None => line.to_owned(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("{}{block}{}", &text[..start], &text[end..]).into_bytes()
+}
+
 /// Post-cutover addition #1297: `plan delete` joins the `plan` subcommands.
 /// Inserts exactly one row between the recorded `create` and `execute` rows of
 /// the `plan --help` command list (cobra lists subcommands alphabetically).
@@ -137,6 +225,19 @@ fn transforms_are_narrow() {
         format!("{ROOT_LONG}\n\nUsage:\n  {MIGRATE_SHORT}\n").into_bytes()
     );
     assert_eq!(help_wording(b"Usage:\n"), b"Usage:\n");
+    // #1303: leaf heading and list rows, nothing else.
+    assert_eq!(
+        help_descriptions(b"Usage:\n  symeraseme calendar [flags]\n", &["calendar"]),
+        b"Show upcoming deadlines and next actions by week\n\nUsage:\n  symeraseme calendar [flags]\n"
+    );
+    assert_eq!(
+        help_descriptions(
+            b"x\n\nAvailable Commands:\n  list        \n  show        \n  keep        kept\n\nFlags:\n  list    \n",
+            &["manual-tasks"]
+        ),
+        b"x\n\nAvailable Commands:\n  list        List manual fallback tasks\n  show        Show manual task details\n  keep        kept\n\nFlags:\n  list    \n"
+    );
+    assert_eq!(help_descriptions(b"Usage:\n", &["version"]), b"Usage:\n");
     assert_ne!(PRODUCT_VERSION, "dev");
     let recorded = format!("x{GO_SERVER_INFO}y");
     assert_eq!(

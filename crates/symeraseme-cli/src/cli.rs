@@ -2,6 +2,7 @@
 
 use crate::command_surface::{self, CommandSpec, FlagSpec};
 use crate::mcp::handler::{ContractHandler, ToolHandler};
+use crate::text_render;
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -587,17 +588,35 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
         // `operate-plan-tick` are identical, so they share one implementation.
         "tick" => plan_tick(parsed),
         "plan tick" => plan_tick(parsed),
-        "dashboard" => contract_command("get_dashboard_data", Map::new(), parsed),
-        "calendar" => contract_command("get_calendar", calendar_arguments(parsed), parsed),
-        "requests list" => contract_command("list_requests", requests_arguments(parsed), parsed),
-        "manual-tasks list" => {
-            contract_command("manual_tasks_list", manual_tasks_arguments(parsed), parsed)
-        }
+        "dashboard" => contract_command_text(
+            "get_dashboard_data",
+            Map::new(),
+            parsed,
+            text_render::dashboard,
+        ),
+        "calendar" => contract_command_text(
+            "get_calendar",
+            calendar_arguments(parsed),
+            parsed,
+            text_render::calendar,
+        ),
+        "requests list" => contract_command_text(
+            "list_requests",
+            requests_arguments(parsed),
+            parsed,
+            text_render::requests_list,
+        ),
+        "manual-tasks list" => contract_command_text(
+            "manual_tasks_list",
+            manual_tasks_arguments(parsed),
+            parsed,
+            text_render::message,
+        ),
         "manual-tasks show" => match int_argument(parsed, "task-id", "task ID") {
             Ok(task_id) => {
                 let mut arguments = Map::new();
                 arguments.insert("task_id".to_owned(), json!(task_id));
-                contract_command("manual_tasks_show", arguments, parsed)
+                contract_command_text("manual_tasks_show", arguments, parsed, text_render::message)
             }
             Err(outcome) => outcome,
         },
@@ -624,10 +643,11 @@ fn dispatch(_specs: &[CommandSpec], parsed: &Parsed) -> Outcome {
             contract_command("manual_tasks_cleanup", arguments, parsed)
         }
         "events show" => match int_argument(parsed, "request-id", "request ID") {
-            Ok(request_id) => contract_command_rendered(
+            Ok(request_id) => contract_command_text(
                 "get_events",
                 events_arguments(parsed, request_id),
                 parsed,
+                text_render::events,
             ),
             Err(outcome) => outcome,
         },
@@ -817,8 +837,8 @@ fn schedule_uninstall(parsed: &Parsed) -> Outcome {
     Outcome::Stdout(b"success\n".to_vec())
 }
 
-/// Go's `schedule status`. The text form prints `success` — Go discards the
-/// status payload unless JSON was requested, which is pinned as measured.
+/// Go's `schedule status`. JSON is Go's payload; text mode lists one line per
+/// scheduler unit instead of Go's bare `success` (#1302).
 fn schedule_status(parsed: &Parsed) -> Outcome {
     let options = schedule_options(parsed);
     let result = match install::status(&options) {
@@ -835,7 +855,12 @@ fn schedule_status(parsed: &Parsed) -> Outcome {
             Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
     }
-    Outcome::Stdout(b"success\n".to_vec())
+    match serde_json::to_value(&result) {
+        Ok(value) => {
+            Outcome::Stdout(format!("{}\n", text_render::schedule_status(&value)).into_bytes())
+        }
+        Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+    }
 }
 
 /// The wall clock, as Go's `time.Now().UTC()`. `chrono` is built without its
@@ -1249,8 +1274,9 @@ pub(crate) fn serve_http(
     }
 }
 
-/// The four CLI commands that are thin wrappers over an MCP tool share Go's
+/// The CLI commands that are thin wrappers over a mutating MCP tool share Go's
 /// body: call the tool, print its result as JSON, or `success` in text mode.
+/// Read-only commands use [`contract_command_text`] instead (#1302).
 fn contract_command(tool: &str, arguments: Map<String, Value>, parsed: &Parsed) -> Outcome {
     match contract_result(tool, &arguments, parsed) {
         Err(outcome) => outcome,
@@ -1259,6 +1285,37 @@ fn contract_command(tool: &str, arguments: Map<String, Value>, parsed: &Parsed) 
             Ok(bytes) => Outcome::Stdout(bytes),
             Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
         },
+    }
+}
+
+/// [`contract_command`] for the read-only tools: JSON mode is unchanged, text
+/// mode prints the payload through `render` instead of `success` (#1302). A
+/// `success: false` payload prints its `error`. Like Go's `RunE`, the tool
+/// runs before the format is validated.
+fn contract_command_text(
+    tool: &str,
+    arguments: Map<String, Value>,
+    parsed: &Parsed,
+    render: fn(&Value) -> String,
+) -> Outcome {
+    let result = match contract_call(tool, &arguments) {
+        Ok(result) => result,
+        Err(outcome) => return outcome,
+    };
+    match output_format(parsed) {
+        Err(outcome) => outcome,
+        Ok("json") => match result {
+            // Pre-rendered Go struct JSON (`get_events`) is written verbatim.
+            Value::String(rendered) => Outcome::Stdout(format!("{rendered}\n").into_bytes()),
+            result => match json_line(&result) {
+                Ok(bytes) => Outcome::Stdout(bytes),
+                Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
+            },
+        },
+        Ok(_) => {
+            let text = text_render::failure(&result).unwrap_or_else(|| render(&result));
+            Outcome::Stdout(format!("{text}\n").into_bytes())
+        }
     }
 }
 
@@ -1494,17 +1551,22 @@ fn contract_result_with_format(
     arguments: &Map<String, Value>,
     format: Result<&str, Outcome>,
 ) -> Result<Option<Value>, Outcome> {
+    let result = contract_call(tool, arguments)?;
+    Ok((format? == "json").then_some(result))
+}
+
+/// Runs one contract tool; a failure becomes the stderr outcome.
+fn contract_call(tool: &str, arguments: &Map<String, Value>) -> Result<Value, Outcome> {
     let handler =
         contract_handler().map_err(|error| Outcome::Stderr(format!("{error}\n").into_bytes()))?;
-    let result = handler
+    handler
         .call(tool, arguments)
-        .map_err(|error| Outcome::Stderr(format!("{error}\n").into_bytes()))?;
-    Ok((format? == "json").then_some(result))
+        .map_err(|error| Outcome::Stderr(format!("{error}\n").into_bytes()))
 }
 
 /// `contract_command` for the tools whose JSON result is carried as pre-rendered
 /// text because Go marshals a *struct* there and keeps its field order:
-/// `get_events`' `[]Event` and `grant --list-tokens`' `[]ConsentToken`.
+/// `grant --list-tokens`' `[]ConsentToken` (`get_events` has its own text form).
 fn contract_command_rendered(
     tool: &str,
     arguments: Map<String, Value>,

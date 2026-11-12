@@ -58,18 +58,15 @@ jobs:
           SYMERASEME_PARITY_LIVE_GO: '0'
         run: |
           set -euo pipefail
-          # The six process comparators are Unix-only; the bind differential is native everywhere.
-          tests=(native_bind_failures_match_checked_out_go)
-          targets=(--test mcp_http_native_contract)
-          if [ "$RUNNER_OS" != Windows ]; then
-            tests+=(live_http_disconnect_cancels_and_reaps_host_agent_like_go
-                    live_http_disconnect_cancels_provider_request_like_go
-                    startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness
-                    occupied_bind_error_matches_go_for_ipv4_and_ipv6
-                    unavailable_local_address_error_matches_go
-                    obs_text_origin_rejection_matches_go_and_rust_processes)
-            targets+=(--test mcp_http_process)
-          fi
+          # All matrix runners are Unix; these six process comparators require it.
+          tests=(native_bind_failures_match_checked_out_go
+                 live_http_disconnect_cancels_and_reaps_host_agent_like_go
+                 live_http_disconnect_cancels_provider_request_like_go
+                 startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness
+                 occupied_bind_error_matches_go_for_ipv4_and_ipv6
+                 unavailable_local_address_error_matches_go
+                 obs_text_origin_rejection_matches_go_and_rust_processes)
+          targets=(--test mcp_http_native_contract --test mcp_http_process)
           cargo +1.98.0 test -p symeraseme-cli "${targets[@]}" --locked -- "${tests[@]}" --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/http-aux.log"
           passed=$(awk '/^test result: ok\. [0-9]+ passed; 0 failed; 0 ignored;/ { sum += $4 } END { print sum + 0 }' "$RUNNER_TEMP/http-aux.log")
           test "$passed" -eq "${#tests[@]}"
