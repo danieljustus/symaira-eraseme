@@ -11,7 +11,8 @@ use super::keyring::{KeyringBackend, OsKeyring};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{self, Read};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
+use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -397,6 +398,25 @@ fn valid_symvault_path(path: &str) -> bool {
         && !path.chars().any(char::is_control)
 }
 
+/// Upper bound for the output readers to see EOF once the provider's process
+/// tree has been killed. Only a descendant that escaped the owned process
+/// group (for example via `setsid`) can still hold a pipe open this long.
+const READER_GRACE: Duration = Duration::from_secs(1);
+
+/// Kills the provider and every descendant that is still in its process group.
+///
+/// On Unix the provider is spawned as the leader of a fresh process group, so a
+/// group-wide `SIGKILL` also reaches background children that inherited the
+/// output pipes. Elsewhere only the direct child can be terminated.
+fn kill_process_tree(child: &mut Child) {
+    #[cfg(unix)]
+    if let Ok(pid) = i32::try_from(child.id()) {
+        let _ =
+            nix::sys::signal::killpg(nix::unistd::Pid::from_raw(pid), nix::sys::signal::SIGKILL);
+    }
+    let _ = child.kill();
+}
+
 fn run_secret_command(
     mut command: Command,
     timeout: Duration,
@@ -404,27 +424,30 @@ fn run_secret_command(
     timeout_error: SecretBackendError,
 ) -> Result<String, SecretBackendError> {
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut command, 0);
     let mut child = command.spawn().map_err(|_| failure)?;
     let Some(stdout) = child.stdout.take() else {
-        let _ = child.kill();
+        kill_process_tree(&mut child);
         let _ = child.wait();
         return Err(failure);
     };
     let Some(stderr) = child.stderr.take() else {
-        let _ = child.kill();
+        kill_process_tree(&mut child);
         let _ = child.wait();
         return Err(failure);
     };
 
-    let stdout_reader = thread::spawn(move || {
+    let (stdout_tx, stdout_rx) = mpsc::channel();
+    thread::spawn(move || {
         let mut stdout = stdout;
         let mut output = Vec::new();
-        stdout.read_to_end(&mut output).map(|_| output)
+        let _ = stdout_tx.send(stdout.read_to_end(&mut output).map(|_| output));
     });
-    let stderr_reader = thread::spawn(move || {
+    let (stderr_tx, stderr_rx) = mpsc::channel();
+    thread::spawn(move || {
         let mut stderr = stderr;
-        let mut sink = io::sink();
-        io::copy(&mut stderr, &mut sink)
+        let _ = stderr_tx.send(io::copy(&mut stderr, &mut io::sink()));
     });
 
     let deadline = Instant::now() + timeout;
@@ -432,31 +455,32 @@ fn run_secret_command(
         match child.try_wait() {
             Ok(Some(status)) => break status,
             Ok(None) if Instant::now() >= deadline => {
-                let _ = child.kill();
+                // The group is killed before the leader is reaped so its id
+                // cannot be recycled in between. The readers end on their own
+                // once the last pipe holder is gone; they are not joined.
+                kill_process_tree(&mut child);
                 let _ = child.wait();
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
                 return Err(timeout_error);
             }
             Ok(None) => thread::sleep(Duration::from_millis(5)),
             Err(_) => {
-                let _ = child.kill();
+                kill_process_tree(&mut child);
                 let _ = child.wait();
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
                 return Err(failure);
             }
         }
     };
 
-    let stdout = stdout_reader.join().ok().and_then(Result::ok);
-    let _ = stderr_reader.join();
+    // The leader is gone, but a background descendant may still own the pipes.
+    // Clean it up before waiting for EOF so the reads below are bounded.
+    kill_process_tree(&mut child);
     if !status.success() {
         return Err(failure);
     }
-    let Some(stdout) = stdout else {
-        return Err(failure);
+    let Ok(Ok(stdout)) = stdout_rx.recv_timeout(READER_GRACE) else {
+        return Err(timeout_error);
     };
+    let _ = stderr_rx.recv_timeout(READER_GRACE);
     Ok(String::from_utf8_lossy(&stdout).trim().to_owned())
 }
 
@@ -603,6 +627,100 @@ mod tests {
             .success();
         assert!(!alive, "timed-out child {} is still running", pid.trim());
         assert_eq!(dir_entries(dir.path()), ["pid"], "unexpected residue");
+    }
+
+    /// Reads the pid a provider script recorded, waiting for the atomic rename
+    /// that publishes it.
+    fn recorded_pid(path: &Path) -> Option<i32> {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            if let Ok(text) = fs::read_to_string(path) {
+                return text.trim().parse().ok();
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        None
+    }
+
+    fn process_exists(pid: i32) -> bool {
+        nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_ok()
+    }
+
+    fn wait_until_dead(pid: i32) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            if !process_exists(pid) {
+                return true;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        false
+    }
+
+    /// Runs a provider whose non-exec shell starts a background `sleep` that
+    /// inherits stdout/stderr and publishes its pid in `bg`. The runner runs on
+    /// a helper thread under an outer deadline so a regression fails instead of
+    /// hanging; a leaked descendant is killed by its recorded pid.
+    fn run_with_background_sleep(
+        body: &str,
+        timeout: Duration,
+    ) -> (Result<String, SecretBackendError>, Duration, i32) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let bg = dir.path().join("bg");
+        let tmp = dir.path().join("bg.tmp");
+        let script = format!(
+            "sleep 30 & echo $! > '{tmp}' && mv '{tmp}' '{bg}'; {body}",
+            tmp = tmp.display(),
+            bg = bg.display(),
+        );
+        let (tx, rx) = mpsc::channel();
+        let started = Instant::now();
+        thread::spawn(move || {
+            let _ = tx.send(run(&script, timeout));
+        });
+        let outcome = rx.recv_timeout(Duration::from_secs(8));
+        let elapsed = started.elapsed();
+        let pid = recorded_pid(&bg).expect("background sleep published its pid");
+        let Ok(result) = outcome else {
+            let _ =
+                nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), nix::sys::signal::SIGKILL);
+            panic!("run_secret_command did not return within 8s: descendant holds the pipes");
+        };
+        (result, elapsed, pid)
+    }
+
+    #[test]
+    fn timeout_kills_background_descendant_holding_the_pipes() {
+        let body = format!("echo {MARKER}; echo {MARKER} >&2; wait");
+        let (result, elapsed, pid) = run_with_background_sleep(&body, Duration::from_millis(750));
+        let error = result.expect_err("timeout must fail");
+        assert_eq!(error, TIMEOUT);
+        assert_error_is_redacted(&error);
+        assert!(elapsed < Duration::from_secs(3), "took {elapsed:?}");
+        assert!(
+            wait_until_dead(pid),
+            "descendant {pid} survived the timeout"
+        );
+    }
+
+    #[test]
+    fn leader_exit_does_not_wait_for_background_descendant_holding_the_pipes() {
+        let body = format!("echo s3cret; echo {MARKER} >&2; exit 0");
+        let (result, elapsed, pid) = run_with_background_sleep(&body, Duration::from_secs(5));
+        assert_eq!(result, Ok("s3cret".to_owned()));
+        assert!(elapsed < Duration::from_secs(3), "took {elapsed:?}");
+        assert!(wait_until_dead(pid), "descendant {pid} survived the leader");
+    }
+
+    #[test]
+    fn failing_leader_with_background_descendant_returns_failure_without_hanging() {
+        let body = format!("echo {MARKER}; echo {MARKER} >&2; exit 4");
+        let (result, elapsed, pid) = run_with_background_sleep(&body, Duration::from_secs(5));
+        let error = result.expect_err("non-zero exit must fail");
+        assert_eq!(error, FAILURE);
+        assert_error_is_redacted(&error);
+        assert!(elapsed < Duration::from_secs(3), "took {elapsed:?}");
+        assert!(wait_until_dead(pid), "descendant {pid} survived the leader");
     }
 
     #[test]
