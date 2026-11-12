@@ -171,12 +171,12 @@ the actual packaged/backend authentication, tool catalogue and shutdown paths.
 
 ## Limitations
 
-- SwiftUI apps require Xcode (or Xcode-beta) for the macro plugins that power
-  `@State`, `@StateObject`, `@Binding`, etc. Building with plain `swift build`
-  from CommandLineTools alone will fail.
+- Local SwiftUI builds require a full Xcode installation (or Xcode-beta) for
+  the macOS SDK and Swift toolchain. Building with plain `swift build` from
+  CommandLineTools alone will fail.
 - The current Rust-only source-tree candidate stages its Rust MCP server through
   `build.sh`, which uses Python 3 to locate the compiler output. Running the staged
   Rust backend requires no Go or Python runtime. This does not describe the already-published dual-backend
   `v0.13.0` prerelease assets.
 - No external Swift dependencies beyond the SymairaTheme, SymairaToolKit and
-  SymairaAppKit packages declared in `Package.swift`.
+  SymairaDaemonKit packages declared in `Package.swift`.

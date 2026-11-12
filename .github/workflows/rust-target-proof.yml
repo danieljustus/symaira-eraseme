@@ -71,11 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo +"$RUST_TOOLCHAIN" build --release -p symeraseme-cli --bin symeraseme-rust --target "${{ matrix.target }}" --locked
-          if [[ "$RUNNER_OS" == Windows ]]; then
-            binary="target/${{ matrix.target }}/release/symeraseme-rust.exe"
-          else
-            binary="target/${{ matrix.target }}/release/symeraseme-rust"
-          fi
+          binary="target/${{ matrix.target }}/release/symeraseme-rust"
           test -f "$binary"
           expected_version="$(python3 -c 'import tomllib,pathlib;print(tomllib.loads(pathlib.Path("Cargo.toml").read_text())["workspace"]["package"]["version"])')"
           test "$("$binary" --version)" = "symeraseme version $expected_version"

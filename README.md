@@ -167,9 +167,8 @@ The complete transport and tool contract lives in
 The event store defaults to `~/.local/share/symeraseme/symeraseme.db`; it never
 falls back to a temporary directory in production. Configuration precedence is
 built-in defaults, `~/.config/symeraseme/config.toml` (or
-`$XDG_CONFIG_HOME/symeraseme/config.toml`), a config file at the platform's
-user configuration location, the project `.symeraseme.toml`, then environment
-variables. `SYMERASEME_DATA_DIR` selects
+`$XDG_CONFIG_HOME/symeraseme/config.toml`), the project `.symeraseme.toml`,
+then environment variables. `SYMERASEME_DATA_DIR` selects
 the base data directory, `SYMERASEME_DB_DIR` overrides only the database
 directory, and `SYMERASEME_ENCRYPT_DB` accepts `1|true|yes|on` or
 `0|false|no|off`. Invalid values fail closed. When encryption is enabled, the
