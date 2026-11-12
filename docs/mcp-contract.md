@@ -346,6 +346,8 @@ Parameters:
     -   `page` (integer): 1-indexed page number
     -   `page_size` (integer): Maximum items per page
 
+Result: `{"page", "page_size", "requests", "total"}`; `requests` is `null` on an empty page and `total` counts every request matching all given filters, including `broker_id` (post-cutover change #1315, recorded in `docs/rust-port-contract-matrix.md`; Go ignored `broker_id` in the total).
+
 ### `get_events`
 
 Return the event history for a removal request.

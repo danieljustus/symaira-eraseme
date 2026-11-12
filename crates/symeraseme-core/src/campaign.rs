@@ -487,7 +487,8 @@ pub fn execute_campaign(
         size => size,
     };
     let repository = Repository::new(store);
-    let total_planned = repository.count_removal_requests(Some(campaign_id), Some("PLANNED"))?;
+    let total_planned =
+        repository.count_removal_requests(Some(campaign_id), Some("PLANNED"), None)?;
     let batch = repository.list_removal_requests(ListRemovalRequestsOptions {
         campaign_id: Some(campaign_id.to_owned()),
         status: Some("PLANNED".to_owned()),

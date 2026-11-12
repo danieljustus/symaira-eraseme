@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- `list_requests` (MCP) and `requests list` now count `total` with the
+  `broker_id` filter, so a broker-filtered page reports its own total and
+  paging stops at the last filled page (#1315).
+
 ## [v0.17.0] - 2026-11-12
 
 ### Changed

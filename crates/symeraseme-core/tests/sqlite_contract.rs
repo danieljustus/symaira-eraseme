@@ -582,9 +582,25 @@ fn typed_repository_queries_preserve_go_filters_pagination_and_event_buckets() {
 
     assert_eq!(
         repository
-            .count_removal_requests(Some("golden-campaign"), None)
+            .count_removal_requests(Some("golden-campaign"), None, None)
             .expect("count requests"),
         3
+    );
+    // The count applies the broker filter exactly like the list does (#1315).
+    let all = repository
+        .list_removal_requests(ListRemovalRequestsOptions {
+            campaign_id: Some("golden-campaign".to_owned()),
+            ..Default::default()
+        })
+        .expect("list all requests");
+    let broker = all[0].broker_id.clone();
+    let listed_for_broker = all.iter().filter(|row| row.broker_id == broker).count() as i64;
+    assert!(listed_for_broker < 3, "fixture needs more than one broker");
+    assert_eq!(
+        repository
+            .count_removal_requests(Some("golden-campaign"), None, Some(&broker))
+            .expect("count requests for one broker"),
+        listed_for_broker
     );
     let page = repository
         .list_removal_requests(ListRemovalRequestsOptions {

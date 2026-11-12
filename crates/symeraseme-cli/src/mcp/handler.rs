@@ -1121,18 +1121,23 @@ impl ContractHandler {
             }
             let campaign_id = optional_str(arguments, "campaign_id");
             let status = optional_str(arguments, "status");
+            let broker_id = optional_str(arguments, "broker_id");
             let repository = Repository::new(store);
             let requests = repository
                 .list_removal_requests(ListRemovalRequestsOptions {
                     campaign_id: campaign_id.clone(),
                     status: status.clone(),
-                    broker_id: optional_str(arguments, "broker_id"),
+                    broker_id: broker_id.clone(),
                     limit: Some(page_size),
                     offset: Some((page - 1) * page_size),
                 })
                 .map_err(|error| ToolError(error.to_string()))?;
             let total = repository
-                .count_removal_requests(campaign_id.as_deref(), status.as_deref())
+                .count_removal_requests(
+                    campaign_id.as_deref(),
+                    status.as_deref(),
+                    broker_id.as_deref(),
+                )
                 .map_err(|error| ToolError(error.to_string()))?;
             Ok(json!({
                 "requests": request_rows(requests),
@@ -2129,9 +2134,31 @@ mod tests {
                     panic!("{} unexpectedly parsed as error", case.name)
                 }
             };
-            assert_response_matches(&case.name, actual, case.response.as_deref());
+            let expected = case
+                .response
+                .as_deref()
+                .map(|response| post_cutover_1315_broker_total(&case.name, response));
+            assert_response_matches(&case.name, actual, expected.as_deref());
         }
         let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Post-cutover contract change #1315 (docs/rust-port-contract-matrix.md):
+    /// `list_requests` counts with the broker filter it pages through. Go
+    /// reported the unfiltered total, which the frozen case records as
+    /// `"total":3` next to two `broker-a` rows. Only that one value of that
+    /// one case is rewritten; every other recorded byte is compared as is.
+    fn post_cutover_1315_broker_total(name: &str, response: &str) -> String {
+        if name != "list_requests_filters_by_broker_without_narrowing_the_total" {
+            return response.to_owned();
+        }
+        let recorded = r#"\"total\":3}"#;
+        assert_eq!(
+            response.matches(recorded).count(),
+            1,
+            "{name}: the recorded unfiltered total moved"
+        );
+        response.replace(recorded, r#"\"total\":2}"#)
     }
 
     /// Compares a response the way the contract does, and names the first

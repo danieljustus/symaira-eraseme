@@ -153,18 +153,29 @@ impl<'store> Repository<'store> {
         rows.collect()
     }
 
-    /// Counts requests with optional campaign and status filters.
+    /// Counts requests with the same optional campaign, status and broker
+    /// filters as [`Self::list_removal_requests`], so a page total matches the
+    /// rows it pages through.
     pub fn count_removal_requests(
         &self,
         campaign_id: Option<&str>,
         status: Option<&str>,
+        broker_id: Option<&str>,
     ) -> rusqlite::Result<i64> {
         self.store.connection().query_row(
             "SELECT COUNT(*) FROM removal_requests r
              LEFT JOIN request_state s ON s.request_id = r.id
              WHERE (?1 IS NULL OR r.campaign_id = ?2)
-               AND (?3 IS NULL OR s.current_status = ?4)",
-            params![campaign_id, campaign_id, status, status],
+               AND (?3 IS NULL OR s.current_status = ?4)
+               AND (?5 IS NULL OR r.broker_id = ?6)",
+            params![
+                campaign_id,
+                campaign_id,
+                status,
+                status,
+                broker_id,
+                broker_id
+            ],
             |row| row.get(0),
         )
     }
