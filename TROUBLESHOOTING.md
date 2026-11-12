@@ -124,13 +124,13 @@ files for diagnosis.
 
 The GUI requires a full Xcode installation, not Command Line Tools alone. For a
 local DMG from the current source-tree candidate, the package version in
-`Cargo.toml` is `0.16.0`. A Rust-only canary DMG is published in the
+`Cargo.toml` is `0.17.0`. A Rust-only canary DMG is published in the
 [`v0.14.0` prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
 To produce a local build instead, run from the repository root with full Xcode:
 
 ```bash
 ./app/SymairaEraseMe/build.sh
-VERSION=0.16.0 ./scripts/package-dmg.sh
+VERSION=0.17.0 ./scripts/package-dmg.sh
 ```
 
 The current candidate app bundle contains `Symaira EraseMe.app/Contents/MacOS/symeraseme`.
