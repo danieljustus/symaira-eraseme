@@ -47,6 +47,9 @@ final class CampaignsViewModel: ObservableObject {
 
         do {
             planResult = try await MCPClient.shared.callTool("plan_create", arguments: args)
+            // The next New Campaign starts empty; a failed create keeps the
+            // input for correction (#1316).
+            clearFormFields()
             // Refresh the campaign list
             await refresh()
         } catch {
@@ -67,12 +70,16 @@ final class CampaignsViewModel: ObservableObject {
     }
 
     func resetForm() {
+        clearFormFields()
+        planResult = nil
+        executeResult = nil
+    }
+
+    private func clearFormFields() {
         newCampaignId = ""
         newCampaignJurisdiction = ""
         newCampaignLaw = ""
         newCampaignPriority = ""
         newCampaignMaxBrokers = 30
-        planResult = nil
-        executeResult = nil
     }
 }

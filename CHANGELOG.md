@@ -6,6 +6,14 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- The MCP servers (`mcp` over HTTP, which the macOS app runs, and `mcp
+  --stdio`) record the time of each tool call. They used the server's start
+  time for every event, completion, `as_of` and `generated_at` written while
+  they kept running (#1312).
+- macOS app: the Complete Task sheet shows the task's broker, reason, form
+  link and instructions and enables "Mark Complete" on the first open (#1314).
+- macOS app: New Campaign opens with an empty form after a successful create;
+  a failed create keeps the input for correction (#1316).
 - macOS app: the Requests page loads again; it decodes the server's
   `requests` list (and an empty page's `null`) instead of failing with a
   decoding error (#1310).

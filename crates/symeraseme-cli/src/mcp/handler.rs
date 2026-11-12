@@ -213,8 +213,11 @@ pub struct ContractHandler {
     pub config: Option<ConfigContext>,
     /// The instant the writing tools record. Go reads `time.Now()`; `chrono`
     /// has no `clock` feature here, so a tool that needs it fails explicitly
-    /// when it was not supplied.
+    /// when neither this fixed instant nor the system clock was supplied.
     pub now: Option<DateTime<Utc>>,
+    /// Read the system clock on every call when no fixed instant is set.
+    /// Long-running servers need this; a fixed instant stays for tests (#1312).
+    pub system_clock: bool,
     /// The data directory the artifact tools use. Go resolves it from
     /// `SYMERASEME_DATA_DIR`; `None` keeps that behaviour.
     pub data_dir: Option<PathBuf>,
@@ -235,6 +238,7 @@ impl ContractHandler {
             workspace_root: workspace_root.into(),
             config: None,
             now: None,
+            system_clock: false,
             data_dir: None,
             imap_dialer: None,
             hwm_store: None,
@@ -254,6 +258,15 @@ impl ContractHandler {
     pub fn with_store(mut self, config: ConfigContext, now: DateTime<Utc>) -> Self {
         self.config = Some(config);
         self.now = Some(now);
+        self
+    }
+
+    /// Adds the configuration and records the current system time on every
+    /// call, as the long-running MCP servers need.
+    pub fn with_store_and_system_clock(mut self, config: ConfigContext) -> Self {
+        self.config = Some(config);
+        self.now = None;
+        self.system_clock = true;
         self
     }
 
@@ -316,6 +329,9 @@ impl ContractHandler {
     }
 
     fn recorded_instant(&self) -> Result<DateTime<Utc>, ToolError> {
+        if self.now.is_none() && self.system_clock {
+            return Ok(DateTime::<Utc>::from(std::time::SystemTime::now()));
+        }
         self.now.ok_or_else(|| {
             ToolError("this tool needs an injected instant and none was supplied".to_owned())
         })

@@ -4,7 +4,6 @@ import SymairaTheme
 /// Manual tasks view — list and complete tasks requiring human intervention.
 struct ManualTasksView: View {
     @StateObject private var vm = ManualTasksViewModel()
-    @State private var showCompleteSheet = false
     @State private var selectedTask: ManualTask?
     @State private var completionNotes: String = ""
 
@@ -35,8 +34,11 @@ struct ManualTasksView: View {
             }
         }
         .task(id: vm.filterStatus) { await vm.refresh() }
-        .sheet(isPresented: $showCompleteSheet) {
-            completeSheet
+        // Presenting by item hands the selected task to the sheet; a separate
+        // boolean let the first presentation render before the task was set
+        // (#1314).
+        .sheet(item: $selectedTask) { task in
+            completeSheet(task)
         }
     }
 
@@ -67,9 +69,8 @@ struct ManualTasksView: View {
                 TableColumn("Actions") { task in
                     if task.status == "pending" {
                         Button("Complete") {
-                            selectedTask = task
                             completionNotes = ""
-                            showCompleteSheet = true
+                            selectedTask = task
                         }
                         .symairaButtonStyle(.secondary)
                         .controlSize(.small)
@@ -85,41 +86,33 @@ struct ManualTasksView: View {
         .symairaCard()
     }
 
-    private var completeSheet: some View {
+    private func completeSheet(_ task: ManualTask) -> some View {
         SymairaSheetScaffold(
             title: "Complete Task",
-            dismiss: {
-                showCompleteSheet = false
-                selectedTask = nil
-            },
-            primaryTitle: "Mark Complete", primaryDisabled: selectedTask == nil,
+            dismiss: { selectedTask = nil },
+            primaryTitle: "Mark Complete",
             primary: {
-                if let task = selectedTask {
-                    Task {
-                        await vm.completeTask(task, notes: completionNotes)
-                        showCompleteSheet = false
-                        selectedTask = nil
-                    }
+                Task {
+                    await vm.completeTask(task, notes: completionNotes)
+                    selectedTask = nil
                 }
             }
         ) {
-            if let task = selectedTask {
-                SymairaFormSection("Task Details") {
-                    SymairaFormRow("Broker") { Text(task.brokerName).symairaText(.callout) }
+            SymairaFormSection("Task Details") {
+                SymairaFormRow("Broker") { Text(task.brokerName).symairaText(.callout) }
+                SymairaFormDivider()
+                SymairaFormRow("Reason") { Text(task.reason).symairaText(.callout) }
+                SymairaFormDivider()
+                SymairaFormRow("Form") {
+                    Link(task.formUrl, destination: URL(string: task.formUrl) ?? URL(string: "about:blank")!)
+                        .symairaText(.caption)
+                        .lineLimit(1)
+                }
+                if !task.instructions.isEmpty {
                     SymairaFormDivider()
-                    SymairaFormRow("Reason") { Text(task.reason).symairaText(.callout) }
-                    SymairaFormDivider()
-                    SymairaFormRow("Form") {
-                        Link(task.formUrl, destination: URL(string: task.formUrl) ?? URL(string: "about:blank")!)
-                            .symairaText(.caption)
-                            .lineLimit(1)
-                    }
-                    if !task.instructions.isEmpty {
-                        SymairaFormDivider()
-                        Text(task.instructions)
-                            .symairaText(.callout)
-                            .foregroundStyle(BrandColors.textSecondary)
-                    }
+                    Text(task.instructions)
+                        .symairaText(.callout)
+                        .foregroundStyle(BrandColors.textSecondary)
                 }
             }
             SymairaFormSection("Completion Notes") {

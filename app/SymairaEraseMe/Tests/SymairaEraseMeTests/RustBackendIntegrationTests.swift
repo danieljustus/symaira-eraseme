@@ -104,6 +104,17 @@ final class RustBackendIntegrationTests: XCTestCase {
         XCTAssertEqual(calendar.horizonWeeks, 8)
         XCTAssertTrue(calendar.weeks.isEmpty)
 
+        // A successful create clears the New Campaign form (#1316).
+        let campaigns = CampaignsViewModel()
+        campaigns.newCampaignId = "app-form-reset"
+        campaigns.newCampaignJurisdiction = "DE"
+        campaigns.newCampaignMaxBrokers = 2
+        await campaigns.createCampaign()
+        XCTAssertNotNil(campaigns.planResult, "the create must succeed against the live server")
+        XCTAssertEqual(campaigns.newCampaignId, "")
+        XCTAssertEqual(campaigns.newCampaignJurisdiction, "")
+        XCTAssertEqual(campaigns.newCampaignMaxBrokers, 30)
+
         guard let pid = manager.pid else {
             XCTFail("The app did not retain the launched backend PID")
             return

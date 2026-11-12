@@ -1225,10 +1225,14 @@ fn int_flag(parsed: &Parsed, name: &str, default: i64) -> i64 {
 }
 
 /// Go's `mcp.ContractHandler()`: the process working directory, the resolved
-/// configuration and the current instant.
+/// configuration and the system clock, read on every call (#1312).
 fn contract_handler() -> Result<ContractHandler, String> {
     let root = env::current_dir().map_err(|error| error.to_string())?;
-    Ok(ContractHandler::new(root).with_store(process_context(), now_utc()))
+    Ok(contract_handler_for(root, process_context()))
+}
+
+fn contract_handler_for(root: std::path::PathBuf, config: ConfigContext) -> ContractHandler {
+    ContractHandler::new(root).with_store_and_system_clock(config)
 }
 
 /// The `mcp --stdio` / `serve --stdio` body: an optional banner on stderr,
@@ -2836,6 +2840,41 @@ fn default_suffix(flag: &FlagSpec) -> String {
 mod tests {
     use super::{TickAction, clap_surface, tick_actions_json};
     use serde_json::json;
+
+    /// The MCP servers keep one handler for their whole lifetime, so the
+    /// production handler must record the time of each call, not the time it
+    /// was built (#1312).
+    #[test]
+    fn contract_handler_records_the_time_of_each_call() {
+        use crate::mcp::handler::ToolHandler;
+        let temp = tempfile::tempdir().expect("temporary workspace");
+        let data_dir = temp.path().join("data");
+        std::fs::create_dir_all(&data_dir).expect("data dir");
+        let environment = std::collections::BTreeMap::from([(
+            "SYMERASEME_DATA_DIR".to_owned(),
+            data_dir.to_string_lossy().into_owned(),
+        )]);
+        let root = temp.path().to_path_buf();
+        let handler = super::contract_handler_for(
+            root.clone(),
+            super::ConfigContext::new(root.clone(), root, environment),
+        );
+        let as_of = |handler: &dyn ToolHandler| {
+            handler
+                .call("get_calendar", &serde_json::Map::new())
+                .expect("calendar")["as_of"]
+                .as_str()
+                .expect("as_of string")
+                .to_owned()
+        };
+        let first = as_of(&handler);
+        std::thread::sleep(std::time::Duration::from_millis(1100));
+        let second = as_of(&handler);
+        assert_ne!(
+            first, second,
+            "a later call must not reuse the first instant"
+        );
+    }
 
     fn count_commands(command: &clap::Command) -> usize {
         1 + command.get_subcommands().map(count_commands).sum::<usize>()
