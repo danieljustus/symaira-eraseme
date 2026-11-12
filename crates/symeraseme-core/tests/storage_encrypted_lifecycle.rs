@@ -5,13 +5,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 use symeraseme_core::storage::encrypted_store::{
-    EncryptedStoreError, clear_master_key, finalise_all, open_configured, open_encrypted,
-    scavenge_stale_temps, set_master_key,
+    CheckpointError, EncryptedStoreError, clear_master_key, decrypt_existing, encrypt_existing,
+    finalise_all, is_stale_temp_name, open_configured, open_encrypted, scavenge_stale_temps,
+    set_master_key,
 };
 use symeraseme_core::storage::encryption::{
-    EnvelopeVersion, decrypt_v3, detect_version, encrypt_v3,
+    EncryptionError, EnvelopeVersion, decrypt_v3, detect_version, encrypt_v3,
 };
-use symeraseme_core::storage::{DbLock, lock_path_for};
+use symeraseme_core::storage::{DbLock, LockError, lock_path_for};
 use tempfile::tempdir;
 
 static TEST_LOCK: Mutex<()> = Mutex::new(());
@@ -390,4 +391,598 @@ fn scavenge_preserves_unregistered_decrypted_temp_for_other_process() {
     scavenge_stale_temps(&tmp_dir).unwrap();
     assert!(!temp.exists());
     assert!(!lock_path_for(&temp).exists());
+}
+
+// ---- failure and recovery paths ---------------------------------------------
+//
+// Every test below runs in its own temporary directory, forces a real
+// filesystem failure (read-only directory, occupied target) and asserts the
+// returned error together with the files left on disk. Read-only-directory
+// tests skip when the platform does not enforce directory modes (root).
+
+const PLAINTEXT_MARKER: &[u8] = b"SQLite format 3\0 plaintext-marker-1304";
+
+fn listing(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+/// Asserts no regular file below `dir` contains `needle`.
+fn assert_no_file_contains(dir: &Path, needle: &[u8]) {
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            assert_no_file_contains(&path, needle);
+        } else if let Ok(bytes) = fs::read(&path) {
+            assert!(
+                !bytes.windows(needle.len()).any(|window| window == needle),
+                "plaintext residue in {}",
+                path.display()
+            );
+        }
+    }
+}
+
+fn make_non_empty_dir(path: &Path) {
+    fs::create_dir(path).unwrap();
+    fs::write(path.join("child"), b"keep").unwrap();
+}
+
+/// Restores owner write access so `tempdir` can always clean up.
+#[cfg(unix)]
+struct RestoreMode(PathBuf);
+
+#[cfg(unix)]
+impl Drop for RestoreMode {
+    fn drop(&mut self) {
+        let _ = fs::set_permissions(&self.0, fs::Permissions::from_mode(0o700));
+    }
+}
+
+#[cfg(unix)]
+fn make_read_only(dir: &Path) -> RestoreMode {
+    fs::set_permissions(dir, fs::Permissions::from_mode(0o500)).unwrap();
+    RestoreMode(dir.to_path_buf())
+}
+
+#[cfg(unix)]
+fn read_only_dirs_are_enforced() -> bool {
+    let probe = tempdir().unwrap();
+    let _restore = make_read_only(probe.path());
+    let enforced = File::create(probe.path().join("probe")).is_err();
+    if !enforced {
+        eprintln!("skipping: read-only directories are not enforced (running as root?)");
+    }
+    enforced
+}
+
+#[cfg(unix)]
+#[test]
+fn atomic_transition_write_failure_leaves_target_and_directory_untouched() {
+    if !read_only_dirs_are_enforced() {
+        return;
+    }
+    let dir = tempdir().unwrap();
+    let store_dir = dir.path().join("store");
+    fs::create_dir(&store_dir).unwrap();
+    let target = store_dir.join("enc.db");
+    fs::write(&target, b"old ciphertext").unwrap();
+
+    let restore = make_read_only(&store_dir);
+    let error = symeraseme_core::storage::atomic_transition_with_recovery(&target, b"new")
+        .expect_err("a read-only parent must fail the write");
+    drop(restore);
+
+    let EncryptedStoreError::ConversionFailed {
+        ref message,
+        ref recovery_path,
+    } = error
+    else {
+        panic!("unexpected variant: {error:?}");
+    };
+    assert!(message.starts_with("write replacement failed"), "{message}");
+    assert_eq!(*recovery_path, None, "nothing was left behind to recover");
+    assert!(
+        error
+            .to_string()
+            .starts_with("eventstore: conversion failed:")
+    );
+    assert_eq!(fs::read(&target).unwrap(), b"old ciphertext");
+    assert_eq!(listing(&store_dir), ["enc.db"]);
+}
+
+#[test]
+fn atomic_transition_rename_failure_keeps_recovery_copy_at_reported_path() {
+    let dir = tempdir().unwrap();
+    let target = dir.path().join("enc.db");
+    make_non_empty_dir(&target);
+
+    let error = symeraseme_core::storage::atomic_transition_with_recovery(&target, b"new-cipher")
+        .expect_err("renaming a file over a non-empty directory must fail");
+
+    let EncryptedStoreError::ConversionFailed {
+        ref message,
+        ref recovery_path,
+    } = error
+    else {
+        panic!("unexpected variant: {error:?}");
+    };
+    assert!(message.starts_with("rename failed"), "{message}");
+    assert!(!message.contains("recovery rename failed"), "{message}");
+    let recovery = recovery_path.clone().expect("recovery path is reported");
+    assert_eq!(recovery.parent().unwrap(), dir.path());
+    let name = recovery.file_name().unwrap().to_string_lossy().into_owned();
+    assert!(name.starts_with(".symeraseme_recovery_") && is_stale_temp_name(&name));
+    assert_eq!(fs::read(&recovery).unwrap(), b"new-cipher");
+    #[cfg(unix)]
+    assert_eq!(
+        recovery.metadata().unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    assert!(error.to_string().contains(&recovery.display().to_string()));
+    // The occupied target is untouched and the write temp was renamed away.
+    assert_eq!(fs::read(target.join("child")).unwrap(), b"keep");
+    assert_eq!(listing(dir.path()), [name.as_str(), "enc.db"]);
+}
+
+#[test]
+fn atomic_transition_rejects_a_parent_that_is_a_file() {
+    let dir = tempdir().unwrap();
+    let parent = dir.path().join("not-a-dir");
+    fs::write(&parent, b"owner").unwrap();
+
+    let error =
+        symeraseme_core::storage::atomic_transition_with_recovery(&parent.join("enc.db"), b"x")
+            .expect_err("a file cannot be a parent directory");
+
+    assert!(matches!(error, EncryptedStoreError::Io(_)), "{error:?}");
+    assert!(std::error::Error::source(&error).is_some());
+    assert_eq!(fs::read(&parent).unwrap(), b"owner");
+    assert_eq!(listing(dir.path()), ["not-a-dir"]);
+}
+
+#[test]
+fn decrypt_existing_fails_closed_without_the_right_key() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("decrypt.db");
+    let ciphertext = encrypt_v3(PLAINTEXT_MARKER, &KEY).unwrap();
+    fs::write(&path, &ciphertext).unwrap();
+
+    set_master_key([0x43; 32]);
+    let error = decrypt_existing(&path).expect_err("wrong key must not decrypt");
+    assert!(
+        matches!(error, EncryptedStoreError::Encryption(_)),
+        "{error:?}"
+    );
+
+    clear_master_key();
+    let error = decrypt_existing(&path).expect_err("missing key must not decrypt");
+    assert!(matches!(error, EncryptedStoreError::MasterKeyUnavailable));
+
+    assert_eq!(fs::read(&path).unwrap(), ciphertext);
+    assert_eq!(listing(dir.path()), ["decrypt.db"]);
+    assert_no_file_contains(dir.path(), PLAINTEXT_MARKER);
+}
+
+#[test]
+fn decrypt_existing_leaves_missing_empty_and_plain_files_alone() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    let dir = tempdir().unwrap();
+    decrypt_existing(&dir.path().join("missing.db")).unwrap();
+    let empty = dir.path().join("empty.db");
+    fs::write(&empty, b"").unwrap();
+    decrypt_existing(&empty).unwrap();
+    let plain = dir.path().join("plain.db");
+    fs::write(&plain, PLAINTEXT_MARKER).unwrap();
+    decrypt_existing(&plain).unwrap();
+    assert_eq!(fs::read(&empty).unwrap(), b"");
+    assert_eq!(fs::read(&plain).unwrap(), PLAINTEXT_MARKER);
+
+    // An unreadable path is an I/O error, not a silent success.
+    let directory = dir.path().join("a-directory");
+    fs::create_dir(&directory).unwrap();
+    let error = decrypt_existing(&directory).expect_err("directories cannot be decrypted");
+    assert!(matches!(error, EncryptedStoreError::Io(_)), "{error:?}");
+    let error = encrypt_existing(&directory).expect_err("directories cannot be encrypted");
+    assert!(matches!(error, EncryptedStoreError::Io(_)), "{error:?}");
+}
+
+#[cfg(unix)]
+#[test]
+fn decrypt_existing_write_failure_keeps_ciphertext_and_writes_no_plaintext() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    if !read_only_dirs_are_enforced() {
+        return;
+    }
+    set_master_key(KEY);
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("decrypt-ro.db");
+    let ciphertext = encrypt_v3(PLAINTEXT_MARKER, &KEY).unwrap();
+    fs::write(&path, &ciphertext).unwrap();
+
+    let restore = make_read_only(dir.path());
+    let error = decrypt_existing(&path).expect_err("read-only parent must fail the rewrite");
+    drop(restore);
+    clear_master_key();
+
+    assert!(matches!(
+        error,
+        EncryptedStoreError::ConversionFailed {
+            recovery_path: None,
+            ..
+        }
+    ));
+    assert_eq!(fs::read(&path).unwrap(), ciphertext);
+    assert_eq!(listing(dir.path()), ["decrypt-ro.db"]);
+    assert_no_file_contains(dir.path(), PLAINTEXT_MARKER);
+}
+
+#[test]
+fn encrypt_existing_fails_closed_without_a_key_and_round_trips_with_one() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("encrypt.db");
+    fs::write(&path, PLAINTEXT_MARKER).unwrap();
+
+    clear_master_key();
+    let error = encrypt_existing(&path).expect_err("missing key must not encrypt");
+    assert!(matches!(error, EncryptedStoreError::MasterKeyUnavailable));
+    assert_eq!(fs::read(&path).unwrap(), PLAINTEXT_MARKER);
+    assert_eq!(listing(dir.path()), ["encrypt.db"]);
+
+    set_master_key(KEY);
+    encrypt_existing(&path).unwrap();
+    let ciphertext = fs::read(&path).unwrap();
+    assert_eq!(decrypt_v3(&ciphertext, &KEY).unwrap(), PLAINTEXT_MARKER);
+    // Already-encrypted, empty and missing files are no-ops.
+    encrypt_existing(&path).unwrap();
+    assert_eq!(fs::read(&path).unwrap(), ciphertext);
+    encrypt_existing(&dir.path().join("missing.db")).unwrap();
+    assert_eq!(listing(dir.path()), ["encrypt.db"]);
+    clear_master_key();
+}
+
+#[cfg(unix)]
+#[test]
+fn encrypt_existing_write_failure_keeps_original_and_leaves_no_copy() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    if !read_only_dirs_are_enforced() {
+        return;
+    }
+    set_master_key(KEY);
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("encrypt-ro.db");
+    fs::write(&path, PLAINTEXT_MARKER).unwrap();
+
+    let restore = make_read_only(dir.path());
+    let error = encrypt_existing(&path).expect_err("read-only parent must fail the rewrite");
+    drop(restore);
+    clear_master_key();
+
+    assert!(matches!(
+        error,
+        EncryptedStoreError::ConversionFailed {
+            recovery_path: None,
+            ..
+        }
+    ));
+    assert_eq!(fs::read(&path).unwrap(), PLAINTEXT_MARKER);
+    assert_eq!(listing(dir.path()), ["encrypt-ro.db"]);
+}
+
+#[cfg(unix)]
+#[test]
+fn close_write_failure_keeps_canonical_ciphertext_and_retry_leaves_no_plaintext() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    if !read_only_dirs_are_enforced() {
+        return;
+    }
+    set_master_key(KEY);
+    let dir = tempdir().unwrap();
+    let canonical_dir = dir.path().join("canonical");
+    fs::create_dir(&canonical_dir).unwrap();
+    let canonical = canonical_dir.join("close-failure.db");
+    let tmp_dir = dir.path().join("tmp");
+    let store = open_encrypted(&canonical, &tmp_dir).expect("open encrypted store");
+    store
+        .connection()
+        .execute(
+            "INSERT INTO campaigns (id, kind, notes) VALUES ('failed-close', 'initial', 'survives')",
+            [],
+        )
+        .unwrap();
+    let before = fs::read(&canonical).unwrap();
+
+    let restore = make_read_only(&canonical_dir);
+    let error = store.close().expect_err("re-encryption must fail");
+    let EncryptedStoreError::ConversionFailed {
+        ref message,
+        ref recovery_path,
+    } = error
+    else {
+        panic!("unexpected variant: {error:?}");
+    };
+    assert!(message.starts_with("write replacement failed"), "{message}");
+    assert_eq!(*recovery_path, None);
+
+    // The canonical file is still the previous ciphertext and nothing but the
+    // lock sits next to it: no plaintext, no transition temp.
+    assert_eq!(fs::read(&canonical).unwrap(), before);
+    assert!(decrypt_v3(&before, &KEY).is_ok());
+    let lock_name = lock_path_for(&canonical)
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+    assert_eq!(
+        listing(&canonical_dir),
+        ["close-failure.db", lock_name.as_str()]
+    );
+    assert_no_file_contains(&canonical_dir, b"SQLite format 3\0");
+    // Plaintext stays only in the private temp area until the retry.
+    let temps = listing(&tmp_dir);
+    assert!(
+        temps
+            .iter()
+            .any(|name| name.starts_with("symeraseme_decrypted_")),
+        "{temps:?}"
+    );
+    for name in &temps {
+        let mode = fs::metadata(tmp_dir.join(name))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode & 0o077, 0, "{name} must not be group/world accessible");
+    }
+
+    drop(restore);
+    finalise_all().expect("retry after restoring write access");
+    assert_eq!(listing(&tmp_dir), Vec::<String>::new());
+    assert_no_file_contains(&tmp_dir, b"SQLite format 3\0");
+    let reopened = open_encrypted(&canonical, dir.path().join("reopen-tmp")).unwrap();
+    let notes: String = reopened
+        .connection()
+        .query_row(
+            "SELECT notes FROM campaigns WHERE id = 'failed-close'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(notes, "survives");
+    reopened.close().unwrap();
+    clear_master_key();
+}
+
+#[cfg(unix)]
+#[test]
+fn open_encrypted_publish_failure_removes_the_plaintext_initializer() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    if !read_only_dirs_are_enforced() {
+        return;
+    }
+    set_master_key(KEY);
+    let dir = tempdir().unwrap();
+    let canonical_dir = dir.path().join("canonical");
+    fs::create_dir(&canonical_dir).unwrap();
+    let canonical = canonical_dir.join("publish-failure.db");
+    let tmp_dir = dir.path().join("tmp");
+    // Pre-create the lock file: opening an existing file needs no directory
+    // write access, so only publishing the new ciphertext can fail.
+    File::create(lock_path_for(&canonical)).unwrap();
+
+    let restore = make_read_only(&canonical_dir);
+    let error = open_encrypted(&canonical, &tmp_dir).expect_err("publish must fail");
+    drop(restore);
+    clear_master_key();
+
+    assert!(
+        matches!(
+            error,
+            EncryptedStoreError::ConversionFailed {
+                recovery_path: None,
+                ..
+            }
+        ),
+        "{error:?}"
+    );
+    assert!(!canonical.exists());
+    assert_eq!(listing(&tmp_dir), Vec::<String>::new());
+    assert_no_file_contains(dir.path(), b"SQLite format 3\0");
+}
+
+#[test]
+fn open_encrypted_with_wrong_key_creates_no_plaintext_temp() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    let dir = tempdir().unwrap();
+    let canonical = dir.path().join("wrong-key.db");
+    let tmp_dir = dir.path().join("tmp");
+    let ciphertext = encrypt_v3(PLAINTEXT_MARKER, &KEY).unwrap();
+    fs::write(&canonical, &ciphertext).unwrap();
+
+    set_master_key([0x43; 32]);
+    let error = open_encrypted(&canonical, &tmp_dir).expect_err("wrong key must not open");
+    clear_master_key();
+
+    assert!(
+        matches!(error, EncryptedStoreError::Encryption(_)),
+        "{error:?}"
+    );
+    assert_eq!(fs::read(&canonical).unwrap(), ciphertext);
+    assert_eq!(listing(&tmp_dir), Vec::<String>::new());
+    assert_no_file_contains(dir.path(), PLAINTEXT_MARKER);
+}
+
+#[test]
+fn error_display_source_and_from_conversions_cover_every_variant() {
+    use std::error::Error;
+    let io = || std::io::Error::other("disk");
+    let lock = LockError::Acquire {
+        path: PathBuf::from("/db.lock"),
+        source: io(),
+    };
+    assert!(lock.to_string().contains("cannot acquire DB lock /db.lock"));
+    let release = LockError::Release {
+        path: PathBuf::from("/db.lock"),
+        source: io(),
+    };
+    assert!(
+        release
+            .to_string()
+            .contains("lock release failed for /db.lock")
+    );
+
+    let cases: Vec<(EncryptedStoreError, &str, bool)> = vec![
+        (lock.into(), "cannot acquire DB lock", true),
+        (io().into(), "eventstore I/O error: disk", true),
+        (
+            rusqlite::Error::QueryReturnedNoRows.into(),
+            "eventstore SQLite error",
+            true,
+        ),
+        (
+            EncryptionError::AuthenticationFailed.into(),
+            "eventstore encryption error",
+            true,
+        ),
+        (
+            CheckpointError::Query(rusqlite::Error::QueryReturnedNoRows).into(),
+            "eventstore: WAL checkpoint:",
+            true,
+        ),
+        (
+            EncryptedStoreError::MasterKeyUnavailable,
+            "identity master key unavailable",
+            false,
+        ),
+        (
+            EncryptedStoreError::InvalidPath("bad".into()),
+            "eventstore: invalid path: bad",
+            false,
+        ),
+        (
+            EncryptedStoreError::DirectorySyncFailed {
+                path: PathBuf::from("/enc.db"),
+                recovery_path: None,
+                source: io(),
+            },
+            "eventstore: directory sync failed for /enc.db: disk",
+            true,
+        ),
+        (
+            EncryptedStoreError::ConversionFailed {
+                message: "boom".into(),
+                recovery_path: None,
+            },
+            "eventstore: conversion failed: boom",
+            false,
+        ),
+    ];
+    for (error, expected, has_source) in cases {
+        assert!(
+            error.to_string().contains(expected),
+            "{error} !~ {expected}"
+        );
+        assert_eq!(error.source().is_some(), has_source, "{error:?}");
+    }
+
+    let busy = CheckpointError::Busy {
+        busy: 1,
+        log_frames: 2,
+        checkpointed: 3,
+    };
+    assert_eq!(
+        busy.to_string(),
+        "eventstore: WAL checkpoint busy (busy=1 log_frames=2 checkpointed=3)"
+    );
+    assert!(busy.source().is_none());
+    let query = CheckpointError::Query(rusqlite::Error::QueryReturnedNoRows);
+    assert!(query.source().is_some());
+}
+
+#[test]
+fn scavenge_removes_only_unregistered_stale_transition_files() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    let dir = tempdir().unwrap();
+    let tmp_dir = dir.path().join("tmp");
+    fs::create_dir_all(&tmp_dir).unwrap();
+    let old = SystemTime::now() - Duration::from_secs(301);
+    let age = |path: &Path| {
+        File::open(path)
+            .unwrap()
+            .set_times(FileTimes::new().set_modified(old))
+            .unwrap();
+    };
+
+    let stale = [
+        ".symeraseme_write_old.tmp",
+        ".symeraseme_recovery_old.tmp",
+        ".symeraseme_previous_old.tmp",
+        "symeraseme_decrypted_old.db",
+        "symeraseme_init_old.db",
+    ];
+    for name in stale {
+        fs::write(tmp_dir.join(name), b"stale").unwrap();
+        age(&tmp_dir.join(name));
+    }
+    // Sidecars of a stale main file go with it.
+    for suffix in ["-wal", "-shm"] {
+        fs::write(
+            tmp_dir.join(format!("symeraseme_init_old.db{suffix}")),
+            b"x",
+        )
+        .unwrap();
+    }
+
+    // Survivors: recent transition files, unrelated names, directories that
+    // merely look like transition files, and orphan locks.
+    let keep_recent = tmp_dir.join(".symeraseme_write_recent.tmp");
+    let keep_unrelated = tmp_dir.join("unrelated.db");
+    let keep_dir = tmp_dir.join(".symeraseme_recovery_dir.tmp");
+    let keep_lock = tmp_dir.join("symeraseme_init_orphan.db.lock");
+    fs::write(&keep_recent, b"recent").unwrap();
+    fs::write(&keep_unrelated, b"unrelated").unwrap();
+    make_non_empty_dir(&keep_dir);
+    fs::write(&keep_lock, b"lock").unwrap();
+    for path in [&keep_unrelated, &keep_dir, &keep_lock] {
+        age(path);
+    }
+
+    scavenge_stale_temps(&tmp_dir).unwrap();
+
+    let mut expected = vec![
+        keep_recent
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned(),
+        keep_unrelated
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned(),
+        keep_dir.file_name().unwrap().to_string_lossy().into_owned(),
+        keep_lock
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned(),
+    ];
+    expected.sort();
+    assert_eq!(listing(&tmp_dir), expected);
+}
+
+#[test]
+fn scavenge_reports_unreadable_directory_but_ignores_a_missing_one() {
+    let _guard = TEST_LOCK.lock().unwrap();
+    let dir = tempdir().unwrap();
+    scavenge_stale_temps(dir.path().join("missing")).unwrap();
+    let file = dir.path().join("not-a-dir");
+    fs::write(&file, b"x").unwrap();
+    assert!(scavenge_stale_temps(&file).is_err());
 }

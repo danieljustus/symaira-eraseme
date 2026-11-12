@@ -77,7 +77,7 @@ mod tests {
         EncryptedStoreError, cleanup_recovery_paths, remember_recovery_path, scavenge_stale_temps,
     };
     use std::fs::{File, FileTimes};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::time::{Duration, SystemTime};
     use tempfile::tempdir;
 
@@ -217,6 +217,438 @@ mod tests {
         assert!(temp.exists());
         super::unregister_temp(&encrypted);
         std::fs::remove_file(temp).unwrap();
+    }
+
+    // ---- atomic_transition_with_recovery failure branches -------------------
+    //
+    // The temp-name id and the parent-directory sync are injected through
+    // `atomic_transition_with`, so every branch below runs against a real
+    // temporary directory with a deterministic name and no mocked filesystem.
+
+    const FIXED_ID: u64 = 0x1234_5678_9abc_def0;
+
+    fn write_name() -> String {
+        format!(".symeraseme_write_{FIXED_ID:016x}.tmp")
+    }
+
+    fn recovery_name() -> String {
+        format!(".symeraseme_recovery_{FIXED_ID:016x}.tmp")
+    }
+
+    fn listing(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
+    fn make_non_empty_dir(path: &Path) {
+        std::fs::create_dir(path).unwrap();
+        std::fs::write(path.join("child"), b"keep").unwrap();
+    }
+
+    /// Restores owner write access so `tempdir` can always clean up.
+    #[cfg(unix)]
+    struct RestoreMode(PathBuf);
+
+    #[cfg(unix)]
+    impl Drop for RestoreMode {
+        fn drop(&mut self) {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&self.0, std::fs::Permissions::from_mode(0o700));
+        }
+    }
+
+    /// Reports whether a 0500 directory really refuses new files. Root (and
+    /// some container filesystems) ignore the mode, so the test skips there.
+    #[cfg(unix)]
+    fn read_only_dirs_are_enforced() -> bool {
+        use std::os::unix::fs::PermissionsExt;
+        let probe = tempdir().unwrap();
+        let _restore = RestoreMode(probe.path().to_path_buf());
+        std::fs::set_permissions(probe.path(), std::fs::Permissions::from_mode(0o500)).unwrap();
+        let enforced = File::create(probe.path().join("probe")).is_err();
+        if !enforced {
+            eprintln!("skipping: read-only directories are not enforced (running as root?)");
+        }
+        enforced
+    }
+
+    #[cfg(unix)]
+    fn mode_of(path: &Path) -> u32 {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o777
+    }
+
+    #[test]
+    fn atomic_transition_success_syncs_parent_and_leaves_only_target() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("enc.db");
+        std::fs::write(&target, b"old").unwrap();
+        let mut synced = None;
+        super::atomic_transition_with(&target, b"new-ciphertext", FIXED_ID, |parent| {
+            synced = Some(parent.to_path_buf());
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(synced.as_deref(), Some(dir.path()));
+        assert_eq!(std::fs::read(&target).unwrap(), b"new-ciphertext");
+        assert_eq!(listing(dir.path()), ["enc.db"]);
+    }
+
+    #[test]
+    fn directory_sync_failure_keeps_recovery_copy_of_new_ciphertext() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("enc.db");
+        let error = super::atomic_transition_with(&target, b"new-ciphertext", FIXED_ID, |_| {
+            Err(std::io::Error::other("injected sync failure"))
+        })
+        .expect_err("directory sync failure must be reported");
+
+        let expected = dir.path().join(recovery_name());
+        let EncryptedStoreError::DirectorySyncFailed {
+            ref path,
+            ref recovery_path,
+            ref source,
+        } = error
+        else {
+            panic!("unexpected variant: {error:?}");
+        };
+        assert_eq!(path, &target);
+        assert_eq!(recovery_path.as_ref(), Some(&expected));
+        assert_eq!(source.to_string(), "injected sync failure");
+        let rendered = error.to_string();
+        assert!(rendered.contains("recovery copy at"), "{rendered}");
+        assert!(rendered.contains(&expected.display().to_string()));
+        // The rename already happened, so the target holds the new
+        // ciphertext and the recovery copy mirrors it byte for byte.
+        assert_eq!(std::fs::read(&target).unwrap(), b"new-ciphertext");
+        assert_eq!(std::fs::read(&expected).unwrap(), b"new-ciphertext");
+        #[cfg(unix)]
+        assert_eq!(mode_of(&expected), 0o600);
+        assert_eq!(listing(dir.path()), [recovery_name().as_str(), "enc.db"]);
+        assert_eq!(super::recovery_path(&error), Some(expected));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn directory_sync_failure_with_unwritable_recovery_reports_no_recovery_path() {
+        use std::os::unix::fs::PermissionsExt;
+        if !read_only_dirs_are_enforced() {
+            return;
+        }
+        let dir = tempdir().unwrap();
+        let parent = dir.path().join("store");
+        std::fs::create_dir(&parent).unwrap();
+        let _restore = RestoreMode(parent.clone());
+        let target = parent.join("enc.db");
+
+        // The sync hook revokes write access after the rename succeeded, so
+        // only the recovery copy cannot be created.
+        let error = super::atomic_transition_with(&target, b"new-ciphertext", FIXED_ID, |dir| {
+            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+            Err(std::io::Error::other("injected sync failure"))
+        })
+        .expect_err("directory sync failure must be reported");
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+        let EncryptedStoreError::DirectorySyncFailed {
+            path,
+            recovery_path,
+            source,
+        } = error
+        else {
+            panic!("unexpected variant");
+        };
+        assert_eq!(path, target);
+        assert_eq!(recovery_path, None, "no recovery file exists to point at");
+        let message = source.to_string();
+        assert!(message.contains("injected sync failure"), "{message}");
+        assert!(message.contains("recovery write failed"), "{message}");
+        assert!(message.contains("recovery removed"), "{message}");
+        assert_eq!(std::fs::read(&target).unwrap(), b"new-ciphertext");
+        assert_eq!(listing(&parent), ["enc.db"]);
+    }
+
+    #[test]
+    fn directory_sync_failure_reports_recovery_path_when_cleanup_fails() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("enc.db");
+        // A non-empty directory squats on the recovery name: the recovery
+        // file cannot be created and the squatter cannot be removed.
+        let squatter = dir.path().join(recovery_name());
+        make_non_empty_dir(&squatter);
+
+        let error = super::atomic_transition_with(&target, b"new-ciphertext", FIXED_ID, |_| {
+            Err(std::io::Error::other("injected sync failure"))
+        })
+        .expect_err("directory sync failure must be reported");
+
+        let EncryptedStoreError::DirectorySyncFailed {
+            path,
+            recovery_path,
+            source,
+        } = error
+        else {
+            panic!("unexpected variant");
+        };
+        assert_eq!(path, target);
+        assert_eq!(recovery_path, Some(squatter.clone()));
+        let message = source.to_string();
+        assert!(message.contains("recovery write failed"), "{message}");
+        assert!(message.contains("cleanup failed"), "{message}");
+        assert_eq!(std::fs::read(&target).unwrap(), b"new-ciphertext");
+        assert_eq!(std::fs::read(squatter.join("child")).unwrap(), b"keep");
+    }
+
+    #[test]
+    fn rename_failure_with_failed_recovery_rename_keeps_write_file() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("enc.db");
+        make_non_empty_dir(&target);
+        let squatter = dir.path().join(recovery_name());
+        make_non_empty_dir(&squatter);
+
+        let error = super::atomic_transition_with(&target, b"new-ciphertext", FIXED_ID, |_| {
+            panic!("directory sync must not run after a failed rename")
+        })
+        .expect_err("rename into a non-empty directory must fail");
+
+        let write_path = dir.path().join(write_name());
+        let EncryptedStoreError::ConversionFailed {
+            ref message,
+            ref recovery_path,
+        } = error
+        else {
+            panic!("unexpected variant: {error:?}");
+        };
+        assert!(message.contains("rename failed"), "{message}");
+        assert!(message.contains("recovery rename failed"), "{message}");
+        assert_eq!(recovery_path.as_ref(), Some(&write_path));
+        assert_eq!(std::fs::read(&write_path).unwrap(), b"new-ciphertext");
+        #[cfg(unix)]
+        assert_eq!(mode_of(&write_path), 0o600);
+        // Neither the real target nor the squatter was disturbed.
+        assert_eq!(std::fs::read(target.join("child")).unwrap(), b"keep");
+        assert_eq!(std::fs::read(squatter.join("child")).unwrap(), b"keep");
+
+        // An unregistered caller drops the recovery file once it has the error.
+        let error = super::cleanup_unregistered_recovery(error);
+        assert!(!write_path.exists());
+        assert!(matches!(
+            error,
+            EncryptedStoreError::ConversionFailed { .. }
+        ));
+    }
+
+    #[test]
+    fn write_failure_with_failed_cleanup_reports_write_path() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("enc.db");
+        // A non-empty directory squats on the write name: create_new fails
+        // and the cleanup `remove_file` cannot remove it either.
+        let squatter = dir.path().join(write_name());
+        make_non_empty_dir(&squatter);
+
+        let error = super::atomic_transition_with(&target, b"new-ciphertext", FIXED_ID, |_| {
+            panic!("directory sync must not run after a failed write")
+        })
+        .expect_err("write into an occupied temp name must fail");
+
+        let EncryptedStoreError::ConversionFailed {
+            message,
+            recovery_path,
+        } = error
+        else {
+            panic!("unexpected variant");
+        };
+        assert!(message.contains("write replacement failed"), "{message}");
+        assert!(message.contains("cleanup failed"), "{message}");
+        assert_eq!(recovery_path, Some(squatter.clone()));
+        assert!(!target.exists());
+        assert_eq!(std::fs::read(squatter.join("child")).unwrap(), b"keep");
+    }
+
+    // ---- recovery bookkeeping ------------------------------------------------
+
+    #[test]
+    fn recovery_path_is_only_present_on_recovery_bearing_variants() {
+        let path = PathBuf::from("/recovery/copy");
+        let sync = EncryptedStoreError::DirectorySyncFailed {
+            path: PathBuf::from("/target"),
+            recovery_path: Some(path.clone()),
+            source: std::io::Error::other("sync"),
+        };
+        let conversion = EncryptedStoreError::ConversionFailed {
+            message: "convert".into(),
+            recovery_path: Some(path.clone()),
+        };
+        assert_eq!(super::recovery_path(&sync), Some(path.clone()));
+        assert_eq!(super::recovery_path(&conversion), Some(path));
+        for none in [
+            EncryptedStoreError::DirectorySyncFailed {
+                path: PathBuf::from("/target"),
+                recovery_path: None,
+                source: std::io::Error::other("sync"),
+            },
+            EncryptedStoreError::ConversionFailed {
+                message: "convert".into(),
+                recovery_path: None,
+            },
+            EncryptedStoreError::MasterKeyUnavailable,
+            EncryptedStoreError::InvalidPath("x".into()),
+            EncryptedStoreError::Io(std::io::Error::other("io")),
+        ] {
+            assert_eq!(super::recovery_path(&none), None, "{none}");
+        }
+    }
+
+    #[test]
+    fn cleanup_unregistered_recovery_removes_only_the_recovery_file() {
+        let dir = tempdir().unwrap();
+        let recovery = dir.path().join(".symeraseme_recovery_one.tmp");
+        let bystander = dir.path().join("bystander.db");
+        std::fs::write(&recovery, b"ciphertext").unwrap();
+        std::fs::write(&bystander, b"keep").unwrap();
+
+        let error = super::cleanup_unregistered_recovery(EncryptedStoreError::ConversionFailed {
+            message: "boom".into(),
+            recovery_path: Some(recovery.clone()),
+        });
+        assert!(!recovery.exists());
+        assert!(bystander.exists());
+        // The error is handed back untouched, including the (now stale) path.
+        assert_eq!(super::recovery_path(&error), Some(recovery.clone()));
+
+        // A missing recovery file and an error without one are both fine.
+        super::cleanup_unregistered_recovery(error);
+        let error = super::cleanup_unregistered_recovery(EncryptedStoreError::MasterKeyUnavailable);
+        assert!(matches!(error, EncryptedStoreError::MasterKeyUnavailable));
+        assert!(bystander.exists());
+    }
+
+    #[test]
+    fn cleanup_recovery_paths_stops_at_first_removal_failure() {
+        let dir = tempdir().unwrap();
+        let stuck = dir.path().join(".symeraseme_recovery_stuck.tmp");
+        make_non_empty_dir(&stuck);
+        let after = dir.path().join(".symeraseme_recovery_after.tmp");
+        std::fs::write(&after, b"x").unwrap();
+
+        assert!(super::cleanup_recovery_paths(&[stuck, after.clone()]).is_err());
+        assert!(after.exists(), "cleanup must stop at the first failure");
+        super::cleanup_recovery_paths(&[after.clone(), after.clone()]).unwrap();
+        assert!(!after.exists());
+    }
+
+    #[test]
+    fn retain_failed_close_registers_lock_and_deduplicates_recovery_paths() {
+        let dir = tempdir().unwrap();
+        let encrypted = dir.path().join("retain.db");
+        let plain = dir.path().join("retain-plain.db");
+        let recovery = dir.path().join(".symeraseme_recovery_retain.tmp");
+        let mut store = super::Store::open(&plain).unwrap();
+        store.db_lock = Some(super::DbLock::lock(&encrypted, 1).unwrap());
+        let error = EncryptedStoreError::ConversionFailed {
+            message: "boom".into(),
+            recovery_path: Some(recovery.clone()),
+        };
+
+        super::retain_failed_close(&encrypted, &mut store, &error);
+        assert!(store.db_lock.is_none(), "the lock moves into the registry");
+        {
+            let map = super::ENCRYPTED_TEMPS.lock().unwrap();
+            let registration = map.get(&encrypted).expect("registered");
+            assert_eq!(registration.tmp_path, plain);
+            assert!(!registration.active);
+            assert!(registration.lock.is_some());
+            assert_eq!(
+                registration.recovery_paths.as_slice(),
+                std::slice::from_ref(&recovery)
+            );
+        }
+
+        // Without a lock to retain there is nothing to do, and re-reporting
+        // the same recovery path never duplicates it.
+        super::retain_failed_close(&encrypted, &mut store, &error);
+        super::remember_recovery_path(&encrypted, &error);
+        assert_eq!(super::registered_recovery_paths(&encrypted), [recovery]);
+
+        // Unknown canonical paths yield no recovery paths and no registration.
+        let unknown = dir.path().join("unknown.db");
+        super::remember_recovery_path(&unknown, &error);
+        assert!(super::registered_recovery_paths(&unknown).is_empty());
+
+        super::ENCRYPTED_TEMPS.lock().unwrap().remove(&encrypted);
+    }
+
+    // ---- scavenging with registered recovery files ---------------------------
+
+    fn age(path: &Path) {
+        File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_times(FileTimes::new().set_modified(SystemTime::now() - Duration::from_secs(301)))
+            .unwrap();
+    }
+
+    #[test]
+    fn scavenge_keeps_registered_recovery_file_but_removes_unregistered_stale_temps() {
+        let dir = tempdir().unwrap();
+        let encrypted = dir.path().join("scavenge-recovery.db");
+        let registered = dir.path().join(".symeraseme_recovery_registered.tmp");
+        let stray_recovery = dir.path().join(".symeraseme_recovery_stray.tmp");
+        let stray_write = dir.path().join(".symeraseme_write_stray.tmp");
+        let stray_previous = dir.path().join(".symeraseme_previous_stray.tmp");
+        for path in [&registered, &stray_recovery, &stray_write, &stray_previous] {
+            std::fs::write(path, b"ciphertext").unwrap();
+            age(path);
+        }
+
+        super::ENCRYPTED_TEMPS.lock().unwrap().insert(
+            encrypted.clone(),
+            super::RegisteredTemp {
+                tmp_path: dir.path().join("scavenge-recovery-plain.db"),
+                active: false,
+                lock: None,
+                temp_lock: None,
+                recovery_paths: vec![registered.clone()],
+            },
+        );
+        let result = scavenge_stale_temps(dir.path());
+        super::ENCRYPTED_TEMPS.lock().unwrap().remove(&encrypted);
+        result.unwrap();
+
+        assert!(registered.exists(), "registered recovery copy must survive");
+        assert!(!stray_recovery.exists());
+        assert!(!stray_write.exists());
+        assert!(!stray_previous.exists());
+    }
+
+    #[test]
+    fn cleanup_helpers_report_the_first_failure() {
+        let dir = tempdir().unwrap();
+        let stuck = dir.path().join("symeraseme_init_stuck.db");
+        make_non_empty_dir(&stuck);
+
+        let error = super::cleanup_initializer(&stuck).expect_err("directory cannot be unlinked");
+        assert!(
+            error.to_string().contains("symeraseme_init_stuck.db"),
+            "{error}"
+        );
+        assert!(super::cleanup_plain_temp(&stuck).is_err());
+        assert!(stuck.join("child").exists());
+
+        let plain = dir.path().join("symeraseme_decrypted_plain.db");
+        std::fs::write(&plain, b"plaintext").unwrap();
+        std::fs::write(format!("{}-wal", plain.display()), b"wal").unwrap();
+        super::cleanup_plain_temp(&plain).unwrap();
+        assert!(!plain.exists());
+        assert!(!PathBuf::from(format!("{}-wal", plain.display())).exists());
+        super::cleanup_initializer(&plain).unwrap();
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -783,6 +1215,20 @@ pub fn atomic_transition_with_recovery(
     target: &Path,
     ciphertext: &[u8],
 ) -> Result<(), EncryptedStoreError> {
+    atomic_transition_with(target, ciphertext, rand::rng().next_u64(), |dir| {
+        sync_dir(dir)
+    })
+}
+
+/// Implementation of [`atomic_transition_with_recovery`] with the temp-name id
+/// and the parent-directory sync injected so failure paths can be forced
+/// deterministically in tests.
+fn atomic_transition_with(
+    target: &Path,
+    ciphertext: &[u8],
+    id: u64,
+    sync_parent: impl FnOnce(&Path) -> io::Result<()>,
+) -> Result<(), EncryptedStoreError> {
     // Reject invalid paths before creating parents or temporary ciphertext.
     validate_replacement_path(target)?;
     let parent = target
@@ -791,7 +1237,6 @@ pub fn atomic_transition_with_recovery(
         .unwrap_or_else(|| Path::new("."));
     ensure_parent_dir(parent)?;
 
-    let id = rand::rng().next_u64();
     let write_name = format!(".symeraseme_write_{id:016x}.tmp");
     let write_path = parent.join(write_name);
 
@@ -842,7 +1287,7 @@ pub fn atomic_transition_with_recovery(
     }
 
     // Target is now replaced with ciphertext. Directory sync must succeed.
-    if let Err(err) = sync_dir(parent) {
+    if let Err(err) = sync_parent(parent) {
         // Directory sync failure: leave recovery copy of the new ciphertext
         let rec_name = format!(".symeraseme_recovery_{id:016x}.tmp");
         let rec_path = parent.join(rec_name);
