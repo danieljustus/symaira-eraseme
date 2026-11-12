@@ -6,6 +6,12 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- macOS app: the Requests page loads again; it decodes the server's
+  `requests` list (and an empty page's `null`) instead of failing with a
+  decoding error (#1310).
+- macOS app: the Calendar page loads again and shows open requests grouped by
+  ISO week with their next action or deadline, matching the server's
+  `get_calendar` result (#1311).
 - `list_requests` (MCP) and `requests list` now count `total` with the
   `broker_id` filter, so a broker-filtered page reports its own total and
   paging stops at the last filled page (#1315).

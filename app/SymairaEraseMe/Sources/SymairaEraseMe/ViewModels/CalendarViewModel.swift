@@ -22,7 +22,4 @@ final class CalendarViewModel: ObservableObject {
             state = .failed(error.localizedDescription)
         }
     }
-
-    var tickActions: [TickAction] { calendarData?.tickActions ?? [] }
-    var deadlines: UpcomingDeadlines? { calendarData?.upcomingDeadlines }
 }

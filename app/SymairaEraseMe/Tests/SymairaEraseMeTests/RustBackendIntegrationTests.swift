@@ -96,6 +96,13 @@ final class RustBackendIntegrationTests: XCTestCase {
         XCTAssertEqual(call["count"] as? Int, 1273)
         let brokerList: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers")
         XCTAssertEqual(brokerList.count, brokerList.brokers.count)
+        // The page models decode the live server's answers (#1310, #1311).
+        let requests: RequestListResponse = try await MCPClient.shared.callTool("list_requests")
+        XCTAssertEqual(requests.total, 0)
+        XCTAssertTrue(requests.items.isEmpty)
+        let calendar: CalendarData = try await MCPClient.shared.callTool("get_calendar", arguments: ["weeks": 8])
+        XCTAssertEqual(calendar.horizonWeeks, 8)
+        XCTAssertTrue(calendar.weeks.isEmpty)
 
         guard let pid = manager.pid else {
             XCTFail("The app did not retain the launched backend PID")

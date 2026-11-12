@@ -45,7 +45,8 @@ struct RemovalRequest: Codable, Identifiable {
     var statusDisplay: String { currentStatus ?? "UNKNOWN" }
 }
 
-/// Paginated response from `list_requests`.
+/// Paginated response from `list_requests`: `{"page","page_size","requests","total"}`.
+/// The server answers an empty page with `"requests": null`.
 struct RequestListResponse: Codable {
     let page: Int
     let pageSize: Int
@@ -55,6 +56,15 @@ struct RequestListResponse: Codable {
     enum CodingKeys: String, CodingKey {
         case page
         case pageSize = "page_size"
-        case total, items
+        case total
+        case items = "requests"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        page = try container.decode(Int.self, forKey: .page)
+        pageSize = try container.decode(Int.self, forKey: .pageSize)
+        total = try container.decode(Int.self, forKey: .total)
+        items = try container.decodeIfPresent([RemovalRequest].self, forKey: .items) ?? []
     }
 }

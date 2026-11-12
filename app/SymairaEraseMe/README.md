@@ -60,7 +60,7 @@ Sources/SymairaEraseMe/
 │   ├── Request.swift        RemovalRequest, RequestListResponse
 │   ├── Event.swift          RequestEvent, EventListResponse
 │   ├── Broker.swift         Broker, BrokerOptOut, BrokerListResponse
-│   ├── Calendar.swift       CalendarData, TickAction
+│   ├── Calendar.swift       CalendarData, CalendarWeek, CalendarEntry
 │   ├── ManualTask.swift     ManualTask
 │   └── Profile.swift        IdentityProfile, ExecuteResponse
 ├── Services/
@@ -81,7 +81,7 @@ Sources/SymairaEraseMe/
 │   ├── CampaignsView.swift         List, create sheet, execute confirmation
 │   ├── RequestsView.swift          Paginated list, filters, event detail panel
 │   ├── BrokersView.swift           Filterable grid, detail sheet
-│   ├── CalendarView.swift          Deadlines summary, tick actions table
+│   ├── CalendarView.swift          Calendar by ISO week
 │   ├── ManualTasksView.swift       Task list, complete sheet
 │   └── SettingsView.swift          Server start/stop, config, HTML fallback
 └── Theme/
