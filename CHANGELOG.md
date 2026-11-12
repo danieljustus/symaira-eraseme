@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- The MCP servers decode the embedded broker registry once per process
+  instead of on every call; `list_brokers`, `plan_create` and `run_web_form`
+  answer a long-running server in under 1 ms instead of about 33 ms (#1321).
+
 ### Fixed
 
 - The MCP servers (`mcp` over HTTP, which the macOS app runs, and `mcp

@@ -25,7 +25,20 @@ struct Schema {
 }
 
 /// Loads the committed registry embedded into the binary at build time.
+///
+/// The embedded documents cannot change while the process runs, so they are
+/// decoded and validated once and reused; long-running MCP servers otherwise
+/// paid the full parse on every call (#1321). A failed decode is not cached.
 pub fn load_embedded() -> Result<Vec<Broker>, RegistryError> {
+    static DECODED: std::sync::OnceLock<Vec<Broker>> = std::sync::OnceLock::new();
+    if let Some(brokers) = DECODED.get() {
+        return Ok(brokers.clone());
+    }
+    let brokers = decode_embedded()?;
+    Ok(DECODED.get_or_init(|| brokers).clone())
+}
+
+fn decode_embedded() -> Result<Vec<Broker>, RegistryError> {
     let manifest = embedded("manifest.json")?;
     let schema = embedded(BROKER_SCHEMA_PATH)?;
     validate_metadata(manifest, schema)?;
@@ -126,4 +139,17 @@ fn validate_metadata(manifest_bytes: &[u8], schema_bytes: &[u8]) -> Result<(), R
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{decode_embedded, load_embedded};
+
+    /// The cached registry is the freshly decoded one, call after call (#1321).
+    #[test]
+    fn cached_registry_matches_a_fresh_decode() {
+        let fresh = decode_embedded().expect("embedded registry decodes");
+        assert_eq!(load_embedded().expect("first load"), fresh);
+        assert_eq!(load_embedded().expect("cached load"), fresh);
+    }
 }
