@@ -120,6 +120,7 @@ struct ManualTasksView: View {
                     .labelsHidden()
                     .lineLimit(3...6)
                     .textFieldStyle(.symaira)
+                    .accessibilityLabel("Completion Notes")
             }
         }
         .frame(width: 520, height: 500)

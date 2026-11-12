@@ -115,6 +115,26 @@ final class RustBackendIntegrationTests: XCTestCase {
         XCTAssertEqual(campaigns.newCampaignJurisdiction, "")
         XCTAssertEqual(campaigns.newCampaignMaxBrokers, 30)
 
+        // Filters that match no broker create no campaign and report no success (#1318).
+        let zeroMatch = CampaignsViewModel()
+        zeroMatch.newCampaignId = "app-zero-match"
+        zeroMatch.newCampaignJurisdiction = "DE"
+        zeroMatch.newCampaignLaw = "CCPA"
+        _ = await zeroMatch.createCampaign()
+        XCTAssertNil(zeroMatch.planResult, "a zero-match create must not report success")
+        let dashboard: DashboardData = try await MCPClient.shared.callTool("get_dashboard_data")
+        XCTAssertFalse(dashboard.campaigns.contains { $0.id == "app-zero-match" })
+
+        // Every jurisdiction the filter menus offer selects at least one broker (#1313).
+        let facets = RegistryFacets(brokerList.brokers)
+        XCTAssertTrue(facets.categories.contains("other"))
+        XCTAssertFalse(facets.jurisdictions.isEmpty)
+        for jurisdiction in facets.jurisdictions {
+            let matches: BrokerListResponse = try await MCPClient.shared.callTool(
+                "list_brokers", arguments: ["jurisdiction": jurisdiction])
+            XCTAssertGreaterThan(matches.count, 0, "jurisdiction \(jurisdiction) selects no broker")
+        }
+
         guard let pid = manager.pid else {
             XCTFail("The app did not retain the launched backend PID")
             return

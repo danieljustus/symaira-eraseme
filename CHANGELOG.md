@@ -29,6 +29,21 @@ All notable changes to this project are documented in this file.
 - `list_requests` (MCP) and `requests list` now count `total` with the
   `broker_id` filter, so a broker-filtered page reports its own total and
   paging stops at the last filled page (#1315).
+- macOS app: the Brokers filters offer the jurisdictions, categories and
+  priorities the registry actually uses. The Jurisdiction menu listed law
+  names (GDPR, CCPA, LGPD, PIPEDA), so every choice showed no brokers, and
+  the "other" category was missing. The subtitle keeps the registry total and
+  shows the filtered share as "119 of 1273 brokers" (#1313).
+- macOS app: New Campaign picks jurisdiction, law and priority from registry
+  values instead of free text, shows how many brokers match, and refuses a
+  combination that matches none instead of creating an empty campaign and
+  reporting success (#1318).
+- macOS app: form fields in New Campaign, Complete Task and Settings and the
+  Max Brokers stepper expose their visible label to VoiceOver; they announced
+  only the placeholder or the value (#1317).
+- macOS app: the zero-match warning, the Settings connection error and the
+  overdue tint in the Calendar show their color; the caption style overrode
+  it with its muted gray (#1323).
 
 ## [v0.17.0] - 2026-11-12
 

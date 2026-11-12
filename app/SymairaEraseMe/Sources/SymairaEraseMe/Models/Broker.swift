@@ -63,3 +63,36 @@ struct BrokerListResponse: Codable {
     let brokers: [Broker]
     let count: Int
 }
+
+/// The filter values the registry actually uses. The server matches filters
+/// exactly, so menus built from these never offer a value that matches no
+/// broker (#1313, #1318).
+struct RegistryFacets: Equatable {
+    var jurisdictions: [String] = []
+    var laws: [String] = []
+    var categories: [String] = []
+    var priorities: [String] = []
+
+    init() {}
+
+    init(_ brokers: [Broker]) {
+        jurisdictions = Set(brokers.flatMap { $0.jurisdictions ?? [] }).sorted()
+        laws = Set(brokers.flatMap { $0.laws ?? [] }).sorted()
+        categories = Set(brokers.compactMap(\.category)).sorted()
+        let rank = ["high": 0, "medium": 1, "low": 2]
+        priorities = Set(brokers.compactMap(\.priority)).sorted {
+            (rank[$0] ?? rank.count, $0) < (rank[$1] ?? rank.count, $1)
+        }
+    }
+
+    /// Menu options: the unfiltered default first, then every registry value.
+    static func options(_ values: [String], all: String) -> [(value: String, label: String)] {
+        [("", all)] + values.map { ($0, displayName($0)) }
+    }
+
+    /// Codes stay as they are ("EU", "CCPA"); slugs read as words ("People Search").
+    static func displayName(_ value: String) -> String {
+        if value == value.uppercased() { return value }
+        return value.split(separator: "-").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    }
+}

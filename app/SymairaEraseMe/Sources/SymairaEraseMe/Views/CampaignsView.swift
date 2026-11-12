@@ -92,28 +92,44 @@ struct CampaignsView: View {
             primaryTitle: "Create Campaign", primaryDisabled: !vm.canCreateCampaign,
             primary: {
                 Task {
-                    await vm.createCampaign()
-                    showCreateSheet = false
+                    if await vm.createCampaign() { showCreateSheet = false }
                 }
             }
         ) {
             SymairaFormSection("Campaign Details") {
                 field("Campaign ID", "e.g. q4-gdpr", text: $vm.newCampaignId)
                 SymairaFormDivider()
-                field("Jurisdiction", "Optional", text: $vm.newCampaignJurisdiction)
+                // Menus offer only registry values; free text matched exactly and
+                // silently planned nothing for "eu" or "Germany" (#1318).
+                filterRow("Jurisdiction", selection: $vm.newCampaignJurisdiction, values: vm.facets.jurisdictions)
                 SymairaFormDivider()
-                field("Law", "Optional", text: $vm.newCampaignLaw)
+                filterRow("Law", selection: $vm.newCampaignLaw, values: vm.facets.laws)
                 SymairaFormDivider()
-                field("Priority", "Optional", text: $vm.newCampaignPriority)
+                filterRow("Priority", selection: $vm.newCampaignPriority, values: vm.facets.priorities)
                 SymairaFormDivider()
                 SymairaFormRow("Max Brokers") {
                     Stepper(
                         "\(vm.newCampaignMaxBrokers.plainDigits)", value: $vm.newCampaignMaxBrokers, in: 1...500)
                         .symairaText(.bodyEmphasized)
+                        .accessibilityLabel("Max Brokers")
+                        .accessibilityValue(vm.newCampaignMaxBrokers.plainDigits)
+                }
+                SymairaFormDivider()
+                SymairaFormRow("Matching Brokers") {
+                    Text(vm.matchCount.map(\.plainDigits) ?? "—")
+                        .symairaText(.bodyEmphasized)
+                }
+                if vm.matchCount == 0 {
+                    Text("No active broker matches these filters. Choose other filters to create a campaign.")
+                        .symairaText(.caption, respectsForeground: false)
+                        .foregroundStyle(BrandColors.rejected)
                 }
             }
         }
         .frame(width: 520, height: 500)
+        .task(id: "\(vm.newCampaignJurisdiction)|\(vm.newCampaignLaw)|\(vm.newCampaignPriority)") {
+            await vm.refreshMatches()
+        }
     }
 
     private func field(_ label: String, _ prompt: String, text: Binding<String>) -> some View {
@@ -121,6 +137,15 @@ struct CampaignsView: View {
             TextField(label, text: text, prompt: Text(prompt))
                 .labelsHidden()
                 .textFieldStyle(.symaira)
+                .frame(width: 260)
+                // labelsHidden() drops the field's name; VoiceOver read only the placeholder (#1317).
+                .accessibilityLabel(label)
+        }
+    }
+
+    private func filterRow(_ label: String, selection: Binding<String>, values: [String]) -> some View {
+        SymairaFormRow(label) {
+            SymairaFilterMenu(label, selection: selection, options: RegistryFacets.options(values, all: "Any"))
                 .frame(width: 260)
         }
     }

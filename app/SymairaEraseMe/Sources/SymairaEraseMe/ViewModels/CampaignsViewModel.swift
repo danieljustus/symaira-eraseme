@@ -15,14 +15,45 @@ final class CampaignsViewModel: ObservableObject {
     @Published var newCampaignPriority: String = ""
     @Published var newCampaignMaxBrokers: Int = 30
 
+    /// Values the filter menus offer, taken from the registry itself (#1318).
+    @Published var facets = RegistryFacets()
+    /// Active brokers the current filters select, counted by the server's own
+    /// filter; nil while unknown.
+    @Published var matchCount: Int?
+
     var campaigns: [DashboardCampaign] { state.value ?? [] }
     var isLoading: Bool { state.isLoading }
     var errorMessage: String? { state.errorMessage }
 
     /// Whether the Create Campaign button may be used: the campaign id must
     /// be non-empty after trimming whitespace (issue #642).
+    /// A filter combination that matches no broker cannot be created either:
+    /// the server would still record an empty campaign (#1318).
     var canCreateCampaign: Bool {
-        !newCampaignId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !newCampaignId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && matchCount != 0
+    }
+
+    private var filterArguments: [String: Any] {
+        var args: [String: Any] = [:]
+        if !newCampaignJurisdiction.isEmpty { args["jurisdiction"] = newCampaignJurisdiction }
+        if !newCampaignLaw.isEmpty { args["law"] = newCampaignLaw }
+        if !newCampaignPriority.isEmpty { args["priority"] = newCampaignPriority }
+        return args
+    }
+
+    /// Loads the menu values once, then counts the brokers the filters select.
+    func refreshMatches() async {
+        do {
+            if facets == RegistryFacets() {
+                let all: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers")
+                facets = RegistryFacets(all.brokers)
+            }
+            let matches: BrokerListResponse = try await MCPClient.shared.callTool(
+                "list_brokers", arguments: filterArguments)
+            matchCount = matches.count
+        } catch {
+            matchCount = nil
+        }
     }
 
     func refresh() async {
@@ -36,13 +67,16 @@ final class CampaignsViewModel: ObservableObject {
         }
     }
 
-    func createCampaign() async {
+    /// Returns false, without creating anything, when the filters match no
+    /// broker; the form then stays open with its warning.
+    @discardableResult
+    func createCampaign() async -> Bool {
+        await refreshMatches()
+        guard matchCount != 0 else { return false }
         state = .loading
 
-        var args: [String: Any] = ["campaign_id": newCampaignId]
-        if !newCampaignJurisdiction.isEmpty { args["jurisdiction"] = newCampaignJurisdiction }
-        if !newCampaignLaw.isEmpty { args["law"] = newCampaignLaw }
-        if !newCampaignPriority.isEmpty { args["priority"] = newCampaignPriority }
+        var args = filterArguments
+        args["campaign_id"] = newCampaignId
         if newCampaignMaxBrokers > 0 { args["max_brokers"] = newCampaignMaxBrokers }
 
         do {
@@ -55,6 +89,7 @@ final class CampaignsViewModel: ObservableObject {
         } catch {
             state = .failed(error.localizedDescription)
         }
+        return true
     }
 
     func executeCampaign(_ campaignId: String) async {
@@ -81,5 +116,6 @@ final class CampaignsViewModel: ObservableObject {
         newCampaignLaw = ""
         newCampaignPriority = ""
         newCampaignMaxBrokers = 30
+        matchCount = nil
     }
 }

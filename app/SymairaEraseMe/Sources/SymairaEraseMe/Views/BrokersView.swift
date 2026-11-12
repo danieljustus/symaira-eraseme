@@ -6,7 +6,7 @@ struct BrokersView: View {
     @StateObject private var vm = BrokersViewModel()
 
     var body: some View {
-        SymairaPage(title: "Brokers", subtitle: "\(vm.total.plainDigits) brokers in registry") {
+        SymairaPage(title: "Brokers", subtitle: vm.subtitle) {
             filterFields
             Spacer(minLength: 0)
             PageRefreshButton(title: "Brokers", refresh: vm.refresh)
@@ -36,18 +36,17 @@ struct BrokersView: View {
         HStack(spacing: SymairaSpacing.medium) {
             TextField("Search…", text: $vm.searchText)
                 .textFieldStyle(.symaira)
+            // Options come from the registry: a fixed list offered law names as
+            // jurisdictions and missed the "other" category (#1313).
             SymairaFilterMenu(
                 "Jurisdiction", selection: $vm.filterJurisdiction,
-                options: [("", "Jurisdiction"), ("GDPR", "GDPR"), ("CCPA", "CCPA"), ("LGPD", "LGPD"),
-                          ("PIPEDA", "PIPEDA")])
+                options: RegistryFacets.options(vm.facets.jurisdictions, all: "Jurisdiction"))
             SymairaFilterMenu(
                 "Category", selection: $vm.filterCategory,
-                options: [("", "Category"), ("people-search", "People Search"), ("marketing", "Marketing"),
-                          ("credit", "Credit"), ("analytics", "Analytics"),
-                          ("background-check", "Background Check"), ("social-media", "Social Media")])
+                options: RegistryFacets.options(vm.facets.categories, all: "Category"))
             SymairaFilterMenu(
                 "Priority", selection: $vm.filterPriority,
-                options: [("", "Priority"), ("high", "High"), ("medium", "Medium"), ("low", "Low")])
+                options: RegistryFacets.options(vm.facets.priorities, all: "Priority"))
         }
     }
 

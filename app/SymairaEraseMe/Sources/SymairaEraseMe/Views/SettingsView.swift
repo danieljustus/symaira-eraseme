@@ -109,6 +109,7 @@ struct SettingsView: View {
             SymairaFormRow("Host") {
                 TextField("Host", text: $serverManager.host)
                     .textFieldStyle(.symaira)
+                    .accessibilityLabel("Host")
                     .frame(minWidth: 180, idealWidth: 260, maxWidth: 360)
                     .onChange(of: serverManager.host) { _, _ in
                         MCPClient.configuredHost = serverManager.host
@@ -120,6 +121,7 @@ struct SettingsView: View {
             SymairaFormRow("Port") {
                 TextField("Port", value: $serverManager.port, format: .number.grouping(.never))
                     .textFieldStyle(.symaira)
+                    .accessibilityLabel("Port")
                     .frame(width: 120)
                     .onChange(of: serverManager.port) { _, _ in
                         MCPClient.configuredPort = serverManager.port
@@ -150,7 +152,7 @@ struct SettingsView: View {
 
             if let error = vm.lastCheckError {
                 Text(error)
-                    .symairaText(.caption)
+                    .symairaText(.caption, respectsForeground: false)
                     .foregroundStyle(BrandColors.rejected)
             }
         }
@@ -161,8 +163,10 @@ struct SettingsView: View {
     private var configurationSection: some View {
         SymairaFormSection("Configuration") {
             SymairaFormRow("Binary Path") {
+                // The placeholder is not the field's name; VoiceOver needs the row label (#1317).
                 TextField("Auto-detect", text: $serverManager.binaryPath)
                     .textFieldStyle(.symaira)
+                    .accessibilityLabel("Binary Path")
                     .frame(minWidth: 240, idealWidth: 360, maxWidth: 520)
             }
 
@@ -171,6 +175,7 @@ struct SettingsView: View {
             SymairaFormRow("Data Directory") {
                 TextField("Default (\(ServerManager.defaultDataDir))", text: $serverManager.dataDir)
                     .textFieldStyle(.symaira)
+                    .accessibilityLabel("Data Directory")
                     .frame(minWidth: 240, idealWidth: 360, maxWidth: 520)
             }
 
@@ -179,6 +184,7 @@ struct SettingsView: View {
             SymairaFormRow("API Key") {
                 SecureField("ANTHROPIC_API_KEY", text: $serverManager.anthropicKey)
                     .textFieldStyle(.symaira)
+                    .accessibilityLabel("API Key")
                     .frame(minWidth: 240, idealWidth: 360, maxWidth: 520)
             }
 

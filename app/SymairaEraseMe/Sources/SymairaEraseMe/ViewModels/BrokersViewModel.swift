@@ -4,7 +4,10 @@ import Foundation
 @MainActor
 final class BrokersViewModel: ObservableObject {
     @Published var state: ViewState<[Broker]> = .idle
-    @Published var total: Int = 0
+    /// Active brokers in the registry, independent of the filters; nil until loaded.
+    @Published var registryTotal: Int?
+    /// Values the filter menus offer, taken from the registry itself (#1313).
+    @Published var facets = RegistryFacets()
 
     /// Filters
     @Published var filterJurisdiction: String = ""
@@ -30,6 +33,14 @@ final class BrokersViewModel: ObservableObject {
         }
     }
 
+    /// The registry total stays visible; filters and search add the share they show.
+    var subtitle: String {
+        guard let total = registryTotal, state.value != nil else { return "Broker registry" }
+        let shown = filteredBrokers.count
+        if shown == total && searchText.isEmpty { return "\(total.plainDigits) brokers in registry" }
+        return "\(shown.plainDigits) of \(total.plainDigits) brokers"
+    }
+
     func refresh() async {
         state = .loading
 
@@ -40,9 +51,18 @@ final class BrokersViewModel: ObservableObject {
         if !filterCategory.isEmpty { args["category"] = filterCategory }
 
         do {
+            // The unfiltered list supplies the registry total and the menu values.
+            if args.isEmpty || registryTotal == nil {
+                let all: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers")
+                registryTotal = all.count
+                facets = RegistryFacets(all.brokers)
+                if args.isEmpty {
+                    state = .loaded(all.brokers)
+                    return
+                }
+            }
             let response: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers", arguments: args)
             state = .loaded(response.brokers)
-            total = response.count
         } catch {
             state = .failed(error.localizedDescription)
         }

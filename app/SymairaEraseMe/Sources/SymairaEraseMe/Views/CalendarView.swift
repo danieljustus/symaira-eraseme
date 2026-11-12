@@ -96,7 +96,8 @@ struct CalendarView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Self.markerDate(entry.markerAt))
                         Text("\(Self.markerLabel(for: entry.marker)) · \(entry.relativeDay)")
-                            .symairaText(.caption)
+                            // The role color would win over the overdue tint otherwise.
+                            .symairaText(.caption, respectsForeground: false)
                             .foregroundStyle(entry.overdue ? BrandColors.overdue : BrandColors.textMuted)
                     }
                 }
