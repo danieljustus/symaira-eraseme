@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-This project is in **alpha** stage (Development Status :: 3 - Alpha). Only the latest release
+This project is in **beta** stage (see the status in the README). Only the latest release
 receives security patches. No long-term support is provided for older versions.
 
 | Version | Supported |
