@@ -19,3 +19,13 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  # macOS app package (CoreKit Swift products, exact-pinned).
+  - package-ecosystem: "swift"
+    directory: "/app/SymairaEraseMe"
+    schedule:
+      interval: "weekly"
+    groups:
+      symaira-corekit:
+        patterns:
+          - "*symaira-corekit*"
