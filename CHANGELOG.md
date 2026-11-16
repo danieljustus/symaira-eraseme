@@ -14,6 +14,11 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- `scripts/record_standalone_evidence.py` records the Rust standalone release
+  evidence (`evidence/standalone.json` plus the locked release binary and its
+  build provenance) that CoreKit's consumer verifier requires in the tagged
+  release commit; the two-commit release sequence is in CONTRIBUTING.md
+  (#1325).
 - The MCP servers decode the embedded broker registry once per process
   instead of on every call; `list_brokers`, `plan_create` and `run_web_form`
   answer a long-running server in under 1 ms instead of about 33 ms (#1321).

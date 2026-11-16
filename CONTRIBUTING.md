@@ -143,6 +143,60 @@ The Homebrew publisher consumes exact published archives and checksums. Do not c
 a release tag from a feature branch; use the repository's release gate and
 verify the release assets and Homebrew Formula after publication.
 
+### Standalone evidence for CoreKit's consumer gate
+
+CoreKit's `port/consumer/verify.py` accepts this repository as a Go-retired
+consumer only if the tagged release commit itself contains Rust standalone
+evidence. `scripts/record_standalone_evidence.py` produces it
+reproducibly; do not hand-edit `evidence/standalone.json` or commit a binary
+built any other way. The release uses two commits, because a commit cannot
+contain its own hash and the evidence must be part of the tagged commit:
+
+1. **P — version-prep commit** (version bump, `Cargo.lock`, changelog), merged
+   to `main`. This is the *source commit*: the binary is built from it.
+2. **E — evidence commit** directly on top of P. It may change only
+   `evidence/standalone.json` and `evidence/artifact/symeraseme`; any other
+   change (including `Cargo.lock`) after P makes the verifier reject the
+   evidence. Tag E as `vX.Y.Z`; E is also CoreKit's `consumer_release.commit`
+   and `checkout_commit`.
+
+```bash
+# 1. From a clean checkout of P on main (HEAD == P, no untracked files).
+#    Needs cargo/rustc 1.98.0 and no RUSTFLAGS/RUSTC_WRAPPER in the environment.
+python3 scripts/record_standalone_evidence.py \
+  --tag vX.Y.Z --source-commit "$(git rev-parse HEAD)" \
+  --corekit-tag <rust.release.tag> --corekit-root /path/to/symaira-corekit
+
+# 2. Commit only the two evidence files as E (via a PR; a squash merge is fine
+#    if P is still main's tip, so that P..E contains nothing but the evidence).
+git add evidence/standalone.json evidence/artifact/symeraseme
+git commit -m "chore(evidence): standalone Rust evidence for vX.Y.Z"
+
+# 3. With E checked out, re-check it without building; then tag E.
+python3 scripts/record_standalone_evidence.py --verify \
+  --tag vX.Y.Z --source-commit <P> \
+  --corekit-tag <rust.release.tag> --corekit-root /path/to/symaira-corekit
+```
+
+`--corekit-tag`/`--corekit-commit` must equal `rust.release` of this
+repository's record in CoreKit's `docs/consumers.json`: the verifier compares
+the report's `tag`/`commit` with that CoreKit release, not with this
+repository's tag. The script builds
+`cargo build --locked --release -p symeraseme-cli --bin symeraseme-rust` for
+the host target in a separate target directory (default `build/rust-evidence`),
+copies the binary, runs `env -i PATH=/usr/bin:/bin HOME=<empty dir>
+./evidence/artifact/symeraseme version`, and records the build and run output
+with the cargo/rustc versions, host target and the `Cargo.lock` SHA-256. The
+host binary is verification evidence only; release archives still come from the
+three native builds in `rust-prerelease.yml`. `evidence/rollback.json` and the
+Go rollback artifact are not touched.
+
+After the release, update the consumer record in CoreKit
+(`consumer_release`, `checkout_commit` = E, `report_sha256` of the committed
+`evidence/standalone.json`, and the Rust pin) and run `port/consumer/verify.py
+--git-pinned-consumers`. CoreKit cannot add these files to an already tagged
+commit, so evidence for a release exists only if E was tagged.
+
 ### Local Rust archive dry-run
 
 With Python 3.11+ and already-built native Rust binaries for all three supported targets:
