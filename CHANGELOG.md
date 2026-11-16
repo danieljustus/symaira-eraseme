@@ -20,6 +20,11 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- macOS app: the `symeraseme mcp` server no longer outlives the app when it
+  ends by SIGTERM, a crash or a kill. The app launches the server with
+  `SYMERASEME_MCP_PARENT_PID`; when that process stops being the server's
+  parent, the server shuts down gracefully within about a second and frees its
+  port. Without the variable (plain CLI use) nothing changes (#1322).
 - The MCP servers (`mcp` over HTTP, which the macOS app runs, and `mcp
   --stdio`) record the time of each tool call. They used the server's start
   time for every event, completion, `as_of` and `generated_at` written while

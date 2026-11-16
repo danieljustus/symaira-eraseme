@@ -97,6 +97,12 @@ Sources/SymairaEraseMe/
 4. Each view fetches data from the appropriate MCP tool.
 5. The app parses `result.content[0].text` → JSON → Swift models.
 
+The server never outlives the app. A normal quit stops it directly; the app also
+launches it with `SYMERASEME_MCP_PARENT_PID=<app pid>`, so the server shuts down
+gracefully within about a second when the app ends any other way (SIGTERM,
+crash, kill) and frees the port. The variable is opt-in: a `symeraseme mcp`
+started from a shell without it keeps running until it is stopped.
+
 ## Liquid Topography GUI preview
 
 The native GUI adopts the same shared AppKit workspace as the Cockpit pilot:

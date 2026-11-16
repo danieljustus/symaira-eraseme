@@ -230,13 +230,11 @@ final class ServerManager: ObservableObject {
         // Set up environment. Expand `~` once so the backend and the
         // Swift client address the same token/database directory.
         let resolvedDataDir = dataDir.isEmpty ? nil : (dataDir as NSString).expandingTildeInPath
-        var env = [String: String]()
-        if let resolvedDataDir {
-            env["SYMERASEME_DATA_DIR"] = resolvedDataDir
-        }
-        if !anthropicKey.isEmpty {
-            env["ANTHROPIC_API_KEY"] = anthropicKey
-        }
+        let env = Self.serverEnvironment(
+            dataDir: resolvedDataDir,
+            anthropicKey: anthropicKey,
+            parentPID: ProcessInfo.processInfo.processIdentifier
+        )
 
         // Update MCPClient with configured host/port
         MCPClient.configuredHost = host
@@ -381,6 +379,24 @@ final class ServerManager: ObservableObject {
             else { return false }
         }
         return labels.last?.contains(where: \.isLetter) == true
+    }
+
+    /// Environment overrides for the launched server. `SYMERASEME_MCP_PARENT_PID`
+    /// names this app so the server shuts itself down when the app ends in any
+    /// way the willTerminate observer cannot cover (SIGTERM, crash, kill) —
+    /// otherwise the orphaned server keeps the port and its token valid (#1322).
+    nonisolated static func serverEnvironment(
+        dataDir: String?, anthropicKey: String, parentPID: Int32
+    ) -> [String: String] {
+        var env = [String: String]()
+        if let dataDir {
+            env["SYMERASEME_DATA_DIR"] = dataDir
+        }
+        if !anthropicKey.isEmpty {
+            env["ANTHROPIC_API_KEY"] = anthropicKey
+        }
+        env["SYMERASEME_MCP_PARENT_PID"] = String(parentPID)
+        return env
     }
 
     nonisolated static func isValidPort(_ port: Int) -> Bool {

@@ -86,8 +86,50 @@ pub(crate) fn serve(
         .map_err(|error| error.to_string())?;
     signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&stopping))
         .map_err(|error| error.to_string())?;
+    if let Some(parent) = expected_parent_pid(std::env::var(PARENT_PID_ENV).ok().as_deref()) {
+        spawn_parent_watch(
+            parent,
+            Arc::clone(&stopping),
+            PARENT_POLL_INTERVAL,
+            std::os::unix::process::parent_id,
+        );
+    }
 
     runtime.block_on(serve_async(address, token, handler, stopping))
+}
+
+/// Opt-in environment variable naming the process that supervises this server.
+/// The macOS app sets it to its own PID; when that process is no longer the
+/// server's parent (quit, SIGTERM, crash, kill) the server shuts down through
+/// the same graceful path as SIGTERM, so it never outlives its owner.
+/// Unset, empty or not a positive integer: no watching, as for plain CLI use.
+const PARENT_PID_ENV: &str = "SYMERASEME_MCP_PARENT_PID";
+
+const PARENT_POLL_INTERVAL: Duration = Duration::from_secs(1);
+
+fn expected_parent_pid(raw: Option<&str>) -> Option<u32> {
+    raw?.trim().parse::<u32>().ok().filter(|pid| *pid > 0)
+}
+
+/// Poll `current_parent` until it differs from `expected`, then request the
+/// graceful shutdown by setting `stopping`. Also ends once `stopping` is set
+/// by a signal. A parent that already died before the first poll is detected
+/// too, because the server was re-parented and the PID no longer matches.
+fn spawn_parent_watch(
+    expected: u32,
+    stopping: Arc<AtomicBool>,
+    interval: Duration,
+    current_parent: fn() -> u32,
+) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        while !stopping.load(Ordering::Relaxed) {
+            if current_parent() != expected {
+                stopping.store(true, Ordering::Relaxed);
+                return;
+            }
+            std::thread::sleep(interval);
+        }
+    })
 }
 
 async fn serve_async(
@@ -1133,6 +1175,54 @@ mod transport_tests {
         chunked.extend_from_slice(b"\r\n0\r\n\r\n");
         // Also exercise the body collector's error, beyond its one-byte allowance.
         expect_http(&actual_http_reply(chunked), 200, Some(-32700));
+    }
+
+    #[test]
+    fn parent_pid_opt_in_accepts_only_a_positive_integer() {
+        assert_eq!(expected_parent_pid(Some("4242")), Some(4242));
+        assert_eq!(expected_parent_pid(Some(" 7 ")), Some(7));
+        for ignored in [
+            None,
+            Some(""),
+            Some("0"),
+            Some("-3"),
+            Some("abc"),
+            Some("1.5"),
+        ] {
+            assert_eq!(expected_parent_pid(ignored), None, "{ignored:?}");
+        }
+    }
+
+    #[test]
+    fn parent_watch_requests_shutdown_once_the_parent_changes() {
+        use std::sync::atomic::AtomicU32;
+        static PARENT: AtomicU32 = AtomicU32::new(100);
+        fn current() -> u32 {
+            PARENT.load(Ordering::Relaxed)
+        }
+        let stopping = Arc::new(AtomicBool::new(false));
+        let watch = spawn_parent_watch(
+            100,
+            Arc::clone(&stopping),
+            Duration::from_millis(5),
+            current,
+        );
+        std::thread::sleep(Duration::from_millis(60));
+        assert!(!stopping.load(Ordering::Relaxed), "unchanged parent");
+        PARENT.store(1, Ordering::Relaxed);
+        watch.join().unwrap();
+        assert!(stopping.load(Ordering::Relaxed), "re-parented server stops");
+    }
+
+    #[test]
+    fn parent_watch_ends_when_a_signal_already_requested_shutdown() {
+        fn current() -> u32 {
+            unreachable!("a stopping server must not poll")
+        }
+        let stopping = Arc::new(AtomicBool::new(true));
+        spawn_parent_watch(100, stopping, Duration::from_millis(5), current)
+            .join()
+            .unwrap();
     }
 
     #[test]
