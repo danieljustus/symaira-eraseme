@@ -87,7 +87,6 @@ struct CalendarView: View {
         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text(week.week)
                 .symairaText(.subheading)
-                .foregroundStyle(BrandColors.textPrimary)
             Table(week.entries) {
                 TableColumn("Request") { Text("\($0.requestId.plainDigits)") }
                     .width(64)

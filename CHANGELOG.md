@@ -52,6 +52,12 @@ All notable changes to this project are documented in this file.
 - macOS app: the zero-match warning, the Settings connection error and the
   overdue tint in the Calendar show their color; the caption style overrode
   it with its muted gray (#1323).
+- macOS app: six more texts show the tone they were written for instead of
+  their role's color: the broker id in Recent Events and the event names in
+  the request detail now use primary ink, and the broker category, broker
+  Notes, task instructions and the Settings About line use secondary gray.
+  The other 27 `.foregroundStyle` calls after `.symairaText` repeated the
+  role's own color and were removed; a test fails if one reappears (#1323).
 
 ## [v0.17.0] - 2026-11-12
 

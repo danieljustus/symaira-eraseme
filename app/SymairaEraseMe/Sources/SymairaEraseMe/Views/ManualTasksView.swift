@@ -77,7 +77,6 @@ struct ManualTasksView: View {
                     } else {
                         Text("Done")
                             .symairaText(.caption)
-                            .foregroundStyle(BrandColors.textMuted)
                     }
                 }
             }
@@ -111,8 +110,7 @@ struct ManualTasksView: View {
                 if !task.instructions.isEmpty {
                     SymairaFormDivider()
                     Text(task.instructions)
-                        .symairaText(.callout)
-                        .foregroundStyle(BrandColors.textSecondary)
+                        .symairaText(.secondary)
                 }
             }
             SymairaFormSection("Completion Notes") {

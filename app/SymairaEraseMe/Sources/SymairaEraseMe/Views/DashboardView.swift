@@ -57,7 +57,6 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Status Breakdown")
                 .symairaText(.subheading)
-                .foregroundStyle(BrandColors.textPrimary)
 
             Chart(vm.statusBreakdown, id: \.label) { item in
                 BarMark(
@@ -86,7 +85,6 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Campaigns")
                 .symairaText(.subheading)
-                .foregroundStyle(BrandColors.textPrimary)
 
             if let campaigns = vm.data?.campaigns, !campaigns.isEmpty {
                 Table(campaigns) {
@@ -118,7 +116,6 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Broker Status")
                 .symairaText(.subheading)
-                .foregroundStyle(BrandColors.textPrimary)
 
             if let brokerStatus = vm.data?.brokerStatus, !brokerStatus.isEmpty {
                 let columns = [
@@ -145,7 +142,6 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text("Recent Events")
                 .symairaText(.subheading)
-                .foregroundStyle(BrandColors.textPrimary)
 
             if let events = vm.data?.recentEvents, !events.isEmpty {
                 VStack(spacing: 0) {
@@ -176,7 +172,6 @@ struct BrokerStatusCard: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(broker.brokerId)
                 .symairaText(.bodyEmphasized)
-                .foregroundStyle(BrandColors.textPrimary)
                 .lineLimit(1)
             HStack(spacing: SymairaSpacing.small) {
                 if broker.confirmed > 0 {
@@ -202,7 +197,6 @@ struct BrokerStatusCard: View {
             }
             Text("\(broker.total.plainDigits) total")
                 .symairaText(.caption)
-                .foregroundStyle(BrandColors.textMuted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .symairaCard(padding: SymairaSpacing.medium)
@@ -217,10 +211,9 @@ struct EventRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(event.eventType.replacingOccurrences(of: "_", with: " ").capitalized)
                     .symairaText(.callout)
-                    .foregroundStyle(BrandColors.textPrimary)
                 if let brokerId = event.brokerId {
                     Text(brokerId)
-                        .symairaText(.caption)
+                        .symairaText(.caption, respectsForeground: false)
                         .foregroundStyle(BrandColors.textPrimary)
                 }
             }
@@ -228,11 +221,9 @@ struct EventRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(event.source)
                     .symairaText(.caption)
-                    .foregroundStyle(BrandColors.textMuted)
                 if let date = event.occurredDate {
                     Text(date.formatted(.relative(presentation: .named)))
                         .symairaText(.caption)
-                        .foregroundStyle(BrandColors.textMuted)
                 }
             }
         }

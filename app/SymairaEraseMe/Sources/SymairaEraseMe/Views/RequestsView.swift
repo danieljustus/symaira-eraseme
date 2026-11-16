@@ -90,7 +90,6 @@ struct RequestsView: View {
         HStack {
             Text("Page \(vm.page.plainDigits) of \(vm.totalPages.plainDigits)")
                 .symairaText(.caption)
-                .foregroundStyle(BrandColors.textMuted)
             Spacer()
             Button("Previous") { vm.previousPage() }
                 .symairaButtonStyle(.secondary)
@@ -107,7 +106,6 @@ struct RequestsView: View {
             HStack {
                 Text("Request #\(request.id.plainDigits)")
                     .symairaText(.subheading)
-                    .foregroundStyle(BrandColors.textPrimary)
                 Spacer()
                 Button {
                     selection = nil
@@ -145,7 +143,6 @@ struct RequestsView: View {
 
             Text("Events")
                 .symairaText(.bodyEmphasized)
-                .foregroundStyle(BrandColors.textPrimary)
 
             switch vm.eventsState {
             case .idle, .loading:
@@ -158,7 +155,6 @@ struct RequestsView: View {
                         .symairaText(.caption)
                     Text(message)
                         .symairaText(.caption)
-                        .foregroundStyle(BrandColors.textMuted)
                     Button("Retry") {
                         Task { await vm.loadEvents(for: request) }
                     }
@@ -170,7 +166,6 @@ struct RequestsView: View {
                 if vm.requestEvents.isEmpty {
                     Text("No events")
                         .symairaText(.caption)
-                        .foregroundStyle(BrandColors.textMuted)
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
@@ -184,14 +179,12 @@ struct RequestsView: View {
                                     .offset(y: 4)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(event.eventType.replacingOccurrences(of: "_", with: " ").capitalized)
-                                            .symairaText(.caption)
+                                            .symairaText(.caption, respectsForeground: false)
                                             .foregroundStyle(BrandColors.textPrimary)
                                         Text(event.occurredAt.formattedDate)
                                             .symairaText(.caption)
-                                            .foregroundStyle(BrandColors.textMuted)
                                         Text("Source: \(event.source)")
                                             .symairaText(.caption)
-                                            .foregroundStyle(BrandColors.textMuted)
                                     }
                                 }
                             }

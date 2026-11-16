@@ -74,7 +74,6 @@ struct BrokersView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(broker.name)
                     .symairaText(.heading)
-                    .foregroundStyle(BrandColors.textPrimary)
                 if let website = broker.website {
                     Link(website, destination: URL(string: website) ?? URL(string: "about:blank")!)
                         .symairaText(.caption)
@@ -102,7 +101,6 @@ struct BrokersView: View {
             if let optOut = broker.optOut, !optOut.isEmpty {
                 Text("Opt-Out Channels")
                     .symairaText(.subheading)
-                    .foregroundStyle(BrandColors.textPrimary)
                 ForEach(optOut.indices, id: \.self) { index in
                     let channel = optOut[index]
                     VStack(alignment: .leading, spacing: 4) {
@@ -120,7 +118,6 @@ struct BrokersView: View {
                         if let fields = channel.requiredFields, !fields.isEmpty {
                             Text("Required fields: \(fields.joined(separator: ", "))")
                                 .symairaText(.caption)
-                                .foregroundStyle(BrandColors.textMuted)
                         }
                     }
                 }
@@ -130,10 +127,8 @@ struct BrokersView: View {
                 SymairaFormDivider()
                 Text("Notes")
                     .symairaText(.subheading)
-                    .foregroundStyle(BrandColors.textPrimary)
                 Text(notes)
-                    .symairaText(.callout)
-                    .foregroundStyle(BrandColors.textSecondary)
+                    .symairaText(.secondary)
             }
         }
         .frame(width: 520, height: 600)
@@ -156,7 +151,6 @@ struct BrokerCard: View {
             HStack {
                 Text(broker.name)
                     .symairaText(.bodyEmphasized)
-                    .foregroundStyle(BrandColors.textPrimary)
                     .lineLimit(1)
                 Spacer()
                 if let priority = broker.priority {
@@ -166,7 +160,7 @@ struct BrokerCard: View {
 
             if let category = broker.category {
                 Text(category.replacingOccurrences(of: "-", with: " ").capitalized)
-                    .symairaText(.caption)
+                    .symairaText(.caption, respectsForeground: false)
                     .foregroundStyle(BrandColors.textSecondary)
             }
 
@@ -183,7 +177,6 @@ struct BrokerCard: View {
                     ForEach(channels, id: \.type) { ch in
                         Label(ch.type, symairaIcon: ch.type == "email" ? .mail : .link, size: 12)
                             .symairaText(.caption)
-                            .foregroundStyle(BrandColors.textMuted)
                     }
                 }
             }

@@ -55,10 +55,8 @@ struct SettingsView: View {
         VStack(alignment: .leading) {
             Text("Settings")
                 .symairaText(.display)
-                .foregroundStyle(BrandColors.textPrimary)
             Text("Configure the MCP server connection and app preferences")
                 .symairaText(.caption)
-                .foregroundStyle(BrandColors.textMuted)
         }
     }
 
@@ -201,13 +199,11 @@ struct SettingsView: View {
             HStack {
                 Text("Symaira EraseMe")
                     .symairaText(.callout)
-                    .foregroundStyle(BrandColors.textPrimary)
                 Text("•")
                     .foregroundStyle(BrandColors.textMuted)
                     .accessibilityHidden(true)
                 Text("Native Dashboard")
-                    .symairaText(.callout)
-                    .foregroundStyle(BrandColors.textSecondary)
+                    .symairaText(.secondary)
             }
 
             Text("Connects to the Symaira MCP server for GDPR/CCPA data broker removal automation.")
