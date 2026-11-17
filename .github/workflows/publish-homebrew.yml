@@ -163,7 +163,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@9ffcbcc2c89631400988e8d4b1e3ac17dbbe3fe9 # main
+        uses: Homebrew/actions/setup-homebrew@ceec4e8419bb3c97ce96e9dda7738499ed5f869d # main
       - name: Download the rendered Formula
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
