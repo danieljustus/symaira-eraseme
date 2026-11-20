@@ -9,7 +9,7 @@ pub fn helper(root: &Path) -> PathBuf {
     let log = root.join("agent-build.log");
     let output = std::fs::File::create(&log).unwrap();
     let mut child = Command::new("rustc")
-        .args(["+1.98.0", "--edition=2024", "--crate-type=bin", "-o"])
+        .args(["+1.98.1", "--edition=2024", "--crate-type=bin", "-o"])
         .arg(&executable)
         .arg(&source)
         .stdout(Stdio::null())

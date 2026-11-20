@@ -88,9 +88,9 @@ jobs:
       - name: Prepare immutable frozen producer history before offline replay
         run: python3 scripts/prepare-frozen-history.py --fetch
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.98.0 --profile minimal
+        run: rustup toolchain install 1.98.1 --profile minimal
       - name: Fetch locked Rust dependencies
-        run: cargo +1.98.0 fetch --locked
+        run: cargo +1.98.1 fetch --locked
       - name: Execute default suite with Go absent from PATH
         shell: bash
         run: |
@@ -122,52 +122,52 @@ jobs:
               cargo = shutil.which("cargo", path=str(tools))
               assert cargo is not None
               print("Verified: go absent from PATH; default frozen suite selected", flush=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "parity", "--all-targets", "--locked", "--offline"],
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "parity", "--all-targets", "--locked", "--offline"],
                              env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "identity_interop",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-core", "--test", "identity_interop",
                               "--test", "encryption_parity", "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "triage_service",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-core", "--test", "triage_service",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "projection_oversized_parity",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-core", "--test", "projection_oversized_parity",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-engine", "--test", "scheduler_parity",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-engine", "--test", "scheduler_parity",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-engine", "--test", "scheduler_install_parity",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-engine", "--test", "scheduler_install_parity",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "config_parity",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-core", "--test", "config_parity",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "campaign_execution_oracle",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-core", "--test", "campaign_execution_oracle",
                               "--test", "campaign_plan_contract", "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "sqlite_contract",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-core", "--test", "sqlite_contract",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "llm_http_failure_next",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-core", "--test", "llm_http_failure_next",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "command_surface",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-cli", "--test", "command_surface",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "triage_native_process",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-cli", "--test", "triage_native_process",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "triage_commands",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-cli", "--test", "triage_commands",
                               "--test", "mcp_triage_process", "--test", "mcp_agent_error_json", "--test", "mcp_agent_error_json_unix",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "plan_execute_live_process",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-cli", "--test", "plan_execute_live_process",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "backend_fallback_process",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-cli", "--test", "backend_fallback_process",
                               "--locked", "--offline"], env=environment, check=True)
               # Every mcp_http_process comparator, including the original wire
               # parent and the six auxiliary families, now replays measured Go.
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "mcp_http_process",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-cli", "--test", "mcp_http_process",
                               "--test", "mcp_http_native_contract", "--locked", "--offline"],
                              env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "mcp_http_headers_process",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-cli", "--test", "mcp_http_headers_process",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-cli", "--test", "frozen_http_aux",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-cli", "--test", "frozen_http_aux",
                               "--locked", "--offline"], env=environment, check=True)
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "--test", "campaign_smtp",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-core", "--test", "campaign_smtp",
                               "--test", "smtp_transport", "--locked", "--offline"], env=environment, check=True)
               # The consent child probe is intentionally not launched directly
               # by libtest: its parent actually executes all 16 isolated
               # umask/resource-limit cases with --ignored and checks 1 passed.
-              subprocess.run([cargo, "+1.98.0", "test", "-p", "symeraseme-core", "-p", "symeraseme-engine",
+              subprocess.run([cargo, "+1.98.1", "test", "-p", "symeraseme-core", "-p", "symeraseme-engine",
                               "-p", "symeraseme-cli", "--lib", "--bins", "--locked", "--offline"],
                              env=environment, check=True)
           PY

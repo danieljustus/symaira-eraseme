@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 env:
-  RUST_TOOLCHAIN: '1.98.0'
+  RUST_TOOLCHAIN: '1.98.1'
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: '0'
   SYMERASEME_PARITY_LIVE_GO: '0'

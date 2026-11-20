@@ -107,7 +107,7 @@ fn rust_fixture(root: &Path) -> PathBuf {
     let executable = root.join("synthetic-agent-error");
     let mut build = Command::new("rustc");
     build
-        .args(["+1.98.0", "--edition=2024", "--crate-type=bin", "-o"])
+        .args(["+1.98.1", "--edition=2024", "--crate-type=bin", "-o"])
         .arg(&executable)
         .arg(Path::new(ROOT).join("crates/symeraseme-cli/tests/fixtures/native_agent_error.rs"));
     let output = capture(build, root, "rust-fixture-build", Duration::from_secs(60));
