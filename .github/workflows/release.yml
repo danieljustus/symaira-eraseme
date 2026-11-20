@@ -160,7 +160,7 @@ jobs:
 
       - name: Install pinned Rust backend toolchain
         run: |
-          rustup toolchain install 1.98.0 --profile minimal
+          rustup toolchain install 1.98.1 --profile minimal
           printf '%s\n' "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Import Developer ID certificate

@@ -38,7 +38,7 @@ jobs:
           fetch-depth: 0 # Frozen readers authenticate immutable producer blobs.
       - name: Install pinned Rust toolchain
         shell: bash
-        run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
+        run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -50,9 +50,9 @@ jobs:
       - name: Lifecycle distinction, bounded missing retry and actual production retry cases
         shell: bash
         run: |
-          cargo +1.98.0 test -p symeraseme-core --locked --test llm_http_failure_next -- --nocapture
+          cargo +1.98.1 test -p symeraseme-core --locked --test llm_http_failure_next -- --nocapture
       - name: Retained source-bound LLM transport transcript gates
         shell: bash
         run: |
-          cargo +1.98.0 test -p symeraseme-core --locked \
+          cargo +1.98.1 test -p symeraseme-core --locked \
             --test llmkit_transport_contract --test llm_surface -- --nocapture

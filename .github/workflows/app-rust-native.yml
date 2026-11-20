@@ -61,7 +61,7 @@ jobs:
         with:
           xcode-version: ${{ matrix.xcode }}
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.98.0 --profile minimal
+        run: rustup toolchain install 1.98.1 --profile minimal
       - name: Verify packaging controls
         shell: bash
         run: |

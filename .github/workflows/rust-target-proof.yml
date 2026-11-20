@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 env:
-  RUST_TOOLCHAIN: '1.98.0'
+  RUST_TOOLCHAIN: '1.98.1'
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: '0'
 

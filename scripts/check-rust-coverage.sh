@@ -22,7 +22,7 @@ if [[ ${#critical_files[@]} -eq 0 ]]; then
 fi
 coverage_json="${COVERAGE_FILE:-${RUNNER_TEMP:-${CARGO_TARGET_DIR:-target}}/rust-coverage.json}"
 mkdir -p "$(dirname "$coverage_json")"
-"$cargo_command" +1.98.0 llvm-cov --workspace --all-features --json \
+"$cargo_command" +1.98.1 llvm-cov --workspace --all-features --json \
   --output-path "$coverage_json" --fail-under-lines 80
 "${PYTHON:-python3}" - "$coverage_json" 90 "${critical_files[@]}" <<'PY'
 import json
