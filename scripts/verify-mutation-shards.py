@@ -26,7 +26,7 @@ def verify_group(documents, scope, denominator, head):
         assert receipt["scope"] == scope and receipt["head"] == head, "mixed source/scope"
         assert receipt["target"] == "x86_64-unknown-linux-gnu", "unexpected mutation target"
         expected_inactive = [
-            r'http\.rs:190:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
+            r'http\.rs:232:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
         ] if scope == "HTTP auth" else []
         assert receipt["inactive_target_exclusions"] == expected_inactive, "unexpected platform exclusions"
         index, total = map(int, receipt["shard"].split("/"))

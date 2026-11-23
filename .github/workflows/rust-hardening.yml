@@ -239,7 +239,7 @@ jobs:
           inactive = []
           if os.environ["MUTATION_SCOPE"] == "HTTP auth":
               inactive = [
-                  r'http\.rs:190:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
+                  r'http\.rs:232:5: replace addr_not_available_message -> String with (String::new\(\)|"xyzzy"\.into\(\))$',
               ]
           for pattern in inactive:
               command += ["--exclude-re", pattern]
