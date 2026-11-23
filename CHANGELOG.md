@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [v0.17.1] - 2026-11-23
 
 ### Security
 
@@ -27,6 +27,9 @@ All notable changes to this project are documented in this file.
 - The MCP servers decode the embedded broker registry once per process
   instead of on every call; `list_brokers`, `plan_create` and `run_web_form`
   answer a long-running server in under 1 ms instead of about 33 ms (#1321).
+- The Rust toolchain pin moves from 1.98.0 to 1.98.1, which fixes a 1.98.0
+  miscompilation of trait object vtables (#1333).
+- The macOS app builds against symaira-corekit 0.22.4 (#1332).
 
 ### Fixed
 

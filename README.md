@@ -14,12 +14,13 @@ Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
 data brokers. It is a local-first Rust CLI with a native SwiftUI macOS app and
 an authenticated MCP JSON-RPC interface.
 
-**Current source tree:** Rust-only CLI and native SwiftUI macOS app, version 0.17.0.
+**Current source tree:** Rust-only CLI and native SwiftUI macOS app, version 0.17.1.
 The 0.15 line is the first without Go sources and supports macOS on Apple Silicon
 and Linux (amd64/arm64) only; 0.15.1 patched the bundled SQLite
 (RUSTSEC-2026-0459), 0.16.0 added `plan delete` and a compact
-`get_dashboard_data` default, and 0.17.0 improves read-only CLI output, command
-help and secret-provider timeout cleanup. The Rust-only package layout
+`get_dashboard_data` default, 0.17.0 improved read-only CLI output, command
+help and secret-provider timeout cleanup, and 0.17.1 patches dependency
+advisories and macOS app server shutdown. The Rust-only package layout
 was introduced in the
 [`v0.14.0` canary prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
 The historical `v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the
@@ -204,7 +205,7 @@ make app-test
 ./app/SymairaEraseMe/build.sh
 
 # Local development packaging example only; not a release-version claim
-VERSION=0.17.0 ./scripts/package-dmg.sh
+VERSION=0.17.1 ./scripts/package-dmg.sh
 ```
 
 Use a full-history clone. Even then, squash merges and deleted feature branches
@@ -273,7 +274,9 @@ and complete-asset immutable publication; version 0.15.0 removes the Go sources
 and the Windows and macOS Intel targets; version 0.15.1 patches the bundled
 SQLite; version 0.16.0 adds `plan delete`, the compact dashboard data and
 app server supervision fixes; version 0.17.0 improves CLI readability and help,
-and cleans up timed-out secret-provider subprocesses. Canary publication alone
+and cleans up timed-out secret-provider subprocesses; version 0.17.1 patches
+the quinn and url dependency advisories, refuses the filesystem root as MCP
+file-read workspace and stops the server with the macOS app. Canary publication alone
 does not complete stable acceptance or Go-retirement technical gates. The
 maintainer's
 2026-10-12 decision separately authorizes source retirement and waives only
