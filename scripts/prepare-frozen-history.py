@@ -18,6 +18,7 @@ REVISIONS = (
     '433622f6e6c884694a304f483ae481f93069b455',  # minor-patch group native dependency refresh
     'fc446060e4346a5896b2c80f5788a5a92be58992',  # supported-target rusqlite 0.41.1 native refresh
     '2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca',  # minor-patch group native dependency refresh
+    'a8eda4f77ce938c32d18dbad7d45de148b7d0482',  # quinn/url RUSTSEC native dependency refresh
 )
 REPOSITORY = 'https://github.com/danieljustus/symaira-eraseme.git'
 

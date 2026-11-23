@@ -74,6 +74,21 @@ original/derived file digest. Raw ZIPs remain retained outside the repository.
 Publication privacy approval does not clear the unchanged frozen/native
 acceptance gates, which must execute on the integrated candidate.
 
+## Capture product version override (#1330)
+
+Maintainer decision (2026-11-23): since #1295 the Rust MCP `initialize` result
+reports `serverInfo.version` as the workspace version, while the retired Go
+server reports `"dev"`. The frozen readers handle this through the explicit
+`post_cutover_1295` transform; the retired live comparators that a capture
+snapshot runs do not. A capture snapshot therefore changes exactly one product
+literal: `version: env!("CARGO_PKG_VERSION"),` in
+`crates/symeraseme-cli/src/mcp/protocol.rs` becomes `version: "dev",`. The
+capture workflow's identity check derives the expected file from the candidate
+by that single replacement and rejects any other product difference. Go
+observations are unchanged, the product candidate keeps its real version, and
+the frozen readers keep checking the real product. This override is not an
+assertion relaxation for any other field.
+
 ## Lock-binding decision (#1263)
 
 The strict whole-`Cargo.lock` binding in `go_source_pin::assert_current_matches_archive`
@@ -119,3 +134,15 @@ for Windows after #1281.
   embedded build info is permitted source-revision volatility: Go derives it
   from the revision, commit time, and nearest reachable tag (`v0.15.1` was
   tagged after the preceding capture).
+
+- `refresh-a8eda4f7` captures candidate `7bd59fdec75f1b37d4559f21c9a828d1f6cd8793`
+  at snapshot `a8eda4f77ce938c32d18dbad7d45de148b7d0482` (tag
+  `frozen-go-captures/dependency-refresh-a8eda4f7`), run `45187451089`;
+  artifacts `14824592142` (macOS arm64), `14824297614` (Linux amd64), and
+  `14823123888` (Linux arm64). It is the first snapshot with the #1330
+  version override. Its workflow installs Rust 1.98.1 next to 1.98.0 because
+  the candidate's native host agent is built with `rustc +1.98.1` (#1334). The
+  48 records match the predecessor's inventory and differ only in source
+  revision, temporary build paths, the `Cargo.lock` digest, HTTP `Date`
+  headers, ephemeral SMTP ports, elapsed times and Go map order in one provider
+  list.

@@ -13,26 +13,26 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
         "darwin/arm64",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "f40c220633556d709d17e5a9566d3e62db62420300fdbdb14d834641f9de7413",
+        "a8eda4f77ce938c32d18dbad7d45de148b7d0482",
+        "935b3ba25346e6db4b1356c6d3b2033a4a9b0650d5c7f4af00c38056b57d80fe",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/http-wire/darwin-arm64/wire.json"
+            "../../../../tests/fixtures/go-frozen/refresh-a8eda4f7/http-wire/darwin-arm64/wire.json"
         ),
     ),
     (
         "linux/amd64",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "f55bc5b04db03c2b5c052fdae5154d25593483cb33ccf10c926b1e4c6636546d",
+        "a8eda4f77ce938c32d18dbad7d45de148b7d0482",
+        "c3694260118d627e745a449b715d2cb393e1a8878858373bf75f769b561a4ead",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/http-wire/linux-amd64/wire.json"
+            "../../../../tests/fixtures/go-frozen/refresh-a8eda4f7/http-wire/linux-amd64/wire.json"
         ),
     ),
     (
         "linux/arm64",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "84b4d0f0b02296d3c4192be7782c919a33017dd7c1d7f213bde668ce0ae7e078",
+        "a8eda4f77ce938c32d18dbad7d45de148b7d0482",
+        "53e6b52b7aa685878ef8d72adc2ae05382cb605b2517bf846e50245e99287ead",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/http-wire/linux-arm64/wire.json"
+            "../../../../tests/fixtures/go-frozen/refresh-a8eda4f7/http-wire/linux-arm64/wire.json"
         ),
     ),
 ];

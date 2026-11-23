@@ -14,55 +14,55 @@ const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
     (
         "darwin/arm64",
         "campaign",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "b28029b53d6b5313efa557689dc91cda8826fee131041d00a66160a71f154e37",
+        "a8eda4f77ce938c32d18dbad7d45de148b7d0482",
+        "32009ec3c1b21f1f22ed47111aa1ad53905170e27f581b808078bb3541ebd8c1",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/smtp/darwin-arm64/campaign.json"
+            "../../../../tests/fixtures/go-frozen/refresh-a8eda4f7/smtp/darwin-arm64/campaign.json"
         ),
     ),
     (
         "darwin/arm64",
         "transport",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "87442c2cbdf069149e735087f421df685aae8e325c7cea43c1600baf840ab83e",
+        "a8eda4f77ce938c32d18dbad7d45de148b7d0482",
+        "e2de35cc57334bb624436b4b869cfe7055bcefc2707e0ac6e7a898c538d2851a",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/smtp/darwin-arm64/transport.json"
+            "../../../../tests/fixtures/go-frozen/refresh-a8eda4f7/smtp/darwin-arm64/transport.json"
         ),
     ),
     (
         "linux/amd64",
         "campaign",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "e609cefbad8e10bcfc2fcf00b3a40385826819f0a932286cad5e1abcc5b58783",
+        "a8eda4f77ce938c32d18dbad7d45de148b7d0482",
+        "5ab3b5b907368ee44ea792f0ad48ed38ccfa70ceb6bf8603916eefbded269ce4",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/smtp/linux-amd64/campaign.json"
+            "../../../../tests/fixtures/go-frozen/refresh-a8eda4f7/smtp/linux-amd64/campaign.json"
         ),
     ),
     (
         "linux/amd64",
         "transport",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "811eaa20b3625d1983c761117519b96788791bcc22beec84bb7943392ae8f706",
+        "a8eda4f77ce938c32d18dbad7d45de148b7d0482",
+        "8814d8e42e22befcd2f976b860a2e7ef5a638ad1ae6e5085d07828fe92ffe137",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/smtp/linux-amd64/transport.json"
+            "../../../../tests/fixtures/go-frozen/refresh-a8eda4f7/smtp/linux-amd64/transport.json"
         ),
     ),
     (
         "linux/arm64",
         "campaign",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "049586987d079468b0035fe65262d83e2875db57d7ea03fec51901f8074f225a",
+        "a8eda4f77ce938c32d18dbad7d45de148b7d0482",
+        "3e4474a2e844db60ddb759202ed94977db4584a4c78135c8cddc5b23d1934497",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/smtp/linux-arm64/campaign.json"
+            "../../../../tests/fixtures/go-frozen/refresh-a8eda4f7/smtp/linux-arm64/campaign.json"
         ),
     ),
     (
         "linux/arm64",
         "transport",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "280a3e79554ffe65e66312e17d8ba58cc5bf7cb2071ee183cb5ca6414bff48a4",
+        "a8eda4f77ce938c32d18dbad7d45de148b7d0482",
+        "fb5f64693aef0c5f535dc7d8cd15241dd244f82ef9f442eccc277a800c4777b2",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/smtp/linux-arm64/transport.json"
+            "../../../../tests/fixtures/go-frozen/refresh-a8eda4f7/smtp/linux-arm64/transport.json"
         ),
     ),
 ];

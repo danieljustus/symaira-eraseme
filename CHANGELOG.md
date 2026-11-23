@@ -6,6 +6,11 @@ All notable changes to this project are documented in this file.
 
 ### Security
 
+- Update `quinn-proto` 0.11.18 to 0.11.19 (RUSTSEC-2026-0523,
+  RUSTSEC-2026-0524), `quinn-udp` 0.5.15 to 0.5.16 (RUSTSEC-2026-0538) and
+  `url` 2.5.8 to 2.5.9 (RUSTSEC-2026-0592, with `form_urlencoded` 1.2.3), plus
+  the minor-patch group from #1328; refresh native evidence as
+  `refresh-a8eda4f7` (#1329, #1330).
 - MCP file reads no longer accept the filesystem root as their workspace. A
   server started with `/` as its working directory (the macOS app's bundled
   server, GUI-launched stdio clients) now answers `redact_file` with
