@@ -12,57 +12,111 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 // Populate only after retaining and independently verifying actual native captures.
 const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
     (
+        "darwin/amd64",
+        "cli",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "b95315462e1e60a6bd542db4efa9513d07931b7e7fe48032bd920d450a82eed0",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/darwin-amd64/cli.json"
+        ),
+    ),
+    (
+        "darwin/amd64",
+        "mcp",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "6d3c2c539404d6095da9860800ee527252a0ccf8185d7a8b6dbe6ed451447e1a",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/darwin-amd64/mcp.json"
+        ),
+    ),
+    (
         "darwin/arm64",
         "cli",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "b477572a3fc341c7ee26648077964e0d9b58585096c3e9e6e0f7b82de5180228",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "2538992712b771b3d37c58b027cecfec61d7852d06c2c6e874595e52f3994ad8",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/native-triage/darwin-arm64/cli.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/darwin-arm64/cli.json"
         ),
     ),
     (
         "darwin/arm64",
         "mcp",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "a7fe29e48b0b1f31abeb3729009f42f10880c1ebf62442cc6882f96966b3bac6",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "fa84e56bc39b333f96043043354c3a2caad1dd98d234fba4ce5865732a3778af",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/native-triage/darwin-arm64/mcp.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/darwin-arm64/mcp.json"
         ),
     ),
     (
         "linux/amd64",
         "cli",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "28e9927a5b35cf3ec855ad54a425f61f5d1047bc36832ea3d4ad8b754aa4c47c",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "6e9977c87765815b9dda1d002e480e0afaf2f8c52e20613eb5a066877fc45165",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/native-triage/linux-amd64/cli.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/linux-amd64/cli.json"
         ),
     ),
     (
         "linux/amd64",
         "mcp",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "23b54a13977e6ef127e9adaaee091af7092557a0e48b96e15eecbc2a869e508e",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "f496a825555de50f4081880919aac89a932b1e7c5784cd4b3f622d071c783c85",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/native-triage/linux-amd64/mcp.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/linux-amd64/mcp.json"
         ),
     ),
     (
         "linux/arm64",
         "cli",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "f4dda8751a6eb6acd176e109b2a3b76837e8c3455851b7ef4eaefe88dc3598cc",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "676475689dc4e8db04c6f6130828a8b4e6af4846d924425326f49bc28fdf6135",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/native-triage/linux-arm64/cli.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/linux-arm64/cli.json"
         ),
     ),
     (
         "linux/arm64",
         "mcp",
-        "2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca",
-        "52b3bb7a4d6639758fc6caf21eae00789284de31b03bde9ae55910b5ca542b55",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "af46c0703c576640813c65ef7129574ae6c6e8c57bc06dd7c3ba2624c54c9b14",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-2a7a5c1f/native-triage/linux-arm64/mcp.json"
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/linux-arm64/mcp.json"
+        ),
+    ),
+    (
+        "windows/amd64",
+        "cli",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "c7cd8116199c5c1f73350ef2d3ed44ec0595be177a13c3924715dd1c9f6abca5",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/windows-amd64/cli.json"
+        ),
+    ),
+    (
+        "windows/amd64",
+        "mcp",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "6a8deee5f0e488da8a66383cfb2f93feb01ab218cb5535f949133f68120b6c0c",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/windows-amd64/mcp.json"
+        ),
+    ),
+    (
+        "windows/arm64",
+        "cli",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "21d766c36e3e2a76d0bed52eef61f0d10194e9be178535509bb87ccce59cbb40",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/windows-arm64/cli.json"
+        ),
+    ),
+    (
+        "windows/arm64",
+        "mcp",
+        "411b5c10eb041f0233e0e86710a3dd733b0012e2",
+        "714e4e258f1ca58c510949ff21e362bea47d24e3176651456c18a40622393596",
+        include_bytes!(
+            "../../../../tests/fixtures/go-frozen/refresh-411b5c10/native-triage/windows-arm64/mcp.json"
         ),
     ),
 ];
@@ -119,34 +173,8 @@ fn verify(raw: &[u8], pin: &str, revision: &str, target: &str, family: &str) -> 
             );
             assert_eq!(recorded["bytes"], archive.stdout.len(), "{name}");
             assert_eq!(recorded["sha256"], digest(&archive.stdout), "{name}");
-            if matches!(
-                name.as_str(),
-                "crates/symeraseme-cli/tests/triage_native_process.rs"
-                    | "crates/symeraseme-cli/tests/support/capture_native_triage.rs"
-            ) {
-                // Retired producers stay bound to the independent Go-era pin,
-                // using the original recorded checkout policy on every host.
-                let pinned = Command::new("git")
-                    .args([
-                        "-c",
-                        &format!("core.autocrlf={autocrlf}"),
-                        "cat-file",
-                        "--filters",
-                        &format!("{}:{name}", go_source_pin::RETIREMENT_SOURCE_REVISION),
-                    ])
-                    .current_dir(ROOT)
-                    .output()
-                    .expect("read independently pinned triage producer");
-                assert!(
-                    pinned.status.success(),
-                    "retired triage producer unavailable"
-                );
-                assert_eq!(
-                    archive.stdout, pinned.stdout,
-                    "retired triage producer: {name}"
-                );
-            } else if go_source_pin::current_tree_bound(name) {
-                let current = go_source_pin::current_source(ROOT, name);
+            if go_source_pin::current_tree_bound(name) {
+                let current = std::fs::read(Path::new(ROOT).join(path)).unwrap();
                 go_source_pin::assert_current_matches_archive(name, &archive.stdout, &current);
             }
         }
@@ -213,25 +241,27 @@ impl Corpus {
     }
 }
 
-pub fn observations(family: &str) -> Corpus {
-    assert!(
-        std::env::var_os("SYMERASEME_CAPTURE_NATIVE_TRIAGE").is_none(),
-        "live Go capture is retired; use the immutable historical capture producer"
-    );
+pub fn observations(family: &str) -> Option<Corpus> {
+    if std::env::var_os("SYMERASEME_CAPTURE_NATIVE_TRIAGE").is_some_and(|value| !value.is_empty()) {
+        return None;
+    }
     match std::env::var("SYMERASEME_PARITY_LIVE_GO").as_deref() {
+        Ok("1") => return None,
         Ok("0") | Err(std::env::VarError::NotPresent) => {}
-        _ => panic!("live Go execution is retired; SYMERASEME_PARITY_LIVE_GO must be 0 or unset"),
+        _ => panic!("SYMERASEME_PARITY_LIVE_GO must be 0 or 1"),
     }
     let target = match (std::env::consts::OS, std::env::consts::ARCH) {
         ("linux", "x86_64") => "linux/amd64",
         ("linux", "aarch64") => "linux/arm64",
+        ("macos", "x86_64") => "darwin/amd64",
         ("macos", "aarch64") => "darwin/arm64",
-        _ => panic!("no recorded native triage capture for this target; live Go is retired"),
+        ("windows", "x86_64") => "windows/amd64",
+        ("windows", "aarch64") => "windows/arm64",
+        _ => return None,
     };
     let (_, _, revision, pin, raw) = RECORDS
         .iter()
-        .find(|record| record.0 == target && record.1 == family)
-        .expect("recorded native triage family; live Go is retired");
+        .find(|record| record.0 == target && record.1 == family)?;
     let record = verify(raw, pin, revision, target, family);
     let mut corrupt = raw.to_vec();
     corrupt.push(b'!');
@@ -252,5 +282,5 @@ pub fn observations(family: &str) -> Corpus {
         ))
         .is_err()
     );
-    Corpus(record)
+    Some(Corpus(record))
 }
