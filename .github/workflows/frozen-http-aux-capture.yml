@@ -39,7 +39,7 @@ jobs:
         run: python3 scripts/prepare-frozen-history.py --fetch
       - name: Install pinned Rust toolchain
         shell: bash
-        run: rustup toolchain install 1.98.0 --profile minimal
+        run: rustup toolchain install 1.98.1 --profile minimal
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -67,7 +67,7 @@ jobs:
                  unavailable_local_address_error_matches_go
                  obs_text_origin_rejection_matches_go_and_rust_processes)
           targets=(--test mcp_http_native_contract --test mcp_http_process)
-          cargo +1.98.0 test -p symeraseme-cli "${targets[@]}" --locked -- "${tests[@]}" --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/http-aux.log"
+          cargo +1.98.1 test -p symeraseme-cli "${targets[@]}" --locked -- "${tests[@]}" --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/http-aux.log"
           passed=$(awk '/^test result: ok\. [0-9]+ passed; 0 failed; 0 ignored;/ { sum += $4 } END { print sum + 0 }' "$RUNNER_TEMP/http-aux.log")
           test "$passed" -eq "${#tests[@]}"
       - name: Retain native replay diagnostics

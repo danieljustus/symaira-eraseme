@@ -116,7 +116,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pinned Rust lint tools
-        run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
+        run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy
       - name: Check formatting and lint
         run: |
           make fmt-check
@@ -133,7 +133,7 @@ jobs:
           persist-credentials: false
       - name: Install pinned Rust toolchains
         run: |
-          rustup toolchain install 1.98.0 --profile minimal
+          rustup toolchain install 1.98.1 --profile minimal
           rustup toolchain install nightly-2026-09-20 --profile minimal --component miri,rust-src
       - name: Prepare immutable frozen producer history
         run: python3 scripts/prepare-frozen-history.py --fetch
@@ -150,7 +150,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.98.0 --profile minimal
+        run: rustup toolchain install 1.98.1 --profile minimal
       - name: Validate embedded registry
         run: |
           make build
@@ -168,12 +168,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pinned Rust audit tool
         run: |
-          rustup toolchain install 1.98.0 --profile minimal
-          cargo +1.98.0 install cargo-audit --version 0.22.2 --locked
+          rustup toolchain install 1.98.1 --profile minimal
+          cargo +1.98.1 install cargo-audit --version 0.22.2 --locked
       - name: Audit Rust dependencies
         run: |
-          cargo +1.98.0 audit --file Cargo.lock
-          cargo +1.98.0 audit --file fuzz/Cargo.lock
+          cargo +1.98.1 audit --file Cargo.lock
+          cargo +1.98.1 audit --file fuzz/Cargo.lock
 
   secrets-scan:
     name: secrets-scan

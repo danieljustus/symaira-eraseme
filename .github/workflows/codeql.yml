@@ -45,7 +45,7 @@ jobs:
 
       - name: Install pinned Rust toolchain
         if: matrix.language == 'rust'
-        run: rustup toolchain install 1.98.0 --profile minimal
+        run: rustup toolchain install 1.98.1 --profile minimal
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3

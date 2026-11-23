@@ -45,7 +45,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  RUST_TOOLCHAIN: '1.98.0'
+  RUST_TOOLCHAIN: '1.98.1'
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: '0'
 
@@ -177,7 +177,7 @@ jobs:
         run: |
           set -euo pipefail
           log="$RUNNER_TEMP/rust-only-process-test.log"
-          cargo +1.98.0 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+          cargo +1.98.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
             -p symeraseme-cli --test backend_fallback_process --locked \
             retired_backend_override_never_dispatches_a_go_sibling -- --exact 2>&1 | tee "$log"
           python3 - "$log" <<'PY'

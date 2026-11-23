@@ -99,7 +99,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
-      RUST_TOOLCHAIN: '1.98.0'
+      RUST_TOOLCHAIN: '1.98.1'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -209,9 +209,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.98.0 --profile minimal
+        run: rustup toolchain install 1.98.1 --profile minimal
       - name: Install pinned cargo-mutants
-        run: cargo +1.98.0 install cargo-mutants --version 27.1.0 --locked
+        run: cargo +1.98.1 install cargo-mutants --version 27.1.0 --locked
       - name: Verify outcome regression controls
         run: |
           python3 scripts/test-verify-mutation-outcomes.py
@@ -229,9 +229,9 @@ jobs:
           import os
           import pathlib
           import subprocess
-          command = ["cargo", "+1.98.0", "mutants", "-p", os.environ["MUTATION_PACKAGE"]]
+          command = ["cargo", "+1.98.1", "mutants", "-p", os.environ["MUTATION_PACKAGE"]]
           target = next(line.removeprefix("host: ") for line in
-                        subprocess.check_output(["rustc", "+1.98.0", "-vV"], text=True).splitlines()
+                        subprocess.check_output(["rustc", "+1.98.1", "-vV"], text=True).splitlines()
                         if line.startswith("host: "))
           assert target == "x86_64-unknown-linux-gnu", "this mutation campaign records the Linux target"
           # Mutations in cfg-disabled platform branches. Apply these anchors

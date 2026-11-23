@@ -20,7 +20,7 @@ the seven-day post-stable observation period on 2026-10-12.
 
 - macOS 14+ (Sonoma)
 - Swift 6+ with full Xcode installed (SwiftUI macros and Metal compiler required)
-- Rust 1.98.0 for the bundled CLI/MCP server
+- Rust 1.98.1 for the bundled CLI/MCP server
 - Python 3 for the local backend-staging script
 
 Go is not needed to build or run the app or execute the repository's normal

@@ -181,7 +181,7 @@ fn prepare(logs: &Path) -> PathBuf {
     let rust_agent = rust_bin.join("claude");
     let mut build = Command::new("rustc");
     build
-        .args(["+1.98.0", "--edition=2024", "--crate-type=bin", "-o"])
+        .args(["+1.98.1", "--edition=2024", "--crate-type=bin", "-o"])
         .arg(&rust_agent)
         .arg(repo().join("crates/symeraseme-cli/tests/fixtures/native_triage_agent.rs"));
     let output = capture(build, logs, "rust-agent-build", Duration::from_secs(60));

@@ -162,7 +162,7 @@ contain its own hash and the evidence must be part of the tagged commit:
 
 ```bash
 # 1. From a clean checkout of P on main (HEAD == P, no untracked files).
-#    Needs cargo/rustc 1.98.0 and no RUSTFLAGS/RUSTC_WRAPPER in the environment.
+#    Needs cargo/rustc 1.98.1 and no RUSTFLAGS/RUSTC_WRAPPER in the environment.
 python3 scripts/record_standalone_evidence.py \
   --tag vX.Y.Z --source-commit "$(git rev-parse HEAD)" \
   --corekit-tag <rust.release.tag> --corekit-root /path/to/symaira-corekit

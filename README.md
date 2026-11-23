@@ -5,7 +5,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/danieljustus/symaira-eraseme/ci.yml?branch=main&label=CI&logo=github)](https://github.com/danieljustus/symaira-eraseme/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/danieljustus/symaira-eraseme?label=Release&logo=github)](https://github.com/danieljustus/symaira-eraseme/releases)
 [![License](https://img.shields.io/github/license/danieljustus/symaira-eraseme?label=License)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.98.0-orange)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.98.1-orange)](https://www.rust-lang.org)
 [![Swift](https://img.shields.io/badge/swift-5.10%2B-F05138)](https://swift.org)
 
 ![Symaira EraseMe social preview](docs/assets/social-preview.png)
@@ -182,7 +182,7 @@ configuration is consumed by the shared Rust LLM provider layer.
 
 ## Development
 
-Requirements: Rust 1.98.0 (pinned in `rust-toolchain.toml`). The Rust build,
+Requirements: Rust 1.98.1 (pinned in `rust-toolchain.toml`). The Rust build,
 test suite and frozen-observation checks do not require Go. A full Xcode
 installation is required for the macOS GUI.
 

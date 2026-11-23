@@ -8,7 +8,7 @@
 skill formats and adapter files.
 
 The current source uses the Rust CLI and a native SwiftUI macOS app,
-without a bundled Go backend or backend selector. Rust 1.98.0 is required for
+without a bundled Go backend or backend selector. Rust 1.98.1 is required for
 development. Go sources and module files have been removed from the current
 source tree. Normal builds and tests require no Go installation; frozen Go
 observations and their immutable producer history remain as conformance
