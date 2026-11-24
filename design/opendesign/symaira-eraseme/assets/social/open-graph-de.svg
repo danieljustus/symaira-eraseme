@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+<title>Symaira EraseMe — og — de</title><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0D0C0A"/><stop offset="1" stop-color="#171510"/></linearGradient><pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse"><path d="M64 0H0V64" fill="none" stroke="#E5C397" stroke-opacity=".07" stroke-width="1"/></pattern><radialGradient id="glow"><stop stop-color="#FF9A8F" stop-opacity=".18"/><stop offset="1" stop-color="#FF9A8F" stop-opacity="0"/></radialGradient></defs>
+<rect width="1200" height="630" fill="url(#bg)"/><rect width="1200" height="630" fill="url(#grid)"/>
+<circle cx="983" cy="327" r="346" fill="url(#glow)"/>
+<rect x="84" y="37" width="90" height="6" rx="4" fill="#FF9A8F"/>
+<g font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif">
+<text x="84" y="81" fill="#E5C397" font-size="19" font-weight="650" letter-spacing="3">LOKAL · OFFEN · SELBSTBESTIMMT</text>
+<text x="84" y="132" fill="#F5F4F0" font-size="51" font-weight="700" letter-spacing="-2">Symaira EraseMe</text>
+<foreignObject x="84" y="154" width="600" height="112"><div xmlns="http://www.w3.org/1999/xhtml" style="font:28px/1.35 -apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;color:#B5AEA5;">Nachvollziehbare Datenbroker-Löschung.</div></foreignObject>
+<foreignObject x="84" y="217" width="600" height="54"><div xmlns="http://www.w3.org/1999/xhtml" style="font:600 18px/1.3 -apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;color:#F5F4F0;">Native App für macOS · CLI · MCP</div></foreignObject>
+<text x="84" y="583" fill="#E5C397" font-size="18" font-weight="600">github.com/danieljustus/symaira-eraseme</text>
+</g><image href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KICA8cGF0aCBkPSJNMTA1IDMwOUwyNzEgMTEyQzI4NyA5MyAzMTUgOTEgMzM0IDEwN0w0MTIgMTczQzQzMSAxODkgNDMzIDIxNyA0MTcgMjM2TDI1MiA0MzNIMTUxTDk0IDM4NUM3NSAzNjkgNzQgMzQxIDkwIDMyMloiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0ZGOUE4RiIgc3Ryb2tlLXdpZHRoPSIyOCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0yNDcgNDA3TDEyNiAzMDVNMjkxIDMwNEwzODMgMzgyIiBzdHJva2U9IiNGN0UwQTgiIHN0cm9rZS13aWR0aD0iMjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxjaXJjbGUgY3g9IjQxNyIgY3k9IjM2NCIgcj0iMTIiIGZpbGw9IiNGN0UwQTgiLz4KICA8Y2lyY2xlIGN4PSI0NTMiIGN5PSIzOTkiIHI9IjgiIGZpbGw9IiNGN0UwQTgiIG9wYWNpdHk9Ii42NSIvPgo8L3N2Zz4K" x="696" y="173" width="283" height="283" preserveAspectRatio="xMidYMid meet"/></svg>

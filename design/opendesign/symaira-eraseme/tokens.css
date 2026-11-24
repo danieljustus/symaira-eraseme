@@ -1,0 +1,65 @@
+/* Symaira UI Foundation — project-local OpenDesign pull layer. */
+:root {
+  --bg: #0D0C0A;
+  --bg-darker: #070605;
+  --fg: #F5F4F0;
+  --muted: #B5AEA5;
+  --muted-readable: #837D74;
+  --surface: rgba(18, 17, 14, 0.65);
+  --surface-hover: rgba(26, 24, 20, 0.8);
+  --surface-opaque: #171510;
+  --accent: #E5C397;
+  --accent-on: #211D17;
+  --accent-secondary: #F8E6CD;
+  --accent-shadow: #C29965;
+  --accent-soft: #EEDCC4;
+  --accent-sand: #D4B285;
+  --positive: #7FD49A;
+  --warning: #E9BC73;
+  --critical: #FF8A80;
+  --informative: #8CC8F2;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(229, 195, 151, 0.22);
+  --border-increased-contrast: rgba(255, 255, 255, 0.22);
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-wordmark: "Roboto Flex", -apple-system, sans-serif;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-section: 32px;
+  --space-spacious: 48px;
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-panel: 20px;
+  --control-min-height-ios: 44px;
+  --control-min-height-macos: 34px;
+  --readable-content-width: 760px;
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-smooth: 400ms;
+  --motion-fast: 200ms;
+}
+[data-theme="light"] {
+  --bg: #F7F3EC;
+  --bg-darker: #EEE7DC;
+  --fg: #211D17;
+  --muted: #5F584F;
+  --muted-readable: #756D63;
+  --surface: rgba(255, 255, 255, 0.32);
+  --surface-hover: rgba(255, 255, 255, 0.5);
+  --surface-opaque: #FFFCF7;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-increased-contrast: rgba(0, 0, 0, 0.18);
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root, [data-theme="light"] {
+    --surface: var(--surface-opaque);
+    --surface-hover: var(--surface-opaque);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-smooth: 0ms; --motion-fast: 0ms; }
+}

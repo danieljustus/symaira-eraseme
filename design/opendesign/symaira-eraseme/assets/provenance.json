@@ -1,0 +1,77 @@
+{
+  "project": "symaira-eraseme",
+  "rule": "Repository assets remain canonical; OpenDesign copies are handoff/reference material.",
+  "items": [
+    {
+      "asset": "assets/brand/product-logo.png",
+      "source": "/Users/daniel/Dev/Symaira Dev/symaira-eraseme/assets/branding/product-logo.png",
+      "sha256": "30369c7520b62fb19558b5fe267d76f692db5ead73545b285695090b30cd53d3",
+      "kind": "canonical repository source"
+    },
+    {
+      "asset": "assets/brand/app-icon.svg",
+      "source": "/Users/daniel/Dev/Symaira Dev/symaira-eraseme/assets/branding/app-icon.svg",
+      "sha256": "a60428b8f90b47746e2d399dca0be402687a031dbab047e5f7a6ffdfd84a4114",
+      "kind": "canonical repository source"
+    },
+    {
+      "asset": "assets/brand/app-icon.png",
+      "source": "/Users/daniel/Dev/Symaira Dev/symaira-eraseme/assets/branding/app-icon.png",
+      "sha256": "476480a9bddddb9907e6ebcb1c339a487a4666c45574c455a022d0c8b94ad869",
+      "kind": "canonical repository source"
+    },
+    {
+      "asset": "assets/brand/foreground-glyph.svg",
+      "source": "/Users/daniel/Dev/Symaira Dev/symaira-eraseme/assets/branding/app-icon-glyph.svg",
+      "sha256": "d76d6d1c1a5c35434bcfbe2672ecec2163397f84c105078782a46e5e5c8167ed",
+      "kind": "canonical repository source"
+    },
+    {
+      "asset": "assets/source/repository-social-preview.png",
+      "source": "/Users/daniel/Dev/Symaira Dev/symaira-eraseme/docs/assets/social-preview.png",
+      "sha256": "d6735fa1bdf5c17d0483843661d1ae04d3006d744dd87cdd0aec7b5a035fd31a",
+      "kind": "canonical repository source"
+    },
+    {
+      "asset": "assets/source/dmg-background.png",
+      "source": "/Users/daniel/Dev/Symaira Dev/symaira-eraseme/assets/branding/symaira-dmg-background.png",
+      "sha256": "06b99dc64ef2d2a9d2424a18102e65806670e0ec4b5fcafa918a30ba0d5b2e55",
+      "kind": "canonical repository source"
+    },
+    {
+      "asset": "assets/social/github-social-en.svg",
+      "source": "deterministic OpenDesign template + project canonical mark",
+      "kind": "generated editable source"
+    },
+    {
+      "asset": "assets/social/open-graph-de.svg",
+      "source": "deterministic OpenDesign template + project canonical mark",
+      "kind": "generated editable source"
+    },
+    {
+      "asset": "assets/social/square-de.svg",
+      "source": "deterministic OpenDesign template + project canonical mark",
+      "kind": "generated editable source"
+    },
+    {
+      "asset": "assets/social/portrait-de.svg",
+      "source": "deterministic OpenDesign template + project canonical mark",
+      "kind": "generated editable source"
+    },
+    {
+      "asset": "assets/social/story-de.svg",
+      "source": "deterministic OpenDesign template + project canonical mark",
+      "kind": "generated editable source"
+    },
+    {
+      "asset": "assets/release/release-card-en.svg",
+      "source": "deterministic OpenDesign template + project canonical mark",
+      "kind": "generated editable source"
+    },
+    {
+      "asset": "assets/readme/readme-hero-de.svg",
+      "source": "deterministic OpenDesign template + project canonical mark",
+      "kind": "generated editable source"
+    }
+  ]
+}

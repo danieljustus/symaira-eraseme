@@ -1,0 +1,50 @@
+{
+  "project": "symaira-eraseme",
+  "repository": "symaira-eraseme",
+  "role": "Privacy removal · macOS app · CLI/MCP",
+  "entry": "symaira-eraseme-complete-program.html",
+  "journeys": [
+    {
+      "id": "E1",
+      "title": "Identitätsprofil einrichten",
+      "steps": 5,
+      "states": 5
+    },
+    {
+      "id": "E2",
+      "title": "Broker und Kampagne planen",
+      "steps": 6,
+      "states": 5
+    },
+    {
+      "id": "E3",
+      "title": "Anfragen senden",
+      "steps": 6,
+      "states": 6
+    },
+    {
+      "id": "E4",
+      "title": "Antworten triagieren",
+      "steps": 5,
+      "states": 5
+    },
+    {
+      "id": "E5",
+      "title": "Action Required und CAPTCHA",
+      "steps": 5,
+      "states": 6
+    },
+    {
+      "id": "E6",
+      "title": "Fristen und Eskalation",
+      "steps": 6,
+      "states": 6
+    },
+    {
+      "id": "E7",
+      "title": "Rescan, Evidenz und Export",
+      "steps": 6,
+      "states": 6
+    }
+  ]
+}
