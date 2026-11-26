@@ -8,9 +8,10 @@ import XCTest
 final class SettingsAppearanceTests: XCTestCase {
     @MainActor
     func testProductionPickerPersistsAndAppliesToNativeWindows() async throws {
-        // The shared picker is SwiftUI segments; only an AX-authorized host can press them.
+        // The shared picker is now a native segmented control; only an
+        // AX-authorized host builds the SwiftUI tree reliably in a test window.
         guard AXIsProcessTrusted() else {
-            throw XCTSkip("Pressing SwiftUI segments requires an AX-authorized test host")
+            throw XCTSkip("Driving the native segmented picker requires an AX-authorized test host")
         }
         _ = NSApplication.shared
         let previousAppearance = NSApp.appearance
@@ -48,16 +49,30 @@ final class SettingsAppearanceTests: XCTestCase {
         let restoreAccessibility = enableEnhancedAccessibility()
         defer { restoreAccessibility() }
         try await Task.sleep(for: .milliseconds(300))
+        // CoreKit v0.25 replaced the SwiftUI segments with one native
+        // NSSegmentedControl. Its AX radio cells do not implement AXPress, so
+        // drive the control's own action after selecting the labelled segment.
+        let picker = try XCTUnwrap(segmentedControl(in: window.contentView!), "Missing native appearance picker")
         for choice in [SymairaAppearance.dark, .light, .system] {
-            try press(in: window, "Missing segment \(choice.title)") {
-                text($0, "accessibilityRole") == NSAccessibility.Role.button.rawValue
-                    && text($0, "accessibilityLabel") == choice.title
-            }
+            let index = try XCTUnwrap(
+                (0..<picker.segmentCount).first { picker.label(forSegment: $0) == choice.title },
+                "Missing segment \(choice.title)")
+            picker.selectedSegment = index
+            XCTAssertTrue(picker.sendAction(picker.action, to: picker.target), "Cannot select \(choice.title)")
             try await Task.sleep(for: .milliseconds(150))
             XCTAssertEqual(defaults.string(forKey: "symeraseme_appearance"), choice.rawValue)
             XCTAssertEqual(NSApp.appearance?.name, choice.nativeAppearance?.name)
             XCTAssertEqual(window.effectiveAppearance.name, otherWindow.effectiveAppearance.name)
         }
         XCTAssertFalse(manager.isRunning)
+    }
+
+    @MainActor
+    private func segmentedControl(in view: NSView) -> NSSegmentedControl? {
+        if let control = view as? NSSegmentedControl { return control }
+        for subview in view.subviews {
+            if let control = segmentedControl(in: subview) { return control }
+        }
+        return nil
     }
 }

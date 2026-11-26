@@ -3,29 +3,39 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+    cooldown:
+      exclude: ["symaira-core-*"]
     groups:
+      symaira-corekit:
+        patterns: ["symaira-core-*"]
+      # A broader group wins over the CoreKit group unless its crates are excluded.
       minor-patch:
         update-types:
           - "minor"
           - "patch"
+        exclude-patterns: ["symaira-core-*"]
 
   - package-ecosystem: "github-actions"
     directory: "/.github/workflows"
     schedule:
       interval: "weekly"
     groups:
+      symaira-corekit:
+        patterns: ["danieljustus/symaira-corekit*"]
       minor-patch:
         update-types:
           - "minor"
           - "patch"
+        exclude-patterns: ["danieljustus/symaira-corekit*"]
 
   # macOS app package (CoreKit Swift products, exact-pinned).
   - package-ecosystem: "swift"
     directory: "/app/SymairaEraseMe"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+    cooldown:
+      exclude: ["*symaira-corekit*"]
     groups:
       symaira-corekit:
-        patterns:
-          - "*symaira-corekit*"
+        patterns: ["*symaira-corekit*"]
