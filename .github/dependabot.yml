@@ -1,7 +1,11 @@
 version: 2
 updates:
+  # fuzz/ keeps its own Cargo.lock; a CoreKit bump must move it too, or
+  # `cargo --locked` fails there (rustix conflict seen with v0.27.0).
   - package-ecosystem: "cargo"
-    directory: "/"
+    directories:
+      - "/"
+      - "/fuzz"
     schedule:
       interval: "daily"
     cooldown:
