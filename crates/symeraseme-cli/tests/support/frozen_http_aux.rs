@@ -25,190 +25,190 @@ pub(crate) const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
     (
         "linux/arm64",
         "live_http_disconnect_cancels_and_reaps_host_agent_like_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "1119f8498a93e89308cdc29c96e52e71fc80d7de90e050095f751533f48b1bb9",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "997bfc7d4afb651343f2328d9033a8da3120a881053afae3145cb31c1bb74751",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-arm64/live_http_disconnect_cancels_and_reaps_host_agent_like_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-arm64/live_http_disconnect_cancels_and_reaps_host_agent_like_go.json"
         ),
     ),
     (
         "linux/arm64",
         "live_http_disconnect_cancels_provider_request_like_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "f58272f10b7421aac467ab609e486212be4a51e8d46e2931a6882363df2124f0",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "2b2c4afc4a9d69d6a3f0500bb74e1f7ba18c5cbedc86c6534bc24ea2dfb79f76",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-arm64/live_http_disconnect_cancels_provider_request_like_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-arm64/live_http_disconnect_cancels_provider_request_like_go.json"
         ),
     ),
     (
         "linux/arm64",
         "native_bind_failures_match_checked_out_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "e3788433f70c6bacb131cb5014054de4d365d43807d4e3adfb014bc3bd1d95e2",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "ed714ad568d860c3d7f17f5f6b88192206960c8c5b7fb0297649da642c90ff04",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-arm64/native_bind_failures_match_checked_out_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-arm64/native_bind_failures_match_checked_out_go.json"
         ),
     ),
     (
         "linux/arm64",
         "obs_text_origin_rejection_matches_go_and_rust_processes",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "6ed20e0c7c3b731f2793a315638704f9aff096f1c148f2e2616b33129e2e6749",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "23e99c0e80fd5066329ba1426abf96306e788e6e671f2d236bd1d1ab0809a196",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-arm64/obs_text_origin_rejection_matches_go_and_rust_processes.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-arm64/obs_text_origin_rejection_matches_go_and_rust_processes.json"
         ),
     ),
     (
         "linux/arm64",
         "occupied_bind_error_matches_go_for_ipv4_and_ipv6",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "71fae0bed526385ac12712cda0da20d712d76867a0c9bc18558fac1bb424b19f",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "628b2a8623eff7931eae43a0c8b80ad1504d429c05652167c55da0205b06a150",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-arm64/occupied_bind_error_matches_go_for_ipv4_and_ipv6.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-arm64/occupied_bind_error_matches_go_for_ipv4_and_ipv6.json"
         ),
     ),
     (
         "linux/arm64",
         "startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "b960dc6e3bb546a4fe54bcd2dfd92290bf533cc003aebff5554b75a2284cce5a",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "792ca54d2762b330d37b968937234fe01b23eb228a246ad48e336769564d7372",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-arm64/startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-arm64/startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json"
         ),
     ),
     (
         "linux/arm64",
         "unavailable_local_address_error_matches_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "338f312bcb1c8b8b5c0a1b458217492fca86ad44a6bab4a2451e246663a3897e",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "3a7ef5bfcb02919c52200d4ff1950a8c5ef9d87d2cece5ef276bbd9abb671b4e",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-arm64/unavailable_local_address_error_matches_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-arm64/unavailable_local_address_error_matches_go.json"
         ),
     ),
     (
         "linux/amd64",
         "live_http_disconnect_cancels_and_reaps_host_agent_like_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "bc0eccc9b1f782926589dcf12c83f961b367c8005e63cce256f3395741ecb6d4",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "84c8d5a26920f457657cad83deb685d6c08f9ab6df6e746bd511c6f3b3170880",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-amd64/live_http_disconnect_cancels_and_reaps_host_agent_like_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-amd64/live_http_disconnect_cancels_and_reaps_host_agent_like_go.json"
         ),
     ),
     (
         "linux/amd64",
         "live_http_disconnect_cancels_provider_request_like_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "3ee0b17bc3b5754c04af726e98e506f08da0a6e20aadfe6fa3001bc7db6c677c",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "9f5d9cbeafc3a43d28b5d023046e9ae7a5c036607ab2bd85b0d9ed29c68cefc4",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-amd64/live_http_disconnect_cancels_provider_request_like_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-amd64/live_http_disconnect_cancels_provider_request_like_go.json"
         ),
     ),
     (
         "linux/amd64",
         "native_bind_failures_match_checked_out_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "e7e8662804c475c77d547b7ed6b773034012f6cab63751fc05dd41df34f0ceec",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "76cca11169f8bc15fff1ccf1e3884494210995ad9b52e013689796ca22bb1d54",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-amd64/native_bind_failures_match_checked_out_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-amd64/native_bind_failures_match_checked_out_go.json"
         ),
     ),
     (
         "linux/amd64",
         "obs_text_origin_rejection_matches_go_and_rust_processes",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "e8b508e29ae9d99cd3115ecb308dbf87a6109ed8ae8bf3c6a5777383df8731b6",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "ee5aa9db6aa891487f63ac61df06440e55a922605485f2c27c9236b7f6e449ee",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-amd64/obs_text_origin_rejection_matches_go_and_rust_processes.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-amd64/obs_text_origin_rejection_matches_go_and_rust_processes.json"
         ),
     ),
     (
         "linux/amd64",
         "occupied_bind_error_matches_go_for_ipv4_and_ipv6",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "f917960a8cfb3bae6afa428a334b9fe153a10c407089f84e582ced82ba73d5fc",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "0923774e0912c0dd8a6e64b3067e1e817d1c000da84f189dfa4c0bc0be7bd7ae",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-amd64/occupied_bind_error_matches_go_for_ipv4_and_ipv6.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-amd64/occupied_bind_error_matches_go_for_ipv4_and_ipv6.json"
         ),
     ),
     (
         "linux/amd64",
         "startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "23f7639aa62144aa7978816e2067bc88d6c789d1ffac5a7d4a8e07ce88bfe142",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "a12b99a74a57a99e6e2d6e90804d09b1dbb727e206f375f3316206b7340674e1",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-amd64/startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-amd64/startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json"
         ),
     ),
     (
         "linux/amd64",
         "unavailable_local_address_error_matches_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "0da127a1d5855ee47aaa086acb06375c9f3b30ad092dc9d2107251107ac0dbc1",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "08ec8e904cc9ccbd6327bbe01d09c5f181a18fb56b4f2f0699ab15826b2c1158",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/linux-amd64/unavailable_local_address_error_matches_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/linux-amd64/unavailable_local_address_error_matches_go.json"
         ),
     ),
     (
         "darwin/arm64",
         "live_http_disconnect_cancels_and_reaps_host_agent_like_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "325c147e933521606352be58f3a4dc8c3d01920d052ddd843e58088b8a0e4558",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "164edc6f0c75dd95c7d0c7304647719e3f5ab4e23dd6e1fecb8a22e69a72a05b",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/darwin-arm64/live_http_disconnect_cancels_and_reaps_host_agent_like_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/darwin-arm64/live_http_disconnect_cancels_and_reaps_host_agent_like_go.json"
         ),
     ),
     (
         "darwin/arm64",
         "live_http_disconnect_cancels_provider_request_like_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "031727c0b3b2fc57cb1fcf5f6d25b0b35645982d3487f5558f107c4e55e874c8",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "7174ed985b806ab78fa275f54dca8b081369a8d49dfaf38285e65c3bfa3cbda8",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/darwin-arm64/live_http_disconnect_cancels_provider_request_like_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/darwin-arm64/live_http_disconnect_cancels_provider_request_like_go.json"
         ),
     ),
     (
         "darwin/arm64",
         "native_bind_failures_match_checked_out_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "5da32f7e4415dd73067c945c866e83a6274e2ffb115d81c2256ea09f622c4161",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "bcb8ed0f2a1dd7f3104cfddfdeb98c0a9a3fbde107276d2dc30eec9a693c3cf0",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/darwin-arm64/native_bind_failures_match_checked_out_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/darwin-arm64/native_bind_failures_match_checked_out_go.json"
         ),
     ),
     (
         "darwin/arm64",
         "obs_text_origin_rejection_matches_go_and_rust_processes",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "19f2b249c2e15271cf1d76bf8f94a7345a31d8e0c511ddb10db477b84a97d9be",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "1ce0c0cb882c58558a1922dae11e8e785ec937526def90f0787e16f25ccea57f",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/darwin-arm64/obs_text_origin_rejection_matches_go_and_rust_processes.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/darwin-arm64/obs_text_origin_rejection_matches_go_and_rust_processes.json"
         ),
     ),
     (
         "darwin/arm64",
         "occupied_bind_error_matches_go_for_ipv4_and_ipv6",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "2b08e9dce5255cbbf966b57bd79e4d35b1873cef5b2dd40b19e8c2e007504a12",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "1be2acc77e898e385c7d41ff9b39b6419b2dbe676e1364698da49a9ea2097e5d",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/darwin-arm64/occupied_bind_error_matches_go_for_ipv4_and_ipv6.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/darwin-arm64/occupied_bind_error_matches_go_for_ipv4_and_ipv6.json"
         ),
     ),
     (
         "darwin/arm64",
         "startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "385be04fb1555a9e0e9166d23aaf2bf5ad310c35268b7fe39535499e39d33232",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "27555babe66dce1e0d28babc084da5abbce3df05c2b398000a25d0e556d1daab",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/darwin-arm64/startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/darwin-arm64/startup_handoff_reselects_a_stolen_candidate_and_rejects_stale_readiness.json"
         ),
     ),
     (
         "darwin/arm64",
         "unavailable_local_address_error_matches_go",
-        "17c7d69658eeb22c4ac96a3c0d4facfb6a372274",
-        "6686e7fa08a31d8fff5d16f8fb6aa8c9ce7069c4817fad7de6b92d009c8ce857",
+        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
+        "78110f380e5054d3bf13167b0151cc0f72c5d27b35e3ee6719a9b1f63a733acc",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-5f5b27a2/http-aux/darwin-arm64/unavailable_local_address_error_matches_go.json"
+            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-aux/darwin-arm64/unavailable_local_address_error_matches_go.json"
         ),
     ),
 ];

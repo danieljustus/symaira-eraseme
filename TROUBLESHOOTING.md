@@ -51,6 +51,18 @@ location. Database encryption is configurable with `SYMERASEME_ENCRYPT_DB`;
 credentials should be referenced through the canonical `symvault://` form or a
 platform secure store.
 
+## Identity master key and the OS keyring
+
+On macOS, the CLI/MCP stores and reads the identity master key in the Keychain
+under service `symeraseme` and account `identity-master-key`. Items written by
+older Go-era installations at the same coordinates are decoded automatically;
+macOS may ask once to allow the CLI to access that existing item.
+
+On Linux, the keyring uses the Secret Service. Without a running Secret Service,
+set `SYMERASEME_IDENTITY_MASTER_KEY` (a hex master key) or
+`SYMVAULT_PASSPHRASE` before initializing a profile. Explicit initialization
+fails closed rather than creating a profile whose key cannot be persisted.
+
 ## Migrating an older installation
 
 The migration command is explicit and dry-run first:

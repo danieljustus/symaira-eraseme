@@ -22,6 +22,8 @@ CANDIDATE = '5f5b27a2802395596dbb59b0362bc7fd71ed9b4a'
 SNAPSHOT = '17c7d69658eeb22c4ac96a3c0d4facfb6a372274'
 PRED_SNAPSHOT = 'a8eda4f77ce938c32d18dbad7d45de148b7d0482'
 PRED_REFRESH = 'a8eda4f7'
+# Squash commit of #1344 on main: imports refresh-5f5b27a2 over refresh-a8eda4f7.
+IMPORT_COMMIT = '3aa50350d031ec6f27042e097001d4ee26136def'
 FIXTURES = ROOT / 'tests/fixtures/go-frozen'
 READERS = IMPORT.READERS
 ARTIFACTS = (
@@ -81,18 +83,27 @@ def make_artifacts(temporary, source=FIXTURES / 'refresh-5f5b27a2', mutate=None,
     return artifacts, digests
 
 
+def committed_reader(reader):
+    """Reader bytes right after the refresh-5f5b27a2 import landed on main.
+
+    Later refreshes repoint the readers in the working tree, so the replay
+    compares against this fixed commit instead of the current checkout.
+    """
+    return git('show', IMPORT_COMMIT + ':' + reader)
+
+
 def prepare_import_root(temporary):
-    """Seed a destination worktree with the reader state before import 784a04cc."""
+    """Seed a destination worktree with the reader state before that import."""
     destination = Path(temporary) / 'import'
     destination.mkdir()
     for reader in READERS:
         target = destination / reader
         target.parent.mkdir(parents=True, exist_ok=True)
         try:
-            target.write_bytes(git('show', '784a04cc^:' + reader))
+            target.write_bytes(git('show', IMPORT_COMMIT + '^:' + reader))
         except subprocess.CalledProcessError:
             # Fallback for shallow checkouts: reverse the committed import text.
-            text = (ROOT / reader).read_text(encoding='utf-8')
+            text = committed_reader(reader).decode('utf-8')
             for record in (FIXTURES / 'refresh-5f5b27a2').rglob('*.json'):
                 relative = record.relative_to(FIXTURES / 'refresh-5f5b27a2').as_posix()
                 predecessor = FIXTURES / 'refresh-a8eda4f7' / relative
@@ -127,7 +138,7 @@ class CaptureRefreshImport(unittest.TestCase):
                 self.assertEqual(copied.read_bytes(), record.read_bytes())
             for reader in READERS:
                 self.assertEqual((destination / reader).read_bytes(),
-                                 (ROOT / reader).read_bytes())
+                                 committed_reader(reader))
 
     def test_non_whitelisted_json_path_stops_the_import(self):
         with tempfile.TemporaryDirectory(prefix='capture-import-test-') as temporary:
