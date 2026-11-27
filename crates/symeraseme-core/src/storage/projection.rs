@@ -9,16 +9,11 @@
 
 use super::{repository::Repository, store::Store, types};
 use crate::timeutil;
-use chrono::{DateTime, Duration, TimeZone, Utc};
 use rusqlite::{Row, Transaction, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::{
-    collections::BTreeMap,
-    error::Error,
-    fmt,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{collections::BTreeMap, error::Error, fmt, time::SystemTime};
+use time::{Duration, OffsetDateTime};
 
 /// Errors returned by event append and projection operations.
 #[derive(Debug)]
@@ -125,7 +120,7 @@ pub fn append_and_project_tx(
     event_type: &types::EventType,
     payload: &Map<String, Value>,
     source: &types::Source,
-    occurred_at: DateTime<Utc>,
+    occurred_at: OffsetDateTime,
 ) -> ProjectionResult<(i64, ProjectionState)> {
     let event_id = append_event_tx(
         transaction,
@@ -147,7 +142,7 @@ impl Store {
         event_type: &types::EventType,
         payload: &Map<String, Value>,
         source: &types::Source,
-        occurred_at: DateTime<Utc>,
+        occurred_at: OffsetDateTime,
     ) -> ProjectionResult<i64> {
         let transaction = self.connection().unchecked_transaction()?;
         let event_id = append_event_tx(
@@ -169,7 +164,7 @@ impl Store {
         event_type: &types::EventType,
         payload: &Map<String, Value>,
         source: &types::Source,
-        occurred_at: DateTime<Utc>,
+        occurred_at: OffsetDateTime,
     ) -> ProjectionResult<i64> {
         self.append_event(request_id, event_type, payload, source, occurred_at)
     }
@@ -181,7 +176,7 @@ impl Store {
         event_type: &types::EventType,
         payload: &Map<String, Value>,
         source: &types::Source,
-        occurred_at: DateTime<Utc>,
+        occurred_at: OffsetDateTime,
     ) -> ProjectionResult<(i64, ProjectionState)> {
         let transaction = self.connection().unchecked_transaction()?;
         let result = append_and_project_tx(
@@ -271,7 +266,7 @@ fn append_event_tx(
     event_type: &types::EventType,
     payload: &Map<String, Value>,
     source: &types::Source,
-    occurred_at: DateTime<Utc>,
+    occurred_at: OffsetDateTime,
 ) -> ProjectionResult<i64> {
     validate_append(event_type, source)?;
     let payload_json = if payload.is_empty() {
@@ -442,7 +437,7 @@ fn apply_event(
             // instead of turning oversized historical payloads into errors.
             const NANOSECONDS_PER_DAY: i64 = 86_400_000_000_000;
             let duration = Duration::nanoseconds(days.wrapping_mul(NANOSECONDS_PER_DAY));
-            if let Some(deadline) = event.occurred_at.checked_add_signed(duration) {
+            if let Some(deadline) = event.occurred_at.checked_add(duration) {
                 state.deadline_at = Some(timeutil::format_iso(deadline));
             }
         }
@@ -507,8 +502,8 @@ fn status_for(event_type: &types::EventType) -> Option<&'static str> {
 }
 
 /// Whether a UTC instant is Go's `time.Time{}` zero value.
-fn is_go_zero_time(timestamp: chrono::DateTime<chrono::Utc>) -> bool {
-    timestamp.timestamp() == -62_135_596_800 && timestamp.timestamp_subsec_nanos() == 0
+fn is_go_zero_time(timestamp: OffsetDateTime) -> bool {
+    timestamp.unix_timestamp() == -62_135_596_800 && timestamp.nanosecond() == 0
 }
 
 /// Extracts the numeric JSON values Go's `toInt` accepts on replay.
@@ -534,11 +529,6 @@ fn go_float_to_int(value: f64) -> i64 {
     value as i64
 }
 
-fn utc_now() -> DateTime<Utc> {
-    let elapsed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    Utc.timestamp_opt(elapsed.as_secs() as i64, elapsed.subsec_nanos())
-        .single()
-        .expect("system clock must produce a representable UTC timestamp")
+fn utc_now() -> OffsetDateTime {
+    OffsetDateTime::from(SystemTime::now())
 }

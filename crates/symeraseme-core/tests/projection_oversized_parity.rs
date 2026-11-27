@@ -9,7 +9,6 @@
 #[path = "support/frozen_native_capture.rs"]
 mod frozen_native_capture;
 
-use chrono::{TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
@@ -173,10 +172,7 @@ fn oversized_expected_response_days_matches_live_go_oracle() {
     let cases: Vec<Case> = serde_json::from_str(CASES).expect("valid projection cases");
     let oracle = run_go_oracle();
     assert_eq!(oracle.cases.len(), cases.len());
-    let occurred_at = Utc
-        .with_ymd_and_hms(2026, 1, 1, 0, 0, 0)
-        .single()
-        .expect("valid boundary timestamp");
+    let occurred_at = time::macros::datetime!(2026-01-01 00:00:00 +00:00);
 
     for (index, case) in cases.iter().enumerate() {
         let mut payload = Map::new();

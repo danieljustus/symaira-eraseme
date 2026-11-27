@@ -537,15 +537,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chrono"
-version = "0.4.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "cipher"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2559,7 +2550,6 @@ name = "symeraseme-cli"
 version = "0.17.1"
 dependencies = [
  "base64 0.23.1",
- "chrono",
  "clap",
  "http",
  "http-body-util",
@@ -2576,6 +2566,7 @@ dependencies = [
  "symeraseme-core",
  "symeraseme-engine",
  "tempfile",
+ "time",
  "tokio",
 ]
 
@@ -2589,7 +2580,6 @@ dependencies = [
  "cap-fs-ext",
  "cap-std",
  "cbc",
- "chrono",
  "crypto-common",
  "flate2",
  "hex",
@@ -2614,6 +2604,7 @@ dependencies = [
  "symaira-core-version",
  "tar",
  "tempfile",
+ "time",
  "tokio",
  "toml",
  "ureq",

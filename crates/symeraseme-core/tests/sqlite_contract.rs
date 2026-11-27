@@ -711,15 +711,15 @@ fn event_queries_accept_the_three_go_timestamp_layouts_and_keep_nulls() {
         .expect("read timestamp variants");
     assert_eq!(events.len(), 4);
     assert_eq!(
-        events[0].occurred_at.to_rfc3339(),
+        symeraseme_core::timeutil::format_rfc3339_auto_si(events[0].occurred_at, false),
         "2026-08-01T08:00:00+00:00"
     );
     assert_eq!(
-        events[1].occurred_at.to_rfc3339(),
+        symeraseme_core::timeutil::format_rfc3339_auto_si(events[1].occurred_at, false),
         "2026-08-01T08:05:00+00:00"
     );
     assert_eq!(
-        events[2].occurred_at.to_rfc3339(),
+        symeraseme_core::timeutil::format_rfc3339_auto_si(events[2].occurred_at, false),
         "2026-08-03T09:12:00+00:00"
     );
     assert_eq!(

@@ -249,11 +249,11 @@ fn inspect(
 mod tests {
     use super::*;
     use crate::storage::types::{EventType, Source};
-    use chrono::{DateTime, TimeZone, Utc};
     use serde_json::Map;
+    use time::OffsetDateTime;
 
-    fn fixed_now() -> DateTime<Utc> {
-        Utc.with_ymd_and_hms(2026, 11, 10, 12, 0, 0).unwrap()
+    fn fixed_now() -> OffsetDateTime {
+        time::macros::datetime!(2026-11-10 12:00:00 +00:00)
     }
 
     fn store() -> (tempfile::TempDir, Store) {

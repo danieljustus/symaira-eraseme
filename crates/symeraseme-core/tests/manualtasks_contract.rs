@@ -10,7 +10,6 @@
 
 use std::process::Command;
 
-use chrono::{DateTime, Utc};
 use symeraseme_core::manualtasks::{
     CreateOpts, ListOpts, cleanup, complete, create, get, instructions_for_reason, list,
     redact_identity_values, save_screenshot,
@@ -18,6 +17,7 @@ use symeraseme_core::manualtasks::{
 use symeraseme_core::storage::repository::Repository;
 use symeraseme_core::storage::store::Store;
 use tempfile::{TempDir, tempdir};
+use time::OffsetDateTime;
 
 const DATA_DIR_CHILD: &str = "SYMERASEME_MANUALTASKS_DATA_DIR_CHILD";
 
@@ -45,10 +45,8 @@ fn run_in_data_dir_child(test_name: &str) -> bool {
     false
 }
 
-fn pinned_now() -> DateTime<Utc> {
-    DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-        .expect("pinned instant")
-        .with_timezone(&Utc)
+fn pinned_now() -> OffsetDateTime {
+    symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00").expect("pinned instant")
 }
 
 fn store_with_request() -> (TempDir, Store, i64) {

@@ -9,7 +9,6 @@
 use std::fs;
 use std::path::Path;
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -18,6 +17,7 @@ use symeraseme_core::identity::{Profile, ProfileAddress, hash_profile};
 use symeraseme_core::registry::load_from_dir;
 use symeraseme_core::storage::store::Store;
 use tempfile::tempdir;
+use time::OffsetDateTime;
 
 const FIXTURE_DIR: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -102,10 +102,8 @@ struct RequestRow {
     identity_snapshot_hash: String,
 }
 
-fn pinned_now() -> DateTime<Utc> {
-    DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-        .expect("pinned instant")
-        .with_timezone(&Utc)
+fn pinned_now() -> OffsetDateTime {
+    symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00").expect("pinned instant")
 }
 
 /// Go's `buildMiniRegistry`: only the three golden brokers, with a manifest and

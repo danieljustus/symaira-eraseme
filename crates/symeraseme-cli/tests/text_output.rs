@@ -4,7 +4,6 @@
 //! Neither is a Go behaviour, so there is no recorded oracle: the contract is
 //! asserted here against seeded stores.
 
-use chrono::{TimeZone, Utc};
 use serde_json::{Map, Value};
 use std::path::Path;
 use std::process::{Command, Output};
@@ -58,7 +57,7 @@ fn seeded() -> tempfile::TempDir {
                 &EventType::Planned,
                 &Map::new(),
                 &Source::System,
-                Utc.with_ymd_and_hms(2026, 11, 10, 12, 0, 0).unwrap(),
+                time::macros::datetime!(2026-11-10 12:00:00 +00:00),
             )
             .unwrap();
         if broker == "acme" {
@@ -68,7 +67,7 @@ fn seeded() -> tempfile::TempDir {
                     &EventType::Sent,
                     &Map::new(),
                     &Source::User,
-                    Utc.with_ymd_and_hms(2026, 11, 10, 12, 5, 0).unwrap(),
+                    time::macros::datetime!(2026-11-10 12:05:00 +00:00),
                 )
                 .unwrap();
         }

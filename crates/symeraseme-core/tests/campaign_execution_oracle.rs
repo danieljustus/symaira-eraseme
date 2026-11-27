@@ -6,7 +6,6 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
-use chrono::{DateTime, Utc};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use symeraseme_core::{
@@ -16,6 +15,7 @@ use symeraseme_core::{
     storage::{EventType, Repository, Source, Store},
 };
 use tempfile::tempdir;
+use time::OffsetDateTime;
 
 const ORACLE_DIR: &str = "rust-tests/parity/oracle/campaign-execution";
 #[path = "support/frozen_campaign_oracle.rs"]
@@ -61,10 +61,8 @@ fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-fn pinned_now() -> DateTime<Utc> {
-    DateTime::parse_from_rfc3339("2026-01-01T00:00:00+00:00")
-        .expect("pinned instant")
-        .with_timezone(&Utc)
+fn pinned_now() -> OffsetDateTime {
+    symeraseme_core::timeutil::parse_rfc3339("2026-01-01T00:00:00+00:00").expect("pinned instant")
 }
 
 fn pin_request_timestamps(store: &Store, ids: &[i64]) {

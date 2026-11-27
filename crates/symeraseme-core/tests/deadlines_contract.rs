@@ -1,7 +1,7 @@
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
 use symeraseme_core::{deadlines::actions_for_candidate, storage::TickCandidate};
+use time::OffsetDateTime;
 
 #[derive(Deserialize)]
 struct GoldenTick {
@@ -9,7 +9,7 @@ struct GoldenTick {
     actions: Vec<Value>,
 }
 
-fn at(value: &str) -> DateTime<Utc> {
+fn at(value: &str) -> OffsetDateTime {
     symeraseme_core::timeutil::parse_timestamp(value).expect("valid fixture timestamp")
 }
 

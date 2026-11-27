@@ -4,18 +4,16 @@
 //! `RunTick` scans, `ApplyTickActions` appends each action's event with source
 //! `scheduler`, dry runs write nothing, and the projections are rebuilt.
 
-use chrono::{DateTime, Duration, Utc};
 use serde_json::{Map, Value, json};
 use symeraseme_core::deadlines::{RunOpts, apply_tick_actions, run_tick};
 use symeraseme_core::storage::repository::Repository;
 use symeraseme_core::storage::store::Store;
 use symeraseme_core::storage::types::{EventType, Source};
 use tempfile::tempdir;
+use time::{Duration, OffsetDateTime};
 
-fn pinned_now() -> DateTime<Utc> {
-    DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-        .expect("pinned instant")
-        .with_timezone(&Utc)
+fn pinned_now() -> OffsetDateTime {
+    symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00").expect("pinned instant")
 }
 
 /// A request whose next action is unset, so the scan always picks it up.
@@ -54,7 +52,8 @@ fn run_tick_scans_and_apply_writes_the_scheduler_event() {
     let store = Store::open(tree.path().join("db.sqlite")).expect("open store");
     let now = pinned_now();
     // 21 days since sending: the first reminder is due (7-day threshold).
-    let sent_at = (now - Duration::days(21)).to_rfc3339();
+    let sent_at =
+        symeraseme_core::timeutil::format_rfc3339_auto_si(now - Duration::days(21), false);
     let request_id = seed_awaiting_ack(&store, &sent_at);
 
     let actions = run_tick(
@@ -90,7 +89,8 @@ fn dry_run_reports_without_writing() {
     let tree = tempdir().expect("temp dir");
     let store = Store::open(tree.path().join("db.sqlite")).expect("open store");
     let now = pinned_now();
-    let sent_at = (now - Duration::days(21)).to_rfc3339();
+    let sent_at =
+        symeraseme_core::timeutil::format_rfc3339_auto_si(now - Duration::days(21), false);
     let request_id = seed_awaiting_ack(&store, &sent_at);
 
     let actions = run_tick(
@@ -133,9 +133,8 @@ fn golden_tick_histories_scan_and_persist_all_four_go_actions() {
         "../../../tests/fixtures/event-store/golden-tick.json"
     ))
     .expect("golden tick fixture");
-    let now = DateTime::parse_from_rfc3339(fixture["now"].as_str().expect("now"))
-        .expect("timestamp")
-        .with_timezone(&Utc);
+    let now = symeraseme_core::timeutil::parse_rfc3339(fixture["now"].as_str().expect("now"))
+        .expect("timestamp");
 
     type History<'a> = (&'a str, &'a [(EventType, Value, i64)]);
     let histories: [History<'_>; 4] = [

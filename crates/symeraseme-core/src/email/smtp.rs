@@ -4,10 +4,10 @@
 //! ID uses the OS CSPRNG. [`NetSmtpTransport`] supplies an explicit network
 //! adapter without enabling sending on the default CLI/MCP execution path.
 
-use chrono::{DateTime, FixedOffset};
 use rand::TryRng;
 use sha2::{Digest, Sha256};
 use std::fmt;
+use time::{OffsetDateTime, UtcOffset};
 
 mod network;
 pub use network::{NetSmtpTransport, SmtpConfig};
@@ -55,8 +55,8 @@ pub trait SmtpTransport {
 pub fn build_mime_at(
     message: &EmailMessage,
     from: &str,
-    now: DateTime<FixedOffset>,
-    local_offset: FixedOffset,
+    now: OffsetDateTime,
+    local_offset: UtcOffset,
     message_id: &str,
 ) -> Result<(Vec<u8>, String), SmtpError> {
     if from.trim().is_empty() {
@@ -87,9 +87,9 @@ pub fn build_mime_at(
     write_header(
         &mut mime,
         "Date",
-        &now.with_timezone(&local_offset)
-            .format("%a, %d %b %Y %H:%M:%S %z")
-            .to_string(),
+        &now.to_offset(local_offset)
+            .format(&time::format_description::well_known::Rfc2822)
+            .expect("timestamp fields are in range"),
     );
     write_header(&mut mime, "Message-ID", &message_id);
     write_header(&mut mime, "MIME-Version", "1.0");
@@ -125,8 +125,8 @@ pub fn recipients(message: &EmailMessage) -> Option<Vec<String>> {
 pub fn send_message_at(
     message: &EmailMessage,
     from: &str,
-    now: DateTime<FixedOffset>,
-    local_offset: FixedOffset,
+    now: OffsetDateTime,
+    local_offset: UtcOffset,
     message_id: &str,
     transport: &dyn SmtpTransport,
 ) -> Result<String, SmtpError> {
