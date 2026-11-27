@@ -14,9 +14,9 @@
 use crate::email::session::FetchedMessage;
 use crate::email::types::Message;
 use base64::Engine;
-use chrono::{DateTime, FixedOffset, NaiveDate, TimeZone};
 use regex::Regex;
 use std::sync::OnceLock;
+use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
 
 /// Reads one header block and returns its fields in order.
 fn read_header(header: &[u8]) -> Result<Vec<(String, String)>, String> {
@@ -285,7 +285,7 @@ pub fn parse_fetched_message(fetched: &FetchedMessage) -> Result<Message, String
     if date.is_none()
         && let Some(internal) = fetched.internal_date
     {
-        date = Some(internal.fixed_offset());
+        date = Some(internal);
     }
 
     Ok(Message {
@@ -316,7 +316,7 @@ pub fn parse_fetched_message(fetched: &FetchedMessage) -> Result<Message, String
 
 /// `net/mail`'s date layouts: `[Mon, ]D Mon [YY]YY HH:MM[:SS] zone`, where the
 /// zone is a numeric offset, a three-letter name, or `UT`.
-fn parse_date(value: &str) -> Option<DateTime<FixedOffset>> {
+fn parse_date(value: &str) -> Option<OffsetDateTime> {
     let text = value.trim();
     let mut rest = text;
     if let Some(comma) = rest.find(',') {
@@ -348,9 +348,17 @@ fn parse_date(value: &str) -> Option<DateTime<FixedOffset>> {
     };
     let zone_text = parts.next()?;
     let offset = parse_zone(zone_text)?;
-    let date = NaiveDate::from_ymd_opt(year, month, day)?;
-    let naive = date.and_hms_opt(hour, minute, second)?;
-    offset.from_local_datetime(&naive).single()
+    let day = u8::try_from(day).ok()?;
+    let date =
+        Date::from_calendar_date(year, Month::try_from(u8::try_from(month).ok()?).ok()?, day)
+            .ok()?;
+    let time = Time::from_hms(
+        u8::try_from(hour).ok()?,
+        u8::try_from(minute).ok()?,
+        u8::try_from(second).ok()?,
+    )
+    .ok()?;
+    Some(PrimitiveDateTime::new(date, time).assume_offset(offset))
 }
 
 fn month_number(name: &str) -> Option<u32> {
@@ -364,7 +372,7 @@ fn month_number(name: &str) -> Option<u32> {
         .map(|index| index as u32 + 1)
 }
 
-fn parse_zone(value: &str) -> Option<FixedOffset> {
+fn parse_zone(value: &str) -> Option<UtcOffset> {
     let bytes = value.as_bytes();
     let sign = match bytes.first()? {
         b'+' => 1,
@@ -374,9 +382,7 @@ fn parse_zone(value: &str) -> Option<FixedOffset> {
             return match letters.to_ascii_uppercase().as_str() {
                 // "MST" is the layout's three-letter zone; Go maps unknown
                 // abbreviations to a zero offset, as do UT/GMT/UTC.
-                name if name.len() == 3 || name == "GMT" || name == "UTC" => {
-                    FixedOffset::east_opt(0)
-                }
+                name if name.len() == 3 || name == "GMT" || name == "UTC" => Some(UtcOffset::UTC),
                 _ => None,
             };
         }
@@ -388,5 +394,5 @@ fn parse_zone(value: &str) -> Option<FixedOffset> {
     // the zone, not panic on a char boundary (fuzz: email_headers).
     let hours: i32 = value.get(1..3)?.parse().ok()?;
     let minutes: i32 = value.get(3..5)?.parse().ok()?;
-    FixedOffset::east_opt(sign * (hours * 3600 + minutes * 60))
+    UtcOffset::from_whole_seconds(sign * (hours * 3600 + minutes * 60)).ok()
 }

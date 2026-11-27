@@ -6,6 +6,7 @@ use std::net::TcpStream;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
+use time::OffsetDateTime;
 
 #[path = "support/mcp_http_port.rs"]
 mod mcp_http_port;
@@ -91,13 +92,16 @@ fn parse_response(raw: &[u8]) -> Response {
         let mut value = value.to_owned();
         if name == "date" {
             let date = value.strip_prefix(' ').expect("HTTP Date separator");
-            let parsed = chrono::DateTime::parse_from_rfc2822(date).expect("valid HTTP Date");
+            let parsed =
+                OffsetDateTime::parse(date, &time::format_description::well_known::Rfc2822)
+                    .expect("valid HTTP Date");
             assert_eq!(
                 date,
                 parsed
-                    .with_timezone(&chrono::Utc)
-                    .format("%a, %d %b %Y %H:%M:%S GMT")
-                    .to_string(),
+                    .format(&time::macros::format_description!(
+                        "[weekday repr:short], [day] [month repr:short] [year] [hour]:[minute]:[second] GMT"
+                    ))
+                    .expect("formatted HTTP Date"),
                 "canonical HTTP Date"
             );
             dates += 1;

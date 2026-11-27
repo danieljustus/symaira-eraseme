@@ -9,6 +9,7 @@ use symeraseme_core::storage::{
     Repository, Store,
     types::{EventType, Source},
 };
+use time::OffsetDateTime;
 
 #[path = "support/frozen_plan_process.rs"]
 mod frozen_plan_process;
@@ -91,7 +92,7 @@ fn prepare(root: &Path, email: bool) -> (PathBuf, PathBuf, PathBuf, String) {
             &EventType::Planned,
             &planned,
             &Source::System,
-            chrono::DateTime::from_timestamp(1_800_000_000, 0).unwrap(),
+            OffsetDateTime::from_unix_timestamp(1_800_000_000).unwrap(),
         )
         .expect("planned event");
     drop(store);

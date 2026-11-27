@@ -13,9 +13,9 @@
 //!   the caller owns the "missing profile means an empty hash" policy that the
 //!   golden fixture exercises. `identity::hash_profile` produces the value.
 
-use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
+use time::OffsetDateTime;
 
 use crate::identity::Profile;
 use crate::jsonorder::go_map_order;
@@ -234,7 +234,7 @@ pub fn plan_campaign(
     brokers: &[Broker],
     identity_hash: &str,
     opts: &PlanOpts,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> Result<PlanResult, PlanError> {
     let repository = Repository::new(store);
     // Go ignores the boolean: a pre-existing campaign id is appended to.
@@ -386,7 +386,7 @@ pub fn get_plan(
 
 fn go_timestamp(value: &str) -> Value {
     match crate::timeutil::parse_timestamp(value) {
-        Ok(parsed) => Value::String(parsed.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)),
+        Ok(parsed) => Value::String(crate::timeutil::format_rfc3339_auto_si(parsed, true)),
         Err(_) => Value::String(value.to_owned()),
     }
 }
@@ -479,7 +479,7 @@ pub fn execute_campaign(
     opts: &ExecuteOpts<'_>,
     profile: ProfileSource<'_>,
     batch_size: i64,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> Result<Map<String, Value>, ExecuteError> {
     let batch_size = match batch_size {
         size if size > BATCH_LIMIT => BATCH_LIMIT,
@@ -533,7 +533,7 @@ pub fn execute_request(
     request_id: i64,
     opts: &ExecuteOpts<'_>,
     profile: ProfileSource<'_>,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> Result<ExecuteResult, ExecuteError> {
     let repository = Repository::new(store);
     let Some(request) = repository.get_removal_request(request_id)? else {
@@ -563,7 +563,7 @@ fn execute_email_request(
     payload: &Map<String, Value>,
     opts: &ExecuteOpts<'_>,
     profile: ProfileSource<'_>,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> Result<ExecuteResult, ExecuteError> {
     let request_id = request.id;
     let broker_name = &request.broker_id;
@@ -818,7 +818,7 @@ fn execute_web_form_request(
     broker_name: &str,
     opts: &ExecuteOpts<'_>,
     profile: ProfileSource<'_>,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> Result<ExecuteResult, ExecuteError> {
     // A missing profile is valid here and yields an empty snapshot hash.
     let profile = profile.map_err(|message| ExecuteError::IdentityProfile(message.to_owned()))?;

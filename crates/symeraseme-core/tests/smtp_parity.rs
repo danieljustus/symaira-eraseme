@@ -1,7 +1,6 @@
 #[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
 mod go_source_pin;
 
-use chrono::{DateTime, FixedOffset};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::cell::RefCell;
@@ -9,6 +8,7 @@ use std::path::Path;
 use symeraseme_core::email::{
     EmailMessage, SmtpTransport, build_mime_at, recipients, send_message_at,
 };
+use time::UtcOffset;
 
 const FIXTURE: &str = include_str!("../../../rust-tests/parity/oracle/email/smtp_cases.json");
 
@@ -27,17 +27,19 @@ fn message(case: &Value) -> EmailMessage {
     }
 }
 
-fn local_offset(case: &Value) -> FixedOffset {
+fn local_offset(case: &Value) -> UtcOffset {
     let offset = case["local_offset"].as_str().unwrap();
-    DateTime::parse_from_str(&format!("2000-01-01T00:00:00{offset}"), "%+")
-        .unwrap()
-        .offset()
-        .to_owned()
+    UtcOffset::parse(
+        offset,
+        time::macros::format_description!("[offset_hour sign:mandatory]:[offset_minute]"),
+    )
+    .expect("valid local offset")
 }
 
 fn actual(case: &Value) -> Value {
     let message = message(case);
-    let now = DateTime::parse_from_rfc3339(case["input"]["date"].as_str().unwrap()).unwrap();
+    let now =
+        symeraseme_core::timeutil::parse_rfc3339(case["input"]["date"].as_str().unwrap()).unwrap();
     let result = build_mime_at(
         &message,
         case["input"]["from"].as_str().unwrap(),
@@ -124,7 +126,8 @@ fn outbound_uses_only_the_fake_transport_and_preserves_go_error_text() {
     let document = fixture();
     let case = &document["cases"][0];
     let message = message(case);
-    let now = DateTime::parse_from_rfc3339(case["input"]["date"].as_str().unwrap()).unwrap();
+    let now =
+        symeraseme_core::timeutil::parse_rfc3339(case["input"]["date"].as_str().unwrap()).unwrap();
     let message_id = case["input"]["message_id"].as_str().unwrap();
     let expected_message = case["message"].as_str().unwrap().as_bytes();
     let expected_recipients = recipients(&message);
@@ -172,15 +175,9 @@ fn empty_message_id_uses_go_shaped_random_id_and_boundary() {
         cc: String::new(),
         bcc: String::new(),
     };
-    let now = DateTime::parse_from_rfc3339("2026-08-31T12:00:00Z").unwrap();
-    let (raw, message_id) = build_mime_at(
-        &message,
-        "sender@example.test",
-        now,
-        FixedOffset::east_opt(0).unwrap(),
-        "",
-    )
-    .unwrap();
+    let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-31T12:00:00Z").unwrap();
+    let (raw, message_id) =
+        build_mime_at(&message, "sender@example.test", now, UtcOffset::UTC, "").unwrap();
     assert_eq!(message_id.len(), 37);
     assert!(message_id.starts_with('<') && message_id.ends_with("@symeraseme>"));
     assert!(

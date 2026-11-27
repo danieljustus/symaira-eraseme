@@ -23,13 +23,13 @@ use crate::email::session::{FetchedMessage, ImapSession};
 use crate::email::types::ImapConfig;
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD};
-use chrono::{DateTime, Utc};
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, RootCertStore};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use time::OffsetDateTime;
 
 /// Read+Write abstraction shared between plain TCP and TLS sessions.
 pub trait ReadWrite: Read + Write + Send + Sync {}
@@ -483,7 +483,7 @@ impl ImapSession for ImapSessionImpl {
     fn search_uid(
         &mut self,
         uid_range: &str,
-        _since: Option<DateTime<Utc>>,
+        _since: Option<OffsetDateTime>,
     ) -> Result<Vec<u32>, String> {
         // Validate the UID range first (matches Go imap.ParseSeqSet)
         validate_uid_range(uid_range)?;

@@ -8,19 +8,15 @@ use crate::email::types::{
     ImapConfig, ImapError, MatchMethod, MatchedMessage, Message, RemovalRequest,
 };
 use base64::Engine;
-use chrono::{DateTime, Duration, Utc};
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
+use time::{Duration, OffsetDateTime};
 
 /// `time.Now().UTC()`. The policy has no clock seam — Go does not have one
 /// either — so a since window is only observable by its presence, never by the
 /// instant it was computed from.
-fn now_utc() -> DateTime<Utc> {
-    let elapsed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    DateTime::<Utc>::from_timestamp(elapsed.as_secs() as i64, elapsed.subsec_nanos())
-        .unwrap_or_default()
+fn now_utc() -> OffsetDateTime {
+    OffsetDateTime::from(SystemTime::now())
 }
 
 /// The prefix every IMAP failure carries, mirroring Go's `ErrIMAP`.
@@ -167,7 +163,7 @@ pub fn poll_inbox_with_defaults(
         last_handled = uid;
         if let Some(since) = since {
             match parsed_message.date {
-                Some(date) if date >= since.fixed_offset() => {}
+                Some(date) if date >= since => {}
                 _ => continue,
             }
         }

@@ -24,7 +24,6 @@ mod html_exports;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{Map, Value, json};
 use symeraseme_core::campaign;
 use symeraseme_core::config::ConfigContext;
@@ -51,6 +50,7 @@ use symeraseme_core::storage::{EventRecord, RemovalRequestRow, Store};
 use symeraseme_core::timeutil;
 use symeraseme_core::triage_service::{self, ClassifyRequest, LlmResponse, RebuttalRequest};
 use symeraseme_engine::scheduler;
+use time::OffsetDateTime;
 
 use super::tools_call::catalogue_has_tool;
 
@@ -169,7 +169,9 @@ fn triage_agent_call<'a>(
 fn go_matched_message_json(matched: &MatchedMessage) -> String {
     let message = &matched.message;
     let date = match &message.date {
-        Some(date) => go_json_string(&date.to_rfc3339_opts(SecondsFormat::AutoSi, true)),
+        Some(date) => go_json_string(&symeraseme_core::timeutil::format_rfc3339_auto_si(
+            *date, true,
+        )),
         None => "null".to_owned(),
     };
     let flags = match &message.flags {
@@ -214,10 +216,10 @@ pub struct ContractHandler {
     /// Configuration for the store-backed tools. Go resolves it from the
     /// process environment; the caller supplies it here for the same reason.
     pub config: Option<ConfigContext>,
-    /// The instant the writing tools record. Go reads `time.Now()`; `chrono`
-    /// has no `clock` feature here, so a tool that needs it fails explicitly
-    /// when neither this fixed instant nor the system clock was supplied.
-    pub now: Option<DateTime<Utc>>,
+    /// The instant the writing tools record. Go reads `time.Now()`; `time`
+    /// has no clock feature enabled here, so a tool that needs it fails
+    /// explicitly when neither this fixed instant nor the system clock was supplied.
+    pub now: Option<OffsetDateTime>,
     /// Read the system clock on every call when no fixed instant is set.
     /// Long-running servers need this; a fixed instant stays for tests (#1312).
     pub system_clock: bool,
@@ -260,7 +262,7 @@ impl ContractHandler {
     #[cfg(test)]
     /// Adds the configuration the store-backed tools resolve their database
     /// from, plus the instant they record.
-    pub fn with_store(mut self, config: ConfigContext, now: DateTime<Utc>) -> Self {
+    pub fn with_store(mut self, config: ConfigContext, now: OffsetDateTime) -> Self {
         self.config = Some(config);
         self.now = Some(now);
         self
@@ -335,9 +337,9 @@ impl ContractHandler {
         }
     }
 
-    fn recorded_instant(&self) -> Result<DateTime<Utc>, ToolError> {
+    fn recorded_instant(&self) -> Result<OffsetDateTime, ToolError> {
         if self.now.is_none() && self.system_clock {
-            return Ok(DateTime::<Utc>::from(std::time::SystemTime::now()));
+            return Ok(OffsetDateTime::from(std::time::SystemTime::now()));
         }
         self.now.ok_or_else(|| {
             ToolError("this tool needs an injected instant and none was supplied".to_owned())
@@ -1596,8 +1598,8 @@ fn timestamp(value: &str) -> Value {
 /// millisecond/microsecond/nanosecond digits; Go trims a trailing zero to any
 /// length, so a value with exactly one, four, five or seven fractional digits
 /// would differ. The product writes whole seconds.
-fn instant(value: DateTime<Utc>) -> String {
-    value.to_rfc3339_opts(SecondsFormat::AutoSi, true)
+fn instant(value: OffsetDateTime) -> String {
+    symeraseme_core::timeutil::format_rfc3339_auto_si(value, true)
 }
 
 /// Go's `parsePollHours`: empty means "no override", and each value must be a
@@ -1903,9 +1905,8 @@ mod tests {
             "SYMERASEME_DATA_DIR".to_owned(),
             data_dir.to_string_lossy().into_owned(),
         );
-        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-            .expect("pinned instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant");
         let handler = ContractHandler::new(&root).with_store(
             ConfigContext::new(root.clone(), root.clone(), environment),
             now,
@@ -1979,9 +1980,8 @@ mod tests {
             "SYMERASEME_DATA_DIR".to_owned(),
             data_dir.to_string_lossy().into_owned(),
         );
-        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-            .expect("pinned instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant");
         let handler = ContractHandler::new(&root).with_store(
             ConfigContext::new(root.clone(), root.clone(), environment),
             now,
@@ -2194,9 +2194,8 @@ mod tests {
             "SYMERASEME_DATA_DIR".to_owned(),
             data_dir.to_string_lossy().into_owned(),
         );
-        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-            .expect("pinned instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant");
         let handler = ContractHandler::new(&root).with_store(
             ConfigContext::new(root.clone(), root.clone(), environment),
             now,
@@ -2356,9 +2355,8 @@ mod tests {
             "SYMERASEME_DATA_DIR".to_owned(),
             data_dir.to_string_lossy().into_owned(),
         );
-        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-            .expect("pinned instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant");
         let handler = ContractHandler::new(&root).with_store(
             ConfigContext::new(root.clone(), root.clone(), environment),
             now,
@@ -2421,9 +2419,8 @@ mod tests {
         let root = workspace("manual-tasks");
         let data_dir = root.join("data");
         fs::create_dir_all(&data_dir).expect("data dir");
-        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-            .expect("pinned instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant");
 
         let mut environment = BTreeMap::new();
         environment.insert(
@@ -2519,9 +2516,8 @@ mod tests {
         let root = workspace("manual-shapes");
         let data_dir = root.join("data");
         fs::create_dir_all(&data_dir).expect("data dir");
-        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-            .expect("pinned instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant");
         let mut environment = BTreeMap::new();
         environment.insert(
             "SYMERASEME_DATA_DIR".to_owned(),
@@ -2708,9 +2704,8 @@ mod tests {
         let root = workspace("plan-create");
         let data_dir = root.join("data");
         fs::create_dir_all(&data_dir).expect("data dir");
-        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-            .expect("pinned instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant");
         let mut environment = BTreeMap::new();
         environment.insert(
             "SYMERASEME_DATA_DIR".to_owned(),
@@ -3131,7 +3126,7 @@ mod tests {
         fn search_uid(
             &mut self,
             uid_range: &str,
-            _since: Option<DateTime<Utc>>,
+            _since: Option<OffsetDateTime>,
         ) -> Result<Vec<u32>, String> {
             let (low, high) = uid_bounds(uid_range);
             Ok(self
@@ -3148,9 +3143,9 @@ mod tests {
                 let Some(message) = self.messages.iter().find(|message| message.uid == *uid) else {
                     return Err(format!("scripted mailbox has no uid {uid}"));
                 };
-                let internal_date = DateTime::parse_from_rfc3339(&message.internal_date)
-                    .map_err(|error| error.to_string())?
-                    .with_timezone(&Utc);
+                let internal_date =
+                    symeraseme_core::timeutil::parse_rfc3339(&message.internal_date)
+                        .map_err(|error| error.to_string())?;
                 out.push(FetchedMessage {
                     uid: message.uid,
                     header: message.header.clone().into_bytes(),
@@ -3243,9 +3238,8 @@ mod tests {
             "SYMERASEME_DATA_DIR".to_owned(),
             data_dir.to_string_lossy().into_owned(),
         );
-        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-            .expect("pinned instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant");
 
         for case in &fixture.cases {
             // A fresh high-water-mark store per case, exactly like the oracle:
@@ -3439,9 +3433,7 @@ mod tests {
                 "{name} arguments"
             );
         }
-        let now = DateTime::parse_from_rfc3339(&fixture.now)
-            .expect("fixed instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339(&fixture.now).expect("fixed instant");
 
         for case in fixture.cases {
             let data_dir = root.join(&case.name).join("data");
@@ -3501,7 +3493,10 @@ mod tests {
                     "{} the envelope reproduces the recorded dashboard bytes",
                     case.name
                 );
-                let result = dashboard_compact::compact_default_result(&case.result, Some(now));
+                let result = dashboard_compact::compact_default_result(
+                    &case.result,
+                    Some(crate::DateTime::from_utc(now)),
+                );
                 let wire = crate::mcp::envelope::result_response(&id, Some(&result));
                 (result, wire)
             } else {
@@ -3545,9 +3540,8 @@ mod tests {
                 .collect::<String>();
             assert_eq!(digest.as_str().unwrap(), expected, "{source}");
         }
-        let now = DateTime::parse_from_rfc3339(oracle["now"].as_str().unwrap())
-            .unwrap()
-            .with_timezone(&Utc);
+        let now =
+            symeraseme_core::timeutil::parse_rfc3339(oracle["now"].as_str().unwrap()).unwrap();
         let cases = oracle["cases"].as_array().unwrap();
         assert_eq!(cases.len(), 25);
         for case in cases {
@@ -3647,9 +3641,8 @@ mod tests {
             "SYMERASEME_DATA_DIR".to_owned(),
             data_dir.to_string_lossy().into_owned(),
         );
-        let now = DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-            .expect("pinned instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00")
+            .expect("pinned instant");
         let handler = ContractHandler::new(&root)
             .with_store(
                 ConfigContext::new(root.clone(), root.clone(), environment),
@@ -4670,9 +4663,8 @@ mod tests {
         }
         store.connection().execute_batch(&sql).expect("seed");
         store.close().expect("close seed store");
-        let now = DateTime::parse_from_rfc3339("2026-08-05T12:00:00+00:00")
-            .expect("fixed instant")
-            .with_timezone(&Utc);
+        let now = symeraseme_core::timeutil::parse_rfc3339("2026-08-05T12:00:00+00:00")
+            .expect("fixed instant");
         let mut environment = std::collections::BTreeMap::new();
         environment.insert(
             "SYMERASEME_DATA_DIR".to_owned(),

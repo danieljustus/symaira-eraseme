@@ -1,7 +1,7 @@
 //! Shared value types for the inbox port.
 
-use chrono::{DateTime, FixedOffset};
 use std::fmt;
+use time::OffsetDateTime;
 
 /// One parsed mailbox message. Field order mirrors Go's `email.Message` because
 /// the wire form of this struct is part of the contract.
@@ -11,7 +11,7 @@ pub struct Message {
     pub subject: String,
     pub from: String,
     pub to: String,
-    pub date: Option<DateTime<FixedOffset>>,
+    pub date: Option<OffsetDateTime>,
     pub body: String,
     /// `None` reproduces Go's nil slice, which marshals as JSON `null`.
     pub flags: Option<Vec<String>>,
