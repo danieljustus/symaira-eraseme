@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- `list_brokers` pages its result: optional `limit` (default 50, at most
+  500), an opaque `cursor` and `detail` (`summary` by default, or `full`).
+  The response adds `total` and `next_cursor`; `count` is now the size of the
+  returned page. A default call returns about 5,900 characters instead of
+  858,000 (#1342).
+- macOS app dashboard: the status breakdown shows every backend status,
+  including failed sends, a Send Failed tile opens the matching requests,
+  Overdue is an attention tile, recent events show relative times, and the
+  campaigns table and status chart fit and read better (#1340, #1341).
+- The macOS app builds against symaira-corekit 0.28.0 (#1350). The CoreKit
+  Dependabot landing workflow uses the v0.28.0 action, which re-resolves
+  partly moved Cargo lockfiles (#1343).
+- Move every CoreKit pin to v0.27.1 and refresh the native evidence as
+  `refresh-5f5b27a2` (#1344).
+- `scripts/derive_capture_snapshot.py` and `scripts/import_capture_refresh.py`
+  automate preparing a native evidence refresh; the import still needs review
+  and every frozen and native gate (#1345).
+
 ## [v0.17.1] - 2026-11-23
 
 ### Security
@@ -19,8 +41,6 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
-- Move every CoreKit pin to v0.27.1 and refresh the native evidence as
-  `refresh-5f5b27a2` (#1344).
 - `scripts/record_standalone_evidence.py` records the Rust standalone release
   evidence (`evidence/standalone.json` plus the locked release binary and its
   build provenance) that CoreKit's consumer verifier requires in the tagged
