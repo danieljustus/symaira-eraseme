@@ -20,6 +20,7 @@ REVISIONS = (
     '2a7a5c1fe6ca1fcf7ffa73ad659eaacba1e7b5ca',  # minor-patch group native dependency refresh
     'a8eda4f77ce938c32d18dbad7d45de148b7d0482',  # quinn/url RUSTSEC native dependency refresh
     '17c7d69658eeb22c4ac96a3c0d4facfb6a372274',  # CoreKit v0.27.1 native dependency refresh
+    '09d8269371cbd3111c8b6584a402caa8ff6ce6df',  # CoreKit v0.28.0 and keyring 4.2.0 native dependency refresh
 )
 REPOSITORY = 'https://github.com/danieljustus/symaira-eraseme.git'
 

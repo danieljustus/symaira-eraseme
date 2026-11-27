@@ -166,6 +166,26 @@ for Windows after #1281.
   derived raw-response/stdin bytes, elapsed times, and Go map order in one
   provider list.
 
+- `refresh-711fd570` captures candidate `711fd570cfd31e093cf80b53520f8692196131c2`
+  (CoreKit crates v0.28.0, the cargo minor-patch group from #1346 and keyring
+  4.2.0 for #1352) at snapshot `09d8269371cbd3111c8b6584a402caa8ff6ce6df`
+  (tag `frozen-go-captures/dependency-refresh-711fd570`), run `46044225920`;
+  artifacts `15221059287` (macOS arm64,
+  `sha256:7fd0b75d66203f9fab8258734ce49906358cbe23aa7c95918191ae60d3f7e99e`),
+  `15222320066` (Linux amd64,
+  `sha256:83dee43d894f231b7322918b2f5d4a9181f872a78d567f02a54223352be24579`)
+  and `15221608520` (Linux arm64,
+  `sha256:65b4f1b79ad79dde7ee6bc8731db03a95751704efe6a1a0f111a3148ec6f3c33`)
+  match their GitHub API digests. It is the first refresh prepared with
+  `scripts/derive_capture_snapshot.py` and `scripts/import_capture_refresh.py`
+  (#1345); the import report accepted only the documented volatile categories
+  for all 48 records. An earlier snapshot for candidate `a44d3ac8`, which also
+  replaced chrono (#1335), failed in run `46041520634` because three retired
+  comparators that must stay byte-identical to `22615ae` still use chrono; its
+  tag stays reachable as `frozen-go-captures/dependency-refresh-a44d3ac8`.
+  The superseded CoreKit v0.27.0 snapshot `c9970318` (run `45921428609`) is
+  kept as `frozen-go-captures/dependency-refresh-f09d6aa5`.
+
 ## Automated refresh preparation (#1345)
 
 The mechanical preparation is scripted; no binding is relaxed. Both scripts
