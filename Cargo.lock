@@ -635,7 +635,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1574,7 +1574,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1758,15 +1758,15 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "1.1.4"
+version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190"
+checksum = "e5e76742e5294153d4dde1207dbec5bdd81eef6fabdc0d2118babadabfd858aa"
 dependencies = [
  "bitflags",
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1835,7 +1835,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2104,26 +2104,23 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "symaira-core-exit"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=7515add9acd865fa56f908643d0b3b689a70946b#7515add9acd865fa56f908643d0b3b689a70946b"
+source = "git+https://github.com/danieljustus/symaira-corekit?tag=v0.27.1#12afa75c07b209ff13943ad0fb148d00f3ebf7cf"
 
 [[package]]
 name = "symaira-core-fs"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=b72cbc569099afc8ba1e30b0fd0d82488e67f6da#b72cbc569099afc8ba1e30b0fd0d82488e67f6da"
+source = "git+https://github.com/danieljustus/symaira-corekit?tag=v0.27.1#12afa75c07b209ff13943ad0fb148d00f3ebf7cf"
 dependencies = [
- "cap-primitives",
- "cap-std",
  "fs2",
  "nix",
  "rustix",
- "same-file",
  "thiserror",
 ]
 
 [[package]]
 name = "symaira-core-llm"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=7515add9acd865fa56f908643d0b3b689a70946b#7515add9acd865fa56f908643d0b3b689a70946b"
+source = "git+https://github.com/danieljustus/symaira-corekit?tag=v0.27.1#12afa75c07b209ff13943ad0fb148d00f3ebf7cf"
 dependencies = [
  "reqwest",
  "serde",
@@ -2138,7 +2135,7 @@ dependencies = [
 [[package]]
 name = "symaira-core-secretref"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=7515add9acd865fa56f908643d0b3b689a70946b#7515add9acd865fa56f908643d0b3b689a70946b"
+source = "git+https://github.com/danieljustus/symaira-corekit?tag=v0.27.1#12afa75c07b209ff13943ad0fb148d00f3ebf7cf"
 dependencies = [
  "rustix",
  "serde",
@@ -2148,7 +2145,7 @@ dependencies = [
 [[package]]
 name = "symaira-core-sqlite"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=b72cbc569099afc8ba1e30b0fd0d82488e67f6da#b72cbc569099afc8ba1e30b0fd0d82488e67f6da"
+source = "git+https://github.com/danieljustus/symaira-corekit?tag=v0.27.1#12afa75c07b209ff13943ad0fb148d00f3ebf7cf"
 dependencies = [
  "rusqlite",
  "symaira-core-fs",
@@ -2158,7 +2155,7 @@ dependencies = [
 [[package]]
 name = "symaira-core-version"
 version = "0.0.0"
-source = "git+https://github.com/danieljustus/symaira-corekit?rev=27177f25f551cecefa7bd6c4524abf175b3a75c7#27177f25f551cecefa7bd6c4524abf175b3a75c7"
+source = "git+https://github.com/danieljustus/symaira-corekit?tag=v0.27.1#12afa75c07b209ff13943ad0fb148d00f3ebf7cf"
 dependencies = [
  "serde",
  "serde_json",
@@ -2339,7 +2336,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2827,7 +2824,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
