@@ -1,5 +1,10 @@
 [advisories]
 version = 2
+ignore = [
+    # Time-boxed until chrono is replaced (option 1 in #1335); that swap changes
+    # Cargo.lock and needs its own native evidence refresh.
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no fixed version; replace with time or jiff (#1335)" },
+]
 
 [bans]
 multiple-versions = "deny"
