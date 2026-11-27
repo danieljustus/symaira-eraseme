@@ -4,8 +4,21 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- The identity master key is stored in the real platform keyring. keyring
+  3.6.3 had no backend feature enabled and fell back to its in-memory mock
+  store, so `identity init` lost a new master key when the process exited and
+  Go-era Keychain items were never read. keyring 4.2.0 uses the macOS
+  Keychain and the Linux Secret Service; reads decode values written by the Go
+  implementation, and initialization fails closed when no store is available
+  (#1352, #1347, #1349).
+
 ### Changed
 
+- Move the CoreKit crates to v0.28.0 and take the cargo minor-patch group
+  (#1346) and the GitHub Actions minor-patch group (#1336); the native
+  evidence is refreshed for the new lockfile.
 - `list_brokers` pages its result: optional `limit` (default 50, at most
   500), an opaque `cursor` and `detail` (`summary` by default, or `full`).
   The response adds `total` and `next_cursor`; `count` is now the size of the
