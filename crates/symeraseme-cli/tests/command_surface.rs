@@ -38,10 +38,11 @@ const SURFACE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../rust-tests/parity/cases/cli/surface.json"
 ));
-/// Hang guard for one CLI subprocess, not a performance budget. A healthy case
-/// finishes in tens of milliseconds on Linux/macOS, so this keeps two orders of
-/// magnitude of headroom.
-const PROCESS_TIMEOUT: Duration = Duration::from_secs(10);
+/// Hang guard for one CLI subprocess, not a performance budget. Most cases
+/// finish in tens of milliseconds, but `brokers list` decodes the full embedded
+/// registry and takes about 2 s in a debug build on an idle Mac; under a full
+/// parallel workspace run that exceeded 10 s. 30 s keeps the guard bounded.
+const PROCESS_TIMEOUT: Duration = Duration::from_secs(30);
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_OUTPUT_BYTES: u64 = 4 * 1024 * 1024;
 
