@@ -431,6 +431,13 @@ pub struct AgentDef {
 }
 
 /// Go's `agentDefs`.
+///
+/// Claude Code deliberately differs from Go: current releases reject Go's
+/// `--no-input` (`unknown option`), so it is replaced by flags that run the
+/// prompt with no built-in tools, no MCP servers and no saved session. The
+/// prompt carries untrusted broker mail that may only be classified, and it
+/// must not land in the agent's transcript store. `--tools` takes a variadic
+/// value, so `--model` (appended later) must keep following it as an option.
 pub const AGENT_DEFS: [AgentDef; 3] = [
     AgentDef {
         name: "claude",
@@ -442,7 +449,10 @@ pub const AGENT_DEFS: [AgentDef; 3] = [
             "{prompt}",
             "--output-format",
             "text",
-            "--no-input",
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            "--tools",
+            "",
         ],
     },
     AgentDef {

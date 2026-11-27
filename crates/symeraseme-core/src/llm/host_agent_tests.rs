@@ -74,6 +74,35 @@ fn error_type(error: &ClientError) -> &'static str {
     }
 }
 
+/// Deliberate deviation from the Go oracle's Claude Code argv (#1356).
+///
+/// Current Claude Code rejects the recorded `--no-input` with
+/// `error: unknown option '--no-input'`, so every Go-shaped call failed before
+/// it reached the model. The port drops that flag and asks for no built-in
+/// tools, no MCP servers and no saved session instead: the prompt carries
+/// untrusted broker mail that must only be classified, never acted on, and it
+/// must not be persisted in the agent's own transcript store. Everything else
+/// the oracle recorded (prompt, output format, model, environment, stdin) is
+/// unchanged.
+fn claude_argv_from_go_oracle(recorded: Vec<String>) -> Vec<String> {
+    let position = recorded
+        .iter()
+        .position(|argument| argument == "--no-input")
+        .expect("the Go oracle records --no-input for Claude Code");
+    let mut argv = recorded;
+    argv.splice(
+        position..=position,
+        [
+            "--no-session-persistence",
+            "--strict-mcp-config",
+            "--tools",
+            "",
+        ]
+        .map(str::to_owned),
+    );
+    argv
+}
+
 #[test]
 fn host_agent_subprocess_protocol_matches_real_go_oracle() {
     let fixture = fixture();
@@ -209,12 +238,15 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
             );
             assert!(!capture.join("stdin").exists(), "{id} did not run CLI");
         } else {
-            let expected_args = expected["arguments"]
+            let mut expected_args = expected["arguments"]
                 .as_array()
                 .expect("recorded arguments")
                 .iter()
                 .map(|value| value.as_str().expect("argument string").to_owned())
                 .collect::<Vec<_>>();
+            if backend == "claude" {
+                expected_args = claude_argv_from_go_oracle(expected_args);
+            }
             assert_eq!(
                 nul_strings(&capture.join("arguments")),
                 expected_args,
