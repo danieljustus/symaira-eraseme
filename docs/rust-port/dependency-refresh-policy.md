@@ -165,3 +165,58 @@ for Windows after #1281.
   `Cargo.lock` digest and bytes, HTTP `Date` headers, ephemeral SMTP ports and
   derived raw-response/stdin bytes, elapsed times, and Go map order in one
   provider list.
+
+## Automated refresh preparation (#1345)
+
+The mechanical preparation is scripted; no binding is relaxed. Both scripts
+are standard-library Python and run under `python3 -I`. They produce a proposal
+for a human reviewer, not acceptance evidence, and never push, dispatch CI,
+merge, publish a release or change an assertion.
+
+1. `scripts/derive_capture_snapshot.py --candidate <sha> --predecessor-tag
+   frozen-go-captures/dependency-refresh-<id> --scratch-worktree <worktree>`
+   builds the snapshot commit with Git plumbing in a clean, separate worktree.
+   It restores the retired producer files from `22615ae` using the predecessor
+   snapshot's own producer set, copies the predecessor capture workflow and
+   script with only the workflow's candidate constant changed, and applies the
+   single #1330 product literal. It verifies that the resulting tree differs
+   from the candidate only in those paths, that protected candidate inputs
+   (including all of `Cargo.lock`) are unchanged, and then prints the snapshot
+   SHA, the tag and the exact local-tag/push/workflow-dispatch commands.
+   `--create-tag` creates the annotated local tag only. The predecessor tag
+   must be from the #1330/#1334 generation. The coordinator still reviews the
+   tag, pushes it, dispatches `frozen-http-aux-capture.yml` (historically
+   Rust CI with `capture_frozen_oracles=true`) and preserves raw artifacts.
+   Example:
+   `python3 -I scripts/derive_capture_snapshot.py --candidate 5f5b27a2... --predecessor-tag frozen-go-captures/dependency-refresh-a8eda4f7 --scratch-worktree /path/to/clean-worktree --json`
+2. `scripts/import_capture_refresh.py --run-id <id> --artifacts-dir <dir>
+   --digests-json <api.json> --candidate <sha> --predecessor-refresh <id>
+   --import-root <separate-worktree> --report <report.json>` verifies each
+   downloaded ZIP against the coordinator's `gh api` digest JSON (`sha256:`
+   hex), requires exactly the three supported targets, checks capture identity
+   and per-record provenance, requires the predecessor's complete 48-record
+   inventory, and compares each record against its predecessor with typed
+   JSON-path rules. Only source revision (including the Go pseudo-version and
+   `vcs.revision`/`vcs.time`), temporary build paths, the `Cargo.lock` digest
+   and bytes with both checked against the candidate commit, HTTP `Date`
+   headers and their re-digested raw-response bytes, ephemeral SMTP ports and
+   their re-digested stdin bytes, elapsed times, and the one provider-list map
+   order may differ. Every other path, added key, missing case or digest
+   mismatch stops with a nonzero exit and a report naming the offending paths.
+   Verified records are copied byte for byte into
+   `tests/fixtures/go-frozen/refresh-<candidate-sha8>/`, the seven reader
+   revision anchors, fixture paths and digest anchors are regenerated from
+   those bytes in the supplied import worktree, and a machine-readable report
+   records artifacts, accepted categories, fixtures and readers. The tool
+   refuses to write into the source checkout.
+   The digest manifest shape is
+   `{"run_id": "<id>", "artifacts": [{"id": "<api id>", "name": "<artifact name>", "target": "darwin/arm64|linux/amd64|linux/arm64", "digest": "sha256:<hex>"}, ...]}`.
+   Example:
+   `python3 -I scripts/import_capture_refresh.py --run-id 45943116789 --artifacts-dir /path/to/downloads --digests-json /path/to/artifact-digests.json --candidate 5f5b27a2... --predecessor-refresh a8eda4f7 --import-root /path/to/import-worktree --report /path/to/report.json`
+3. Review the generated import diff and report before committing it. The
+   strict `go_source_pin::assert_current_matches_archive` whole-`Cargo.lock`
+   binding, all rejection controls, frozen-reader gates, native acceptance
+   matrix and exact-head requirements are unchanged and must still pass on the
+   integrated candidate. Tests replay both tools against the genuine
+   `refresh-a8eda4f7` → `refresh-5f5b27a2` pair and assert that the committed
+   fixture and reader bytes are reproduced exactly.
