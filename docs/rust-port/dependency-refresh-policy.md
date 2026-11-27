@@ -146,3 +146,22 @@ for Windows after #1281.
   revision, temporary build paths, the `Cargo.lock` digest, HTTP `Date`
   headers, ephemeral SMTP ports, elapsed times and Go map order in one provider
   list.
+
+- `refresh-5f5b27a2` captures candidate `5f5b27a2802395596dbb59b0362bc7fd71ed9b4a`
+  at snapshot `17c7d69658eeb22c4ac96a3c0d4facfb6a372274` (tag
+  `frozen-go-captures/dependency-refresh-5f5b27a2`), final run `45943116789`;
+  the initial dispatch `45932990438` was cancelled after its macOS runner
+  stayed queued and its Linux jobs were superseded. Artifacts `15173993674`
+  (macOS arm64, `sha256:fc5c42b3101ec662e74d85dd7a1e93e09206bc2e5b396137a4cced1e58266360`),
+  `15173656654` (Linux amd64,
+  `sha256:835e5618662d8a7dc3a062fcf7909eca6d3c9219da2ed2aaed728d75f74de15a`),
+  and `15173696597` (Linux arm64,
+  `sha256:2301c547bdbadcec30f031e964d19c8c425846733761852dab24aba07e36c6d4`)
+  match their GitHub API digests. The snapshot keeps the #1330 version override
+  and the #1334 Rust 1.98.1 install; only the candidate constant changes. The
+  48 records match the predecessor's three-target inventory and source/generator
+  file sets and differ only in source revision (including the embedded Go
+  pseudo-version and `vcs.revision`/`vcs.time`), temporary Go build paths, the
+  `Cargo.lock` digest and bytes, HTTP `Date` headers, ephemeral SMTP ports and
+  derived raw-response/stdin bytes, elapsed times, and Go map order in one
+  provider list.

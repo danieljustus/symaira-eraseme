@@ -19,6 +19,8 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Move every CoreKit pin to v0.27.1 and refresh the native evidence as
+  `refresh-5f5b27a2` (#1344).
 - `scripts/record_standalone_evidence.py` records the Rust standalone release
   evidence (`evidence/standalone.json` plus the locked release binary and its
   build provenance) that CoreKit's consumer verifier requires in the tagged
