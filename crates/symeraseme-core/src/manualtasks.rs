@@ -829,3 +829,29 @@ pub fn save_screenshot(data: &[u8], now: DateTime<Utc>) -> io::Result<Option<Str
     write_private(&path, data)?;
     Ok(Some(path.to_string_lossy().into_owned()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::driver_timestamp;
+
+    #[test]
+    fn characterization_sql_driver_timestamp_bytes() {
+        for (input, expected) in [
+            ("2026-01-02 03:04:05", "2026-01-02T03:04:05Z"),
+            ("2026-01-02T03:04:05Z", "2026-01-02T03:04:05Z"),
+            (
+                "2026-01-02T03:04:05+02:00",
+                "2026-01-02T03:04:05+02:00",
+            ),
+            (
+                "2026-01-02 03:04:05.120000+02:00",
+                "2026-01-02T03:04:05.12+02:00",
+            ),
+            ("2026-01-02 03:04", "2026-01-02T03:04:00Z"),
+            ("2026-01-02", "2026-01-02T00:00:00Z"),
+            ("not-a-timestamp", "not-a-timestamp"),
+        ] {
+            assert_eq!(driver_timestamp(input.to_owned()), expected, "{input}");
+        }
+    }
+}

@@ -1265,4 +1265,19 @@ mod report_html_tests {
         let html = export_html(&data, now).expect("render report");
         assert!(html.contains("Campaign: first\n\n\nlast\u{e000}\u{e001}"));
     }
+
+    #[test]
+    fn characterization_report_time_layouts() {
+        for (input, expected) in [
+            ("2026-01-02T03:04:05Z", "2026-01-02T03:04:05+00:00"),
+            ("2026-01-02T03:04:05+02:00", "2026-01-02T01:04:05+00:00"),
+            ("2026-01-02T03:04:05", "2026-01-02T03:04:05+00:00"),
+            ("2026-01-02 03:04:05", "2026-01-02T03:04:05+00:00"),
+        ] {
+            let parsed = parse_time(input).unwrap_or_else(|| panic!("{input} must parse"));
+            assert_eq!(format_iso(parsed), expected, "{input}");
+        }
+        assert_eq!(parse_time(""), None);
+        assert_eq!(parse_time("not-a-time"), None);
+    }
 }

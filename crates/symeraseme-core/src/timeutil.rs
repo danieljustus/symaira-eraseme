@@ -332,6 +332,70 @@ mod tests {
         assert_eq!(format_sql_bytes(value), b"2026-08-31 12:34:56");
     }
 
+    #[test]
+    fn characterization_go_rfc3339_auto_si_bytes() {
+        use chrono::{DateTime, SecondsFormat};
+
+        // `AutoSi` emits 0, 3, 6 or 9 fractional digits; it never trims a
+        // trailing zero inside those groups. These bytes reach the MCP wire,
+        // the campaign read path and the email message JSON.
+        for (input, expected) in [
+            ("2026-08-31T12:34:56Z", "2026-08-31T12:34:56Z"),
+            ("2026-08-31T12:34:56.1Z", "2026-08-31T12:34:56.100Z"),
+            ("2026-08-31T12:34:56.12Z", "2026-08-31T12:34:56.120Z"),
+            ("2026-08-31T12:34:56.123Z", "2026-08-31T12:34:56.123Z"),
+            ("2026-08-31T12:34:56.1234Z", "2026-08-31T12:34:56.123400Z"),
+            ("2026-08-31T12:34:56.123456Z", "2026-08-31T12:34:56.123456Z"),
+            (
+                "2026-08-31T12:34:56.1234567Z",
+                "2026-08-31T12:34:56.123456700Z",
+            ),
+            (
+                "2026-08-31T12:34:56.123456789Z",
+                "2026-08-31T12:34:56.123456789Z",
+            ),
+            (
+                "2026-08-31T14:34:56.123+02:30",
+                "2026-08-31T14:34:56.123+02:30",
+            ),
+            (
+                "2026-08-31T12:34:56.123-05:00",
+                "2026-08-31T12:34:56.123-05:00",
+            ),
+        ] {
+            let value = DateTime::parse_from_rfc3339(input).expect(input);
+            assert_eq!(
+                value.to_rfc3339_opts(SecondsFormat::AutoSi, true),
+                expected,
+                "{input}"
+            );
+        }
+    }
+
+    #[test]
+    fn characterization_parsed_fractions_keep_their_instant() {
+        // The parser accepts a fraction on both separators and after a comma,
+        // and drops sub-nanosecond digits. The formatted seconds/truncation
+        // helpers must keep the same instant.
+        for (input, expected_sql) in [
+            ("2026-08-31T12:34:56Z", "2026-08-31 12:34:56"),
+            ("2026-08-31 12:34:56.1", "2026-08-31 12:34:56"),
+            (
+                "2026-08-31T12:34:56.123456789Z",
+                "2026-08-31 12:34:56",
+            ),
+            ("2026-08-31 14:34:56,123+02:00", "2026-08-31 12:34:56"),
+        ] {
+            let value = parse(input).unwrap_or_else(|error| panic!("{input}: {error}"));
+            assert_eq!(format_sql(value), expected_sql, "{input}");
+            assert_eq!(
+                format_iso(value),
+                format!("{}+00:00", expected_sql.replacen(' ', "T", 1)),
+                "{input}"
+            );
+        }
+    }
+
     proptest! {
         #[test]
         fn canonical_iso_round_trips(
