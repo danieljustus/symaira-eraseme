@@ -3,8 +3,14 @@ import SymairaTheme
 
 /// Requests view — paginated list with filters and event detail.
 struct RequestsView: View {
-    @StateObject private var vm = RequestsViewModel()
+    @StateObject private var vm: RequestsViewModel
     @State private var selection: RemovalRequest.ID?
+    private let onFilterApplied: () -> Void
+
+    init(initialStatusFilter: String? = nil, onFilterApplied: @escaping () -> Void = {}) {
+        _vm = StateObject(wrappedValue: RequestsViewModel(initialStatusFilter: initialStatusFilter ?? ""))
+        self.onFilterApplied = onFilterApplied
+    }
 
     /// Backend status values (`list_requests` matches them exactly).
     private static let statusFilters = [
@@ -52,6 +58,7 @@ struct RequestsView: View {
             guard let request = vm.requests.first(where: { $0.id == id }) else { return }
             Task { await vm.loadEvents(for: request) }
         }
+        .onAppear { onFilterApplied() }
     }
 
     @ViewBuilder private var filters: some View {
@@ -146,7 +153,7 @@ struct RequestsView: View {
 
             switch vm.eventsState {
             case .idle, .loading:
-                ProgressView()
+                ProgressView("Loading events…")
 
             case .failed(let message):
                 HStack {

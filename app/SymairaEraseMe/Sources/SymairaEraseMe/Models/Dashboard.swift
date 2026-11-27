@@ -25,10 +25,7 @@ struct DashboardCampaign: Codable, Identifiable {
         case requests
     }
 
-    var createdDate: Date? {
-        guard let createdAt else { return nil }
-        return ISO8601DateFormatter().date(from: createdAt)
-    }
+    var createdDate: Date? { BackendDate.parse(createdAt) }
 }
 
 /// Full dashboard data from `get_dashboard_data`.
@@ -42,6 +39,9 @@ struct DashboardData: Codable {
     let confirmed: Int
     let rejected: Int
     let overdue: Int
+    /// Authoritative status counts from the backend. Optional so older or
+    /// compact payloads without `by_status` still decode.
+    let byStatus: [String: Int]?
     let brokerStatus: [BrokerStatus]
     let recentEvents: [RecentEvent]
     let generatedAt: String
@@ -53,6 +53,7 @@ struct DashboardData: Codable {
         case awaitingAck = "awaiting_ack"
         case awaitingResponse = "awaiting_response"
         case confirmed, rejected, overdue
+        case byStatus = "by_status"
         case brokerStatus = "broker_status"
         case recentEvents = "recent_events"
         case generatedAt = "generated_at"
@@ -94,7 +95,14 @@ struct RecentEvent: Codable, Identifiable {
         case brokerId = "broker_id"
     }
 
-    var occurredDate: Date? {
-        ISO8601DateFormatter().date(from: occurredAt)
+    var occurredDate: Date? { BackendDate.parse(occurredAt) }
+
+    /// A failed send is labelled and coloured as an error in the event log.
+    var isSendFailure: Bool { eventType.uppercased().contains("SEND_FAILED") }
+
+    /// Plain-language event name for the timeline.
+    var displayLabel: String {
+        StatusBadge.vocabulary[eventType.uppercased()]?.label
+            ?? eventType.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }

@@ -24,10 +24,11 @@ enum BrandColors {
     static func color(for status: String) -> Color {
         switch status.uppercased() {
         case "PLANNED": return planned
-        case "SENT", "AWAITING_ACK", "AWAITING_RESPONSE": return pending
-        case "CONFIRMED": return confirmed
-        case "REJECTED", "REJECTED_FINAL": return rejected
-        case "OVERDUE": return overdue
+        case "SENT", "ACK", "AWAITING_ACK", "AWAITING_RESPONSE", "AWAITING_USER_ACTION",
+             "RE_SCAN_DUE", "PENDING": return pending
+        case "CONFIRMED", "COMPLETED": return confirmed
+        case "REJECTED", "REJECTED_FINAL", "OVERDUE", "SEND_FAILED", "BOUNCE", "ESCALATED",
+             "DPA_FILED": return rejected
         default: return textMuted
         }
     }

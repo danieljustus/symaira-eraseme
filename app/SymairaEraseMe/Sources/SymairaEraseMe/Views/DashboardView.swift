@@ -6,6 +6,12 @@ import Charts
 struct DashboardView: View {
     @EnvironmentObject private var serverManager: ServerManager
     @StateObject private var vm = DashboardViewModel()
+    /// Product-owned navigation: a tile can open Requests with a status filter.
+    private var openStatus: ((String) -> Void)?
+
+    init(openStatus: ((String) -> Void)? = nil) {
+        self.openStatus = openStatus
+    }
 
     var body: some View {
         SymairaPage(
@@ -37,17 +43,20 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Summary Cards
+    // MARK: - Summary Tiles
 
     private var summaryCards: some View {
-        LazyVGrid(columns: [
-            GridItem(.adaptive(minimum: 150))
-        ], spacing: SymairaSpacing.medium) {
-            StatCard(title: "Total", value: vm.totalRequests)
-            StatCard(title: "In Progress", value: vm.inProgress)
-            StatCard(title: "Confirmed", value: vm.confirmed)
-            StatCard(title: "Rejected", value: vm.rejected)
-            StatCard(title: "Overdue", value: vm.overdue)
+        // Three columns: the six tiles form two rows of three (LAYOUT-8).
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: SymairaSpacing.medium), count: 3),
+            spacing: SymairaSpacing.medium
+        ) {
+            ForEach(vm.summaryTiles) { tile in
+                DashboardTileView(tile: tile) {
+                    guard let status = tile.statusFilter else { return }
+                    openStatus?(status)
+                }
+            }
         }
     }
 
@@ -55,16 +64,31 @@ struct DashboardView: View {
 
     private var statusBreakdownChart: some View {
         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
-            Text("Status Breakdown")
-                .symairaText(.subheading)
+            HStack {
+                Text("Status Breakdown")
+                    .symairaText(.subheading)
+                Spacer()
+                // Overdue is a deadline flag, never a status bar in this chart.
+                if vm.overdue > 0 {
+                    SymairaBadge(
+                        "\(vm.overdue.plainDigits) overdue",
+                        tone: .critical, icon: .warning
+                    )
+                }
+            }
 
-            Chart(vm.statusBreakdown, id: \.label) { item in
+            let visible = vm.statusBreakdown.filter { $0.count > 0 }
+            Chart(visible) { item in
                 BarMark(
                     x: .value("Count", item.count),
                     y: .value("Status", item.label)
                 )
-                .foregroundStyle(item.color)
-                .cornerRadius(4)
+                .foregroundStyle(BrandColors.color(for: item.status))
+                .annotation(position: .trailing, alignment: .leading, spacing: 4) {
+                    Text(item.count.plainDigits)
+                        .symairaText(.caption)
+                        .monospacedDigit()
+                }
             }
             .chartXAxis(.hidden)
             .chartYAxis {
@@ -73,7 +97,7 @@ struct DashboardView: View {
                         .foregroundStyle(BrandColors.textSecondary)
                 }
             }
-            .frame(height: CGFloat(vm.statusBreakdown.count * 32 + 20))
+            .frame(height: CGFloat(max(1, visible.count) * 34 + 20))
         }
         .symairaCard()
         .topoProtected(hill: true)
@@ -87,19 +111,39 @@ struct DashboardView: View {
                 .symairaText(.subheading)
 
             if let campaigns = vm.data?.campaigns, !campaigns.isEmpty {
+                // Five narrow columns instead of seven: the old table clipped
+                // at the minimum window width (#1341). Counts are merged and
+                // every figure keeps its text label.
                 Table(campaigns) {
-                    TableColumn("ID") { Text($0.id) }
-                    TableColumn("Kind") { Text($0.kind ?? "—") }
-                    TableColumn("Total") { Text("\($0.total.plainDigits)") }
-                    TableColumn("Confirmed") { Text("\($0.confirmed.plainDigits)").foregroundStyle(BrandColors.confirmed) }
-                    TableColumn("Rejected") { Text("\($0.rejected.plainDigits)").foregroundStyle(BrandColors.rejected) }
-                    TableColumn("Overdue") { Text("\($0.overdue.plainDigits)").foregroundStyle(BrandColors.overdue) }
-                    TableColumn("Pending") {
-                        Text("\(($0.sent + $0.awaitingAck + $0.awaitingResponse).plainDigits)")
-                            .foregroundStyle(BrandColors.pending)
+                    TableColumn("Campaign") { Text($0.id).lineLimit(1) }
+                        .width(min: 90, ideal: 140)
+                    TableColumn("Total") { Text("\($0.total.plainDigits)").monospacedDigit() }
+                    TableColumn("In Flight") {
+                        Text("\($0.sent + $0.awaitingAck + $0.awaitingResponse)")
+                            .monospacedDigit()
+                    }
+                    TableColumn("Confirmed") {
+                        Text("\($0.confirmed.plainDigits)")
+                            .foregroundStyle(BrandColors.confirmed)
+                            .monospacedDigit()
+                    }
+                    TableColumn("Needs Attention") { campaign in
+                        HStack(spacing: SymairaSpacing.xSmall) {
+                            if campaign.rejected > 0 {
+                                Label("\(campaign.rejected.plainDigits) rejected", symairaIcon: .failure, size: 12)
+                                    .foregroundStyle(BrandColors.rejected)
+                            }
+                            if campaign.overdue > 0 {
+                                Label("\(campaign.overdue.plainDigits) overdue", symairaIcon: .warning, size: 12)
+                                    .foregroundStyle(BrandColors.overdue)
+                            }
+                            if campaign.rejected == 0 && campaign.overdue == 0 {
+                                Text("—").foregroundStyle(BrandColors.textMuted)
+                            }
+                        }
+                        .symairaText(.caption)
                     }
                 }
-                .frame(height: min(CGFloat(campaigns.count) * 40 + 40, 280))
             } else {
                 Text("No campaigns yet")
                     .foregroundStyle(BrandColors.textMuted)
@@ -144,9 +188,12 @@ struct DashboardView: View {
                 .symairaText(.subheading)
 
             if let events = vm.data?.recentEvents, !events.isEmpty {
+                // The backend labels nearly every event `system`; show the
+                // column only when it actually distinguishes rows (#1341).
+                let showsSource = events.contains { $0.source.lowercased() != "system" }
                 VStack(spacing: 0) {
-                    ForEach(events.prefix(15)) { event in
-                        EventRow(event: event)
+                    ForEach(Array(events.prefix(15))) { event in
+                        EventRow(event: event, showsSource: showsSource)
                         if event.id != events.prefix(15).last?.id {
                             SymairaFormDivider()
                         }
@@ -165,32 +212,79 @@ struct DashboardView: View {
 
 // MARK: - Subviews
 
+/// A native `LabeledContent` summary value. CoreKit 0.28.0 deprecates
+/// `SymairaStatTile` (UI catalog E33), and `gui-review.py` flags every use.
+struct DashboardTileView: View {
+    let tile: DashboardSummaryTile
+    var action: (() -> Void)?
+
+    var body: some View {
+        let content = VStack(alignment: .leading, spacing: SymairaSpacing.xSmall) {
+            LabeledContent {
+                Text(tile.value.plainDigits)
+                    .font(SymairaTypography.stat)
+                    .foregroundStyle(tile.tone.foreground)
+                    .monospacedDigit()
+            } label: {
+                HStack(spacing: SymairaSpacing.xSmall) {
+                    if tile.isAttention {
+                        SymairaIconView(tile.icon, size: 12)
+                            .foregroundStyle(tile.tone.foreground)
+                    }
+                    Text(tile.title)
+                        .symairaText(.caption, respectsForeground: false)
+                        .foregroundStyle(tile.isAttention ? tile.tone.foreground : BrandColors.textSecondary)
+                }
+            }
+            Text(tile.detail ?? " ")
+                .symairaText(.caption, respectsForeground: false)
+                .foregroundStyle(tile.isAttention ? tile.tone.foreground : BrandColors.textMuted)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .symairaCard()
+        .topoProtected(hill: true)
+
+        if let action {
+            Button(action: action) { content }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(tile.title): \(tile.value.plainDigits). Show \(tile.title.lowercased()) requests")
+        } else {
+            content
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(tile.title): \(tile.value.plainDigits)")
+        }
+    }
+}
+
 struct BrokerStatusCard: View {
     let broker: BrokerStatus
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(broker.brokerId)
+            // The dashboard payload carries IDs only; slug names become
+            // readable words, and raw opaque IDs stay as-is.
+            Text(RegistryFacets.displayName(broker.brokerId))
                 .symairaText(.bodyEmphasized)
                 .lineLimit(1)
             HStack(spacing: SymairaSpacing.small) {
                 if broker.confirmed > 0 {
-                    Label("\(broker.confirmed.plainDigits)", symairaIcon: .success, size: 12)
+                    Label("\(broker.confirmed.plainDigits) confirmed", symairaIcon: .success, size: 12)
                         .foregroundStyle(BrandColors.confirmed)
                         .symairaText(.caption)
                 }
                 if broker.pending > 0 {
-                    Label("\(broker.pending.plainDigits)", symairaIcon: .pending, size: 12)
+                    Label("\(broker.pending.plainDigits) in progress", symairaIcon: .pending, size: 12)
                         .foregroundStyle(BrandColors.pending)
                         .symairaText(.caption)
                 }
                 if broker.overdue > 0 {
-                    Label("\(broker.overdue.plainDigits)", symairaIcon: .warning, size: 12)
+                    Label("\(broker.overdue.plainDigits) overdue", symairaIcon: .warning, size: 12)
                         .foregroundStyle(BrandColors.overdue)
                         .symairaText(.caption)
                 }
                 if broker.rejected > 0 {
-                    Label("\(broker.rejected.plainDigits)", symairaIcon: .failure, size: 12)
+                    Label("\(broker.rejected.plainDigits) rejected", symairaIcon: .failure, size: 12)
                         .foregroundStyle(BrandColors.rejected)
                         .symairaText(.caption)
                 }
@@ -205,24 +299,37 @@ struct BrokerStatusCard: View {
 
 struct EventRow: View {
     let event: RecentEvent
+    var showsSource: Bool = true
 
     var body: some View {
         HStack(spacing: SymairaSpacing.medium) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(event.eventType.replacingOccurrences(of: "_", with: " ").capitalized)
-                    .symairaText(.callout)
+                HStack(spacing: SymairaSpacing.xSmall) {
+                    if event.isSendFailure {
+                        SymairaIconView(.failure, size: 12)
+                            .foregroundStyle(SymairaTokens.critical)
+                    }
+                    Text(event.displayLabel)
+                        .symairaText(.callout, respectsForeground: false)
+                        .foregroundStyle(event.isSendFailure ? SymairaTokens.critical : BrandColors.textPrimary)
+                }
                 if let brokerId = event.brokerId {
-                    Text(brokerId)
+                    Text(RegistryFacets.displayName(brokerId))
                         .symairaText(.caption, respectsForeground: false)
                         .foregroundStyle(BrandColors.textPrimary)
                 }
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text(event.source)
-                    .symairaText(.caption)
+                if showsSource {
+                    Text(event.source)
+                        .symairaText(.caption)
+                }
                 if let date = event.occurredDate {
                     Text(date.formatted(.relative(presentation: .named)))
+                        .symairaText(.caption)
+                } else {
+                    Text(event.occurredAt.formattedDate)
                         .symairaText(.caption)
                 }
             }
@@ -235,15 +342,7 @@ struct EventRow: View {
 
 extension String {
     var formattedDate: String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: self) {
-            return date.formatted(.dateTime.month().day().hour().minute())
-        }
-        let simple = ISO8601DateFormatter()
-        if let date = simple.date(from: self) {
-            return date.formatted(.dateTime.month().day().hour().minute())
-        }
-        return self
+        guard let date = BackendDate.parse(self) else { return self }
+        return date.formatted(.dateTime.month().day().hour().minute())
     }
 }

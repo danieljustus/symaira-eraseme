@@ -21,7 +21,10 @@ struct RequestEvent: Codable, Identifiable {
         case source
     }
 
-    var occurredDate: Date? { ISO8601DateFormatter().date(from: occurredAt) }
+    var occurredDate: Date? { BackendDate.parse(occurredAt) }
+
+    /// Same marker the dashboard event timeline uses for error rows.
+    var isSendFailure: Bool { eventType.uppercased().contains("SEND_FAILED") }
 }
 
 /// Response from `get_events`.

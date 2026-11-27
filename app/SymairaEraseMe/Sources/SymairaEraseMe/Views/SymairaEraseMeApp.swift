@@ -33,6 +33,8 @@ struct ContentView: View {
     @State private var selectedNav: NavItem
     @State private var sidebarLayout = SymairaSidebarState()
     @State private var topography = SymairaTopoModel()
+    /// Status preselected from a dashboard attention tile, consumed on arrival.
+    @State private var pendingRequestStatus: String?
 
     init(initialNavigation: NavItem = .dashboard) {
         _selectedNav = State(initialValue: initialNavigation)
@@ -119,14 +121,14 @@ struct ContentView: View {
             // Shared reachability remains authoritative, including external servers.
             if showsLabels {
                 SymairaStatusLabel(
-                    serverManager.mcpReachable ? "MCP Engine Active" : "MCP Engine Offline",
+                    serverManager.mcpReachable ? "Removal engine connected" : "Removal engine offline",
                     tone: serverManager.mcpReachable ? .positive : .critical
                 )
                 .padding(.horizontal, SymairaSpacing.small)
             } else {
                 SymairaStatusDot(
                     tone: serverManager.mcpReachable ? .positive : .critical,
-                    accessibilityLabel: serverManager.mcpReachable ? "MCP Engine Active" : "MCP Engine Offline"
+                    accessibilityLabel: serverManager.mcpReachable ? "Removal engine connected" : "Removal engine offline"
                 )
             }
         }
@@ -138,11 +140,16 @@ struct ContentView: View {
     private var detail: some View {
         switch selectedNav {
         case .dashboard:
-            DashboardView()
+            DashboardView { status in
+                pendingRequestStatus = status
+                selectedNav = .requests
+            }
         case .campaigns:
             CampaignsView()
         case .requests:
-            RequestsView()
+            RequestsView(initialStatusFilter: pendingRequestStatus) {
+                pendingRequestStatus = nil
+            }
         case .brokers:
             BrokersView()
         case .calendar:

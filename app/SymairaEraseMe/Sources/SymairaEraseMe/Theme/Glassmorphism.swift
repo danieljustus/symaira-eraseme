@@ -10,7 +10,7 @@ struct StatusBadge: View {
         "PLANNED": ("Planned", .neutral),
         "SENT": ("Sent", .informative),
         "ACK": ("Acknowledged", .informative),
-        "AWAITING_ACK": ("Awaiting ACK", .warning),
+        "AWAITING_ACK": ("Awaiting confirmation of receipt", .warning),
         "AWAITING_RESPONSE": ("Awaiting Response", .warning),
         "AWAITING_USER_ACTION": ("Action Needed", .warning),
         "RE_SCAN_DUE": ("Re-scan Due", .informative),

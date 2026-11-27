@@ -18,6 +18,11 @@ final class RequestsViewModel: ObservableObject {
     @Published var requestEvents: [RequestEvent] = []
     @Published var eventsState: ViewState<[RequestEvent]> = .idle
 
+    /// Dashboard attention tiles can preselect a status filter (#1340).
+    init(initialStatusFilter: String = "") {
+        self.filterStatus = initialStatusFilter
+    }
+
     var requests: [RemovalRequest] { state.value ?? [] }
     var isLoading: Bool { state.isLoading }
     var errorMessage: String? { state.errorMessage }
