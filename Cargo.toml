@@ -36,9 +36,9 @@ rusqlite = { version = "=0.41.1", default-features = false, features = ["backup"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde_yaml = { package = "yaml_serde", version = "=0.10.7" }
-symaira-core-version = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", tag = "v0.27.0" }
-symaira-core-sqlite = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", tag = "v0.27.0" }
-symaira-core-llm = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", tag = "v0.27.0" }
+symaira-core-version = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", tag = "v0.27.1" }
+symaira-core-sqlite = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", tag = "v0.27.1" }
+symaira-core-llm = { version = "=0.0.0", git = "https://github.com/danieljustus/symaira-corekit", tag = "v0.27.1" }
 tar = "0.4.44"
 tempfile = "3.27.0"
 toml = "1.1.0"
