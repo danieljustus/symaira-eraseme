@@ -84,16 +84,79 @@ pub(crate) fn tools_list(raw: &[u8]) -> ToolsListOutcome {
 ///
 /// The recorded catalogue (`internal/mcp/tools.json`) and the frozen
 /// `tools/list` records stay untouched history; each post-cutover change is an
-/// explicit, narrow override here (#1296: the compact `get_dashboard_data`).
+/// explicit, narrow override here (#1296: the compact `get_dashboard_data`;
+/// #1342: the paged `list_brokers`).
 pub(crate) fn catalogue_tools() -> Vec<Value> {
     let mut catalogue = serde_json::from_slice::<Catalogue>(TOOL_CATALOGUE)
         .expect("Go MCP catalogue is valid JSON");
     for tool in &mut catalogue.tools {
-        if tool.get("name").and_then(Value::as_str) == Some("get_dashboard_data") {
-            *tool = compact_dashboard_tool();
+        match tool.get("name").and_then(Value::as_str) {
+            Some("get_dashboard_data") => *tool = compact_dashboard_tool(),
+            Some("list_brokers") => *tool = paged_brokers_tool(),
+            _ => {}
         }
     }
     catalogue.tools
+}
+
+/// `list_brokers` since #1342: bounded summary pages with an opaque cursor.
+fn paged_brokers_tool() -> Value {
+    serde_json::json!({
+        "name": "list_brokers",
+        "description": "Return filtered brokers from the registry. Bounded, paged summary by default; use limit, cursor and detail for full records.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "jurisdiction": {
+                    "type": "string",
+                    "description": "Filter by jurisdiction (e.g. GDPR, CCPA)"
+                },
+                "law": {
+                    "type": "string",
+                    "description": "Filter by specific law"
+                },
+                "priority": {
+                    "type": "string",
+                    "description": "Filter by priority level"
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Filter by broker category"
+                },
+                "include_disabled": {
+                    "type": "boolean",
+                    "description": "Include disabled brokers",
+                    "default": false
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["active", "deprecated", "merged", "out-of-business"],
+                    "description": "Broker lifecycle status filter (defaults to active)",
+                    "default": "active"
+                },
+                "include_inactive": {
+                    "type": "boolean",
+                    "description": "Include deprecated, merged, and out-of-business brokers",
+                    "default": false
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum brokers per page (1..500, default 50)",
+                    "default": 50
+                },
+                "cursor": {
+                    "type": "string",
+                    "description": "Opaque continuation cursor returned as next_cursor"
+                },
+                "detail": {
+                    "type": "string",
+                    "enum": ["summary", "full"],
+                    "description": "summary returns id, name, category, priority and status; full returns complete broker records",
+                    "default": "summary"
+                }
+            }
+        }
+    })
 }
 
 /// `get_dashboard_data` since #1296: compact by default, sized by arguments.

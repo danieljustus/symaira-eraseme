@@ -58,10 +58,19 @@ struct BrokerVerification: Codable {
     }
 }
 
-/// Response from `list_brokers`.
+/// Response from `list_brokers`. `count` is the page size; `total` counts all
+/// brokers matching the filters (#1342).
 struct BrokerListResponse: Codable {
     let brokers: [Broker]
     let count: Int
+    let total: Int
+    let nextCursor: String?
+    let detail: String?
+
+    enum CodingKeys: String, CodingKey {
+        case brokers, count, total, detail
+        case nextCursor = "next_cursor"
+    }
 }
 
 /// The filter values the registry actually uses. The server matches filters

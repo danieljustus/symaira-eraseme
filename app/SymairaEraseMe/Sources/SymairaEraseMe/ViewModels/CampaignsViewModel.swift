@@ -45,12 +45,13 @@ final class CampaignsViewModel: ObservableObject {
     func refreshMatches() async {
         do {
             if facets == RegistryFacets() {
-                let all: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers")
+                let all = try await BrokerCatalog.load()
                 facets = RegistryFacets(all.brokers)
             }
+            // #1342: the total counts all matches, not just this page.
             let matches: BrokerListResponse = try await MCPClient.shared.callTool(
                 "list_brokers", arguments: filterArguments)
-            matchCount = matches.count
+            matchCount = matches.total
         } catch {
             matchCount = nil
         }

@@ -4,7 +4,9 @@
 mod envelope;
 #[path = "../src/mcp/tools_list.rs"]
 mod tools_list;
-// #1296: the one changed tool is compared through a narrow, documented override.
+// #1296/#1342: the two changed tools are compared through narrow, documented overrides.
+#[path = "../../../rust-tests/brokers_paging.rs"]
+mod brokers_paging;
 #[path = "../../../rust-tests/dashboard_compact.rs"]
 mod dashboard_compact;
 
@@ -29,10 +31,13 @@ fn tools_list_matches_source_bound_response_shape() {
     let ToolsListOutcome::Response(response) = tools_list(LIST_REQUEST) else {
         panic!("tools/list request did not return a response");
     };
-    // Recorded bytes, except the compact `get_dashboard_data` entry (#1296).
+    // Recorded bytes, except the compact `get_dashboard_data` and paged
+    // `list_brokers` entries (#1296, #1342).
     assert_eq!(
         response,
-        dashboard_compact::with_compact_dashboard_tool(LIST_RESPONSE)
+        brokers_paging::with_paged_brokers_tool(&dashboard_compact::with_compact_dashboard_tool(
+            LIST_RESPONSE
+        ))
     );
     let document = serde_json::from_slice::<serde_json::Value>(&response).expect("response JSON");
     let names = document

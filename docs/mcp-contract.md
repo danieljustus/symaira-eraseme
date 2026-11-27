@@ -372,6 +372,11 @@ Parameters:
     -   `include_disabled` (boolean): Include disabled brokers
     -   `status` (enum=['active', 'deprecated', 'merged', 'out-of-business']): Broker lifecycle status filter (defaults to active)
     -   `include_inactive` (boolean): Include deprecated, merged, and out-of-business brokers
+    -   `limit` (integer): Maximum brokers per page (1..500, default 50)
+    -   `cursor` (string): Opaque continuation cursor from `next_cursor`; clients pass it back unchanged
+    -   `detail` (enum=['summary', 'full']): `summary` (default) returns only `id`, `name`, `category`, `priority`, `status`; `full` returns complete broker records
+
+Result: `{"brokers", "count", "filters", "schema_version", "total", "next_cursor", "detail"}`. `count` is the number of brokers in this page, `total` is the number matching the filters, and `next_cursor` is `null` on the last page. The registry order is stable, so a cursor obtained with one filter set can be applied to the same filters again. Compact JSON is kept (no TOON). This bounded default is a post-cutover change (#1342, recorded in `docs/rust-port-contract-matrix.md`). The CLI `brokers list` command keeps its frozen full-registry JSON; `brokers show <id>` is the existing per-broker lookup, so no new MCP lookup tool was added.
 
 ### `get_calendar`
 

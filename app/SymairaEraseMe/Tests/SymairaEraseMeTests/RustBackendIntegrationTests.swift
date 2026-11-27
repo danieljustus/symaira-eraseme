@@ -93,8 +93,16 @@ final class RustBackendIntegrationTests: XCTestCase {
         let tools = try await MCPClient.shared.listTools()
         XCTAssertTrue(tools.contains { $0["name"] as? String == "list_brokers" })
         let call = try await MCPClient.shared.callToolRaw("list_brokers")
-        XCTAssertEqual(call["count"] as? Int, 1273)
-        let brokerList: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers")
+        XCTAssertEqual(call["total"] as? Int, 1273, "default total keeps the registry size")
+        XCTAssertEqual(call["count"] as? Int, 50, "default answer is a bounded page")
+        XCTAssertNotNil(call["next_cursor"] as? String)
+        XCTAssertEqual(call["detail"] as? String, "summary")
+        // #1342: the app walks full-detail pages to keep every broker visible.
+        let allBrokers = try await BrokerCatalog.load()
+        XCTAssertEqual(allBrokers.total, 1273)
+        XCTAssertEqual(allBrokers.brokers.count, 1273)
+        let brokerList: BrokerListResponse = try await MCPClient.shared.callTool(
+            "list_brokers", arguments: ["detail": "full", "limit": 1])
         XCTAssertEqual(brokerList.count, brokerList.brokers.count)
         // The page models decode the live server's answers (#1310, #1311).
         let requests: RequestListResponse = try await MCPClient.shared.callTool("list_requests")
@@ -126,13 +134,13 @@ final class RustBackendIntegrationTests: XCTestCase {
         XCTAssertFalse(dashboard.campaigns.contains { $0.id == "app-zero-match" })
 
         // Every jurisdiction the filter menus offer selects at least one broker (#1313).
-        let facets = RegistryFacets(brokerList.brokers)
+        let facets = RegistryFacets(allBrokers.brokers)
         XCTAssertTrue(facets.categories.contains("other"))
         XCTAssertFalse(facets.jurisdictions.isEmpty)
         for jurisdiction in facets.jurisdictions {
             let matches: BrokerListResponse = try await MCPClient.shared.callTool(
                 "list_brokers", arguments: ["jurisdiction": jurisdiction])
-            XCTAssertGreaterThan(matches.count, 0, "jurisdiction \(jurisdiction) selects no broker")
+            XCTAssertGreaterThan(matches.total, 0, "jurisdiction \(jurisdiction) selects no broker")
         }
 
         guard let pid = manager.pid else {

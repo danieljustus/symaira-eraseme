@@ -9,6 +9,9 @@
 //! Go's switch default.
 
 #[cfg(test)]
+#[path = "../../../../rust-tests/brokers_paging.rs"]
+pub(crate) mod brokers_paging;
+#[cfg(test)]
 #[path = "../../../../rust-tests/dashboard_compact.rs"]
 pub(crate) mod dashboard_compact;
 #[cfg(test)]
@@ -719,10 +722,31 @@ impl ContractHandler {
         })
     }
 
+    /// #1342: the default and maximum page sizes of `list_brokers`.
+    fn broker_page_limits() -> (usize, usize) {
+        (50, 500)
+    }
+
+    /// Opaque page token: clients pass `next_cursor` back unchanged; the
+    /// embedded registry is ordered, so the offset is a stable position.
+    fn broker_cursor(offset: usize) -> String {
+        format!("brokers:{offset}")
+    }
+
+    fn parse_broker_cursor(cursor: &str) -> Result<usize, ToolError> {
+        cursor
+            .strip_prefix("brokers:")
+            .and_then(|digits| digits.parse::<usize>().ok())
+            .ok_or_else(|| ToolError(format!("invalid cursor: {cursor}")))
+    }
+
     /// Go's `list_brokers`: the embedded registry through the shared filter.
     ///
-    /// The envelope and filter keys follow Go map order; nested brokers and
-    /// channels retain the declaration order of Go registry structs.
+    /// #1342 bounds the answer: the default is a summary page of at most 50
+    /// brokers with `total` and `next_cursor`. Full records are still available
+    /// with `detail: "full"`; pages are walked with the opaque cursor. The envelope
+    /// and filter keys follow Go map order; nested brokers and channels retain the
+    /// declaration order of Go registry structs.
     fn list_brokers(&self, arguments: &Map<String, Value>) -> Result<Value, ToolError> {
         let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
         let status = optional_str(arguments, "status").or_else(|| Some("active".to_owned()));
@@ -736,35 +760,94 @@ impl ContractHandler {
             include_inactive: get_bool(arguments, "include_inactive", false),
         };
         let filtered = registry::filter_brokers(&brokers, &filter);
-        let mut broker_values =
-            serde_json::to_value(&filtered).map_err(|error| ToolError(error.to_string()))?;
-        // Registry form-spec floats use Go's integral-number spelling. Keep
-        // struct field order while converting only those numeric wire fields.
-        for broker in broker_values.as_array_mut().expect("broker array") {
-            for channel in broker["opt_out"].as_array_mut().expect("channel array") {
-                if let Some(spec) = channel.get_mut("form_spec") {
-                    for key in ["timeout_seconds", "rate_limit_delay"] {
-                        if let Some(number) = spec.get_mut(key) {
-                            let value = number.as_f64().expect("validated form-spec number");
-                            if value.fract() == 0.0
-                                && value >= i64::MIN as f64
-                                && value < i64::MAX as f64
-                            {
-                                *number = json!(value as i64);
+        let total = filtered.len();
+        let (default_limit, max_limit) = Self::broker_page_limits();
+        let limit = arguments
+            .get("limit")
+            .map(|value| {
+                value
+                    .as_u64()
+                    .and_then(|number| usize::try_from(number).ok())
+                    .ok_or_else(|| ToolError("invalid limit: expected an integer".to_owned()))
+            })
+            .transpose()?
+            .unwrap_or(default_limit);
+        if limit == 0 || limit > max_limit {
+            return Err(ToolError(format!(
+                "limit must be between 1 and {max_limit}"
+            )));
+        }
+        let offset = match arguments.get("cursor") {
+            None | Some(Value::Null) => 0,
+            Some(Value::String(cursor)) => Self::parse_broker_cursor(cursor)?,
+            Some(_) => return Err(ToolError("invalid cursor: expected a string".to_owned())),
+        };
+        if offset > total {
+            return Err(ToolError(
+                "invalid cursor: position beyond the result set".to_owned(),
+            ));
+        }
+        let detail = optional_str(arguments, "detail").unwrap_or_else(|| "summary".to_owned());
+        if detail != "summary" && detail != "full" {
+            return Err(ToolError(format!("invalid detail: {detail}")));
+        }
+        let end = (offset + limit).min(total);
+        let page = &filtered[offset..end];
+        let next_cursor = if end < total {
+            Value::String(Self::broker_cursor(end))
+        } else {
+            Value::Null
+        };
+        let broker_values = if detail == "summary" {
+            let mut values = Vec::with_capacity(page.len());
+            for broker in page {
+                // The enum fields serialise to the registry's wire strings.
+                let full =
+                    serde_json::to_value(*broker).map_err(|error| ToolError(error.to_string()))?;
+                values.push(json!({
+                    "id": full["id"],
+                    "name": full["name"],
+                    "category": full["category"],
+                    "priority": full["priority"],
+                    "status": full["status"],
+                }));
+            }
+            values
+        } else {
+            let mut values =
+                serde_json::to_value(page).map_err(|error| ToolError(error.to_string()))?;
+            // Registry form-spec floats use Go's integral-number spelling. Keep
+            // struct field order while converting only those numeric wire fields.
+            for broker in values.as_array_mut().expect("broker array") {
+                for channel in broker["opt_out"].as_array_mut().expect("channel array") {
+                    if let Some(spec) = channel.get_mut("form_spec") {
+                        for key in ["timeout_seconds", "rate_limit_delay"] {
+                            if let Some(number) = spec.get_mut(key) {
+                                let value = number.as_f64().expect("validated form-spec number");
+                                if value.fract() == 0.0
+                                    && value >= i64::MIN as f64
+                                    && value < i64::MAX as f64
+                                {
+                                    *number = json!(value as i64);
+                                }
                             }
                         }
                     }
                 }
             }
-        }
+            values.as_array().expect("broker array").clone()
+        };
         Ok(json!({
             "brokers": broker_values,
-            "count": filtered.len(),
+            "count": page.len(),
             "filters": {
                 "include_disabled": filter.include_disabled,
                 "status": status,
             },
             "schema_version": 1,
+            "total": total,
+            "next_cursor": next_cursor,
+            "detail": detail,
         }))
     }
 
@@ -2706,10 +2789,9 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// `list_brokers` answers with the registry itself, so the oracle could not
-    /// record it without duplicating ~1 MB of embedded data. The counts and the
-    /// filter echo below are the values Go's real handler produced when the
-    /// oracle measured them.
+    /// #1342: the oracle measured the unfiltered registry once; since the
+    /// default answer is now a bounded summary page, the recorded total stays
+    /// in `total` and `count` becomes the page size.
     #[test]
     fn list_brokers_shape_matches_the_measured_handler_answers() {
         let root = workspace("list-brokers");
@@ -2734,18 +2816,177 @@ mod tests {
         };
 
         // include_inactive makes Go ignore the status filter, so both statuses
-        // come back.
+        // come back. The recorded total is now `total`; `count` is the page.
         let all = call(r#"{"status":"out-of-business","include_inactive":true}"#);
         assert_eq!(all["schema_version"], 1);
-        assert_eq!(all["count"], 1274);
+        assert_eq!(all["total"], 1274);
+        assert_eq!(all["count"], 50);
+        assert_eq!(all["next_cursor"], "brokers:50");
+        assert_eq!(all["detail"], "summary");
         assert_eq!(all["filters"]["status"], "out-of-business");
         assert_eq!(all["filters"]["include_disabled"], false);
         assert_eq!(all["brokers"][0]["id"], "0ptimus-analytics-us");
 
         // The default is the active registry.
         let active = call("{}");
-        assert_eq!(active["count"], 1273);
+        assert_eq!(active["total"], 1273);
+        assert_eq!(active["count"], 50);
         assert_eq!(active["filters"]["status"], "active");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// #1342 acceptance: a default call is compact, the cursor reaches the
+    /// last broker exactly once, filters compose with paging, and malformed
+    /// limits/cursors are rejected instead of silently returning more data.
+    #[test]
+    fn list_brokers_paging_contract_stays_bounded() {
+        let root = workspace("list-brokers-paging");
+        let handler = ContractHandler::new(&root);
+        let call = |arguments: &str| -> Value {
+            let arguments: Value = serde_json::from_str(arguments).expect("arguments");
+            let request = json!({
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "list_brokers", "arguments": arguments},
+            })
+            .to_string();
+            match initialize(request.as_bytes(), &handler) {
+                InitializeOutcome::Response(bytes) => {
+                    let envelope: Value = serde_json::from_slice(&bytes).expect("envelope JSON");
+                    let text = envelope["result"]["content"][0]["text"]
+                        .as_str()
+                        .expect("payload text");
+                    serde_json::from_str(text).expect("payload JSON")
+                }
+                other => panic!("expected a response, got {other:?}"),
+            }
+        };
+        let call_wire = |arguments: &str| -> Value {
+            let arguments: Value = serde_json::from_str(arguments).expect("arguments");
+            let request = json!({
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "list_brokers", "arguments": arguments},
+            })
+            .to_string();
+            match initialize(request.as_bytes(), &handler) {
+                InitializeOutcome::Response(bytes) => {
+                    serde_json::from_slice(&bytes).expect("envelope JSON")
+                }
+                other => panic!("expected a response, got {other:?}"),
+            }
+        };
+
+        let default = call("{}");
+        assert_eq!(default["count"], 50);
+        assert_eq!(default["total"], 1273);
+        assert_eq!(default["next_cursor"], "brokers:50");
+        assert_eq!(default["detail"], "summary");
+        assert_eq!(
+            keys(&default["brokers"][0]),
+            vec!["id", "name", "category", "priority", "status"]
+        );
+
+        let wire = call_wire("{}");
+        let text = wire["result"]["content"][0]["text"]
+            .as_str()
+            .expect("payload text");
+        eprintln!("default list_brokers payload chars: {}", text.len());
+        assert!(
+            text.len() < 50_000,
+            "default payload must stay below 50K chars"
+        );
+
+        // Walk every page with the opaque cursor and count unique ids.
+        let ids_of = |payload: &Value| -> Vec<String> {
+            payload["brokers"]
+                .as_array()
+                .expect("brokers array")
+                .iter()
+                .map(|broker| broker["id"].as_str().expect("broker id").to_owned())
+                .collect()
+        };
+        let mut ids = ids_of(&default);
+        let mut cursor = default["next_cursor"]
+            .as_str()
+            .expect("next cursor")
+            .to_owned();
+        let mut pages = 1;
+        loop {
+            let page = call(&json!({"cursor": cursor}).to_string());
+            pages += 1;
+            assert!(pages <= 30, "paging did not terminate");
+            assert!(page["brokers"].as_array().expect("brokers").len() <= 50);
+            assert_eq!(page["total"], 1273);
+            ids.extend(ids_of(&page));
+            match &page["next_cursor"] {
+                Value::Null => break,
+                Value::String(next) => cursor = next.clone(),
+                other => panic!("unexpected next_cursor: {other}"),
+            }
+        }
+        assert_eq!(ids.len(), 1273);
+        let mut unique = ids.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), 1273, "the cursor repeated or skipped brokers");
+
+        // Filters compose with the page; a separate wide request pins the
+        // filtered order so the two pages can be compared.
+        let all_de = call(r#"{"jurisdiction":"DE","limit":500}"#);
+        assert_eq!(all_de["count"], all_de["total"]);
+        assert!(all_de["next_cursor"].is_null());
+        let first_de = call(r#"{"jurisdiction":"DE","limit":2}"#);
+        assert_eq!(first_de["count"], 2);
+        assert_eq!(first_de["total"], all_de["total"]);
+        assert_eq!(first_de["next_cursor"], "brokers:2");
+        let second_de = call(r#"{"jurisdiction":"DE","limit":2,"cursor":"brokers:2"}"#);
+        assert_eq!(second_de["count"], 2);
+        assert_eq!(second_de["total"], all_de["total"]);
+        let all_ids = ids_of(&all_de);
+        assert_eq!(ids_of(&first_de), all_ids[..2]);
+        assert_eq!(ids_of(&second_de), all_ids[2..4]);
+
+        assert_eq!(call(r#"{"limit":500}"#)["count"], 500);
+        assert_eq!(call(r#"{"limit":1}"#)["count"], 1);
+        let full = call(r#"{"detail":"full","limit":1}"#);
+        assert_eq!(full["detail"], "full");
+        assert!(
+            !full["brokers"][0]["opt_out"]
+                .as_array()
+                .expect("channels")
+                .is_empty()
+        );
+
+        for bad in ["0", "501", "-1"] {
+            let wire = call_wire(&format!(r#"{{"limit":{bad}}}"#));
+            assert_eq!(wire["error"]["code"], -32603, "limit {bad}");
+            assert!(
+                wire["error"]["message"]
+                    .as_str()
+                    .expect("error message")
+                    .contains("limit"),
+                "limit {bad}: {wire}"
+            );
+        }
+        for bad in ["nope", "brokers:x", "brokers:999999"] {
+            let wire = call_wire(&json!({"cursor": bad}).to_string());
+            assert_eq!(wire["error"]["code"], -32603, "cursor {bad}");
+            assert!(
+                wire["error"]["message"]
+                    .as_str()
+                    .expect("error message")
+                    .contains("invalid cursor"),
+                "cursor {bad}: {wire}"
+            );
+        }
+        let wire = call_wire(r#"{"detail":"everything"}"#);
+        assert_eq!(wire["error"]["code"], -32603);
+        assert!(
+            wire["error"]["message"]
+                .as_str()
+                .expect("error message")
+                .contains("invalid detail")
+        );
 
         let _ = fs::remove_dir_all(&root);
     }
@@ -3341,7 +3582,28 @@ mod tests {
                 other => panic!("{name}: expected a complete response, got {other:?}"),
             };
             let actual = String::from_utf8(actual).unwrap();
-            let expected = case["response"].as_str().unwrap_or_default();
+            let recorded = case["response"].as_str().unwrap_or_default();
+            // #1342: the three successful recorded list_brokers answers are
+            // compared through a narrow summary-page override; the recorded
+            // invalid-boolean error and every other case stay byte-exact.
+            let expected = match name {
+                "list-brokers-entire-registry"
+                | "list-brokers-populated"
+                | "list-brokers-empty" => {
+                    let envelope: Value = serde_json::from_str(recorded).unwrap();
+                    let text = envelope["result"]["content"][0]["text"]
+                        .as_str()
+                        .expect("recorded payload text");
+                    let payload: Value = serde_json::from_str(text).unwrap();
+                    let paged = brokers_paging::paged_default_summary(&payload);
+                    String::from_utf8(crate::mcp::envelope::result_response(
+                        &json!(1),
+                        Some(&paged),
+                    ))
+                    .unwrap()
+                }
+                _ => recorded.to_owned(),
+            };
             // HTML exports are Symaira-designed since the Liquid Topography redesign:
             // the envelope still matches Go byte for byte, the HTML a Rust golden.
             if let Some((field, next)) = match name {
@@ -3362,11 +3624,11 @@ mod tests {
                 assert_response_matches(
                     name,
                     Some(without_html(&actual, field, next)),
-                    Some(&without_html(expected, field, next)),
+                    Some(&without_html(&expected, field, next)),
                 );
                 continue;
             }
-            assert_response_matches(name, Some(actual), Some(expected));
+            assert_response_matches(name, Some(actual), Some(&expected));
         }
         eprintln!(
             "25 recorded Go tool gap cases match complete response bytes; nine source digests verified"

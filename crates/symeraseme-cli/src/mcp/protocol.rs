@@ -1128,11 +1128,14 @@ mod tests {
         const RESPONSE: &[u8] = include_bytes!(
             "../../../../tests/fixtures/mcp-contract/mcp-002/tools-list.response.json"
         );
-        // Recorded bytes, except the compact `get_dashboard_data` entry (#1296).
+        // Recorded bytes, except the compact `get_dashboard_data` and paged
+        // `list_brokers` entries (#1296, #1342).
+        let expected =
+            crate::mcp::handler::dashboard_compact::with_compact_dashboard_tool(RESPONSE);
         assert_eq!(
             initialize(REQUEST, &no_backend_handler()),
             InitializeOutcome::Response(
-                crate::mcp::handler::dashboard_compact::with_compact_dashboard_tool(RESPONSE)
+                crate::mcp::handler::brokers_paging::with_paged_brokers_tool(&expected)
             )
         );
     }

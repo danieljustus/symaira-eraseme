@@ -51,18 +51,21 @@ final class BrokersViewModel: ObservableObject {
         if !filterCategory.isEmpty { args["category"] = filterCategory }
 
         do {
-            // The unfiltered list supplies the registry total and the menu values.
+            // #1342: the server returns a bounded page; walk all pages so the
+            // list, detail sheet and registry facets still see every broker.
+            // The unfiltered catalogue also supplies the registry total and
+            // the menu values.
             if args.isEmpty || registryTotal == nil {
-                let all: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers")
-                registryTotal = all.count
+                let all = try await BrokerCatalog.load()
+                registryTotal = all.total
                 facets = RegistryFacets(all.brokers)
                 if args.isEmpty {
                     state = .loaded(all.brokers)
                     return
                 }
             }
-            let response: BrokerListResponse = try await MCPClient.shared.callTool("list_brokers", arguments: args)
-            state = .loaded(response.brokers)
+            let matches = try await BrokerCatalog.load(arguments: args)
+            state = .loaded(matches.brokers)
         } catch {
             state = .failed(error.localizedDescription)
         }

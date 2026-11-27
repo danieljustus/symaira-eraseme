@@ -11,6 +11,44 @@ tracked separately in #1276. Historical rows below preserve what was measured
 and must not be edited to erase those observations. Remove a Windows-only
 fixture only after checking its replay and provenance consumers.
 
+## Post-cutover contract change: bounded `list_brokers` pages (2026-11-27, #1342)
+
+`list_brokers` answered with all 1,273 active brokers including nested
+opt-out, verification, jurisdiction and law records (~858K characters of tool
+payload). Go is removed (CUT-005), so the change is recorded here; frozen Go
+records stay unchanged history. Compact JSON is kept (no TOON conversion).
+
+- **Paging.** New optional `limit` (integer, default 50, 1..500) and `cursor`
+  (opaque `brokers:<offset>` token) arguments. The result keeps `brokers` and
+  the `filters` echo, adds `total` (all matches of the filters) and
+  `next_cursor` (`null` on the last page), and redefines `count` as the number
+  of brokers in the page. Invalid cursors, non-integer limits, limits outside
+  1..500 and unknown `detail` values are handler errors (`-32603`).
+- **Summary by default.** `detail` defaults to `summary`, which returns only
+  `id`, `name`, `category`, `priority` and `status` per broker. `detail: "full"`
+  returns the previous complete records for one page, so the macOS app can
+  page through full records for its detail sheet and registry facets. The CLI
+  already has the per-broker `brokers show <id>` lookup; no new MCP tool was
+  added and the 26-tool catalogue size is unchanged.
+- **`tools/list`.** The `list_brokers` entry carries the new `inputSchema` and
+  description, applied over `internal/mcp/tools.json` in `tools_list.rs` and to
+  the recorded `tools/list` responses in `mcp_tools_list.rs` and `protocol.rs`.
+- **CLI.** `brokers list` keeps its frozen full-registry output; only the MCP
+  tool is bounded.
+- **Overrides.** The frozen `mcp-tool-gaps` capture has four `list_brokers`
+  cases: three successful results (entire registry, DE filter, empty filter)
+  are compared through `rust-tests/brokers_paging.rs::paged_default_summary`,
+  which derives the expected page from the recorded brokers; the recorded
+  invalid-boolean error is compared byte-for-byte. `mcp::handler`'s direct
+  shape test now asserts the recorded totals in `total` and the page size in
+  `count`. New acceptance tests live in `mcp::handler` (default size, full
+  cursor walk, filters, bounds, invalid input, <50K chars).
+  The retained historical MCP oracle `rust-tests/parity/cases/mcp/transcript.jsonl`
+  also records a `tool-call-list_brokers` full-registry response; no current
+  test replays that corpus, and the record is left untouched as history.
+  Affected rows: MCP-002 (`tools/list`), MCP-004 (frozen `mcp-tool-gaps`
+  `list_brokers` cases) and the MCP `list_brokers` shape test.
+
 ## Post-cutover contract change: `list_requests` total honours the broker filter (2026-11-12, #1315)
 
 `list_requests` applied `broker_id` to the returned rows but counted `total`
