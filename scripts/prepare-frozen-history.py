@@ -21,6 +21,7 @@ REVISIONS = (
     'a8eda4f77ce938c32d18dbad7d45de148b7d0482',  # quinn/url RUSTSEC native dependency refresh
     '17c7d69658eeb22c4ac96a3c0d4facfb6a372274',  # CoreKit v0.27.1 native dependency refresh
     '09d8269371cbd3111c8b6584a402caa8ff6ce6df',  # CoreKit v0.28.0 and keyring 4.2.0 native dependency refresh
+    'e0a4c294542b09f53ef8e8b7cd1585c574a8c365',  # chrono replaced with time; #1335 comparator override refresh
 )
 REPOSITORY = 'https://github.com/danieljustus/symaira-eraseme.git'
 

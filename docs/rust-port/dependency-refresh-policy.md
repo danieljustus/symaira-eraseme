@@ -210,6 +210,22 @@ for Windows after #1281.
   The superseded CoreKit v0.27.0 snapshot `c9970318` (run `45921428609`) is
   kept as `frozen-go-captures/dependency-refresh-f09d6aa5`.
 
+- `refresh-8dc0b7bb` captures candidate `8dc0b7bb91a60cab2409fa7c998875b6dcfbeef1`
+  (chrono replaced with `time` 0.3.55, #1335) at snapshot
+  `e0a4c294542b09f53ef8e8b7cd1585c574a8c365` (tag
+  `frozen-go-captures/dependency-refresh-8dc0b7bb`), run `46067295620`;
+  artifacts `15231198614` (macOS arm64,
+  `sha256:6261b3cbecee6b4fa0d33baaf3657a0d2c50fd65448ba12637343721f3db4e22`),
+  `15231766315` (Linux amd64,
+  `sha256:48d39abf580a67ff24bd5821e0032e271955b2d914e1a57fc654f9b592be4eb8`)
+  and `15232105319` (Linux arm64,
+  `sha256:f20312416f12aea89d0c129df00cc89ea8d9bee61edb0d1d861d6dfb2ca5b38d`)
+  match their GitHub API digests. It is the first snapshot with the #1335
+  comparator override. The import report accepted the documented volatile
+  categories for all 48 records plus 15 `archived_generators` digests of the
+  three ported comparators, each moved from its `22615ae` entry to the entry
+  of the reviewed edits.
+
 ## Automated refresh preparation (#1345)
 
 The mechanical preparation is scripted; no binding is relaxed. Both scripts
