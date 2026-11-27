@@ -89,6 +89,30 @@ observations are unchanged, the product candidate keeps its real version, and
 the frozen readers keep checking the real product. This override is not an
 assertion relaxation for any other field.
 
+## Capture comparator override (#1335)
+
+Maintainer decision (2026-11-27): chrono is replaced with `time`, so the
+candidate's `Cargo.lock` no longer contains chrono. Three retired live
+comparators that a capture snapshot restores from `22615ae` still call chrono
+and would not compile: `crates/symeraseme-cli/tests/plan_execute_live_process.rs`,
+`crates/symeraseme-cli/tests/mcp_http_headers_process.rs` and
+`crates/symeraseme-core/tests/campaign_smtp.rs`. For a candidate without chrono
+in `Cargo.lock`, the snapshot ports only those chrono calls to `time`.
+`scripts/capture_overrides.json` lists every edit as an exact `old`/`new` pair
+with its occurrence count in the `22615ae` file; nothing else in those files may
+differ, and the Go observations are unchanged.
+
+The same table is the single source for every check:
+`scripts/derive_capture_snapshot.py` writes the ported files and, on the first
+chrono-free snapshot, inserts the matching check into the predecessor capture
+workflow (later snapshots inherit it); the workflow's identity check reads the
+table from the candidate commit; `scripts/import_capture_refresh.py` accepts an
+`archived_generators` digest change for these three files only from the
+`22615ae` entry to the ported entry; and
+`go_source_pin::assert_retired_generator_matches_archive` accepts exactly the
+`22615ae` bytes or those bytes with the table applied. No other assertion is
+relaxed.
+
 ## Lock-binding decision (#1263)
 
 The strict whole-`Cargo.lock` binding in `go_source_pin::assert_current_matches_archive`

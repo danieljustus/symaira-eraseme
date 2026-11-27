@@ -6,8 +6,10 @@ the caller's checkout and the current branch are never modified. The derived
 tree is the candidate tree plus (a) the retired Go producer files of the
 predecessor snapshot, byte-identical to 22615ae, (b) the predecessor capture
 workflow with only its candidate constant replaced, (c) the predecessor capture
-script unchanged, and (d) the single #1330 product-version override. Nothing
-else may differ. Creating the local tag is opt-in; pushing and dispatching
+script unchanged, (d) the single #1330 product-version override and, once
+chrono has left the candidate's Cargo.lock, (e) the #1335 comparator override:
+the reviewed chrono-to-time edits in `scripts/capture_overrides.json` applied to
+three retired comparators. Nothing else may differ. Creating the local tag is opt-in; pushing and dispatching
 capture CI stay manual coordinator steps.
 """
 import argparse
@@ -32,6 +34,26 @@ PROTECTED = (
 )
 PRODUCT_LITERAL = b'version: env!("CARGO_PKG_VERSION"),'
 CAPTURE_LITERAL = b'version: "dev",'
+OVERRIDES = 'scripts/capture_overrides.json'
+CHRONO_LOCK_ENTRY = b'\nname = "chrono"\n'
+# Inserted once into a pre-#1335 predecessor workflow when the candidate first
+# needs the comparator override; later snapshots inherit it unchanged.
+WORKFLOW_ANCHOR = b"          for name in changed:\n"
+WORKFLOW_OVERRIDE_LOAD = (
+    b"          # Maintainer decision #1335: chrono left Cargo.lock. Three retired comparators port only their chrono\n"
+    b"          # calls to time, exactly as the candidate's reviewed scripts/capture_overrides.json lists.\n"
+    b"          overrides = json.loads(git('cat-file', '--filters', candidate + ':scripts/capture_overrides.json'))['comparators']\n"
+    b"          assert set(overrides) <= set(changed), 'capture comparator override without snapshot change'\n")
+WORKFLOW_RETIRED_CHECK = (
+    b"              original = git('cat-file', '--filters', retirement + ':' + name)\n"
+    b"              assert (root / name).read_bytes() == original, 'retired input altered: ' + name\n")
+WORKFLOW_RETIRED_OVERRIDE = (
+    b"              original = git('cat-file', '--filters', retirement + ':' + name)\n"
+    b"              for edit in overrides.get(name, ()):\n"
+    b"                  old, new = edit['old'].encode(), edit['new'].encode()\n"
+    b"                  assert original.count(old) == edit['count'], 'capture comparator override: ' + name\n"
+    b"                  original = original.replace(old, new)\n"
+    b"              assert (root / name).read_bytes() == original, 'retired input altered: ' + name\n")
 CANDIDATE_CONSTANT = re.compile(rb"candidate = '([0-9a-f]{40})'")
 SHA = re.compile(r'^[0-9a-f]{40}$')
 
@@ -131,7 +153,42 @@ def workflow_for(repo, predecessor, old_candidate, candidate, env=None):
                               'required for a current capture snapshot')
     old = ('candidate = ' + repr(old_candidate)).encode('ascii')
     new = ('candidate = ' + repr(candidate)).encode('ascii')
-    return replace_once(original, old, new, WORKFLOW)
+    workflow = replace_once(original, old, new, WORKFLOW)
+    if comparator_overrides(repo, candidate, env=env) and b'#1335' not in workflow:
+        workflow = replace_once(workflow, WORKFLOW_ANCHOR,
+                                WORKFLOW_OVERRIDE_LOAD + WORKFLOW_ANCHOR, WORKFLOW)
+        workflow = replace_once(workflow, WORKFLOW_RETIRED_CHECK,
+                                WORKFLOW_RETIRED_OVERRIDE, WORKFLOW)
+    return workflow
+
+
+def comparator_overrides(repo, candidate, env=None):
+    """Return the #1335 edit table when the candidate no longer locks chrono."""
+    if CHRONO_LOCK_ENTRY in blob_at(repo, candidate, 'Cargo.lock', env=env):
+        return {}
+    try:
+        table = json.loads(blob_at(repo, candidate, OVERRIDES, env=env))
+    except (DerivationError, ValueError) as error:
+        raise DerivationError('chrono-free candidate needs a valid ' + OVERRIDES + ': '
+                              + str(error)) from error
+    if table.get('retirement_revision') != RETIREMENT:
+        raise DerivationError(OVERRIDES + ': retirement revision mismatch')
+    return table['comparators']
+
+
+def apply_overrides(data, edits, label):
+    """Apply each documented edit exactly `count` times to retired bytes."""
+    for edit in edits:
+        old, new = edit['old'].encode('utf-8'), edit['new'].encode('utf-8')
+        if data.count(old) != edit['count']:
+            raise DerivationError(label + ': expected ' + str(edit['count']) + ' of '
+                                  + repr(old) + ', found ' + str(data.count(old)))
+        data = data.replace(old, new)
+    return data
+
+
+def comparator_blob(repo, path, edits, env=None):
+    return apply_overrides(blob_at(repo, RETIREMENT, path, env=env), edits, path)
 
 
 def protocol_for(repo, candidate, env=None):
@@ -208,8 +265,16 @@ def derive(repo, scratch, candidate, predecessor):
         producers = retired_paths(repo, predecessor, old_candidate, env=env)
         retirement_tree = tree_entries(repo, RETIREMENT, env=env)
 
+        overrides = comparator_overrides(repo, candidate, env=env)
+        unknown = set(overrides) - producers
+        if unknown:
+            raise DerivationError('comparator override for a non-producer path: '
+                                  + repr(sorted(unknown)))
         for path in sorted(producers):
             mode, oid = retirement_tree[path]
+            if path in overrides:
+                oid = hash_blob(repo, comparator_blob(repo, path, overrides[path], env=env),
+                                env=env)
             git(scratch, 'update-index', '--add', '--cacheinfo',
                 mode + ',' + oid + ',' + path, env=env)
 
@@ -252,10 +317,15 @@ def verify_tree(repo, tree, candidate, predecessor, old_candidate, producers):
     if changed != expected:
         raise DerivationError('tree differs from candidate outside the documented set: '
                               + repr(sorted(changed ^ expected)))
+    overrides = comparator_overrides(repo, candidate)
     for path in producers:
-        if result[path] != retirement_tree[path]:
+        expected_entry = retirement_tree[path]
+        if path in overrides:
+            expected_entry = (expected_entry[0], hash_blob(
+                repo, comparator_blob(repo, path, overrides[path])))
+        if result[path] != expected_entry:
             raise DerivationError('retired producer not byte-identical to ' + RETIREMENT
-                                  + ': ' + path)
+                                  + ' plus the documented #1335 override: ' + path)
     if result[WORKFLOW][1] != hash_blob(repo, workflow_for(repo, predecessor,
                                                           old_candidate, candidate)):
         raise DerivationError('capture workflow is not the predecessor workflow with '

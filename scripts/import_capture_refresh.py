@@ -56,7 +56,10 @@ CATEGORIES = (
     'ephemeral SMTP ports and derived stdin bytes',
     'elapsed times',
     'Go map order in one provider list',
+    '#1335 comparator override digests of the retired chrono comparators',
 )
+OVERRIDES = 'scripts/capture_overrides.json'
+CHRONO_LOCK_ENTRY = b'\nname = "chrono"\n'
 
 
 class VerificationError(RuntimeError):
@@ -174,12 +177,15 @@ def parse_pseudo_version(value):
 
 
 class CheckContext:
-    def __init__(self, snapshot, predecessor_snapshot, candidate, lock_bytes, lock_digest):
+    def __init__(self, snapshot, predecessor_snapshot, candidate, lock_bytes, lock_digest,
+                 generator_overrides=None):
         self.snapshot = snapshot
         self.predecessor_snapshot = predecessor_snapshot
         self.candidate = candidate
         self.lock_bytes = lock_bytes
         self.lock_digest = lock_digest
+        # {path: (retired entry, overridden entry)} for the #1335 comparators.
+        self.generator_overrides = generator_overrides or {}
 
 
 def valid_revision(old, new, path, context):
@@ -505,6 +511,31 @@ def candidate_lock(repo, candidate):
     return len(data), sha256(data)
 
 
+def generator_overrides(repo, candidate):
+    """Expected archived-generator entries for the #1335 comparator override.
+
+    Only a candidate whose Cargo.lock no longer has chrono carries the override;
+    each entry maps a retired comparator to its exact 22615ae entry and to the
+    entry of those bytes with the candidate's reviewed edits applied.
+    """
+    if CHRONO_LOCK_ENTRY in git(repo, 'cat-file', '--filters', candidate + ':Cargo.lock'):
+        return {}
+    table = json.loads(git(repo, 'cat-file', '--filters', candidate + ':' + OVERRIDES))
+    if table.get('retirement_revision') != RETIREMENT:
+        raise VerificationError(OVERRIDES + ': retirement revision mismatch')
+    expected = {}
+    for path, edits in table['comparators'].items():
+        data = git(repo, 'cat-file', 'blob', RETIREMENT + ':' + path)
+        retired = {'bytes': len(data), 'sha256': sha256(data)}
+        for edit in edits:
+            old, new = edit['old'].encode('utf-8'), edit['new'].encode('utf-8')
+            if data.count(old) != edit['count']:
+                raise VerificationError(OVERRIDES + ': edit count mismatch in ' + path)
+            data = data.replace(old, new)
+        expected[path] = (retired, {'bytes': len(data), 'sha256': sha256(data)})
+    return expected
+
+
 def validate_provenance(old_bytes, new_bytes, rel, target, context, snapshot):
     try:
         old, new = json.loads(old_bytes), json.loads(new_bytes)
@@ -526,14 +557,26 @@ def validate_provenance(old_bytes, new_bytes, rel, target, context, snapshot):
         raise VerificationError('record target/toolchain mismatch: ' + rel)
     if set(old.get('archived_generators', {})) != set(new.get('archived_generators', {})):
         raise VerificationError('archived generator set changed: ' + rel)
+    overridden = 0
     for generator, entry in old.get('archived_generators', {}).items():
         current = new['archived_generators'][generator]
         if generator == 'Cargo.lock':
+            continue
+        if generator in context.generator_overrides and entry != current:
+            retired, expected = context.generator_overrides[generator]
+            if entry not in (retired, expected) or current != expected:
+                raise VerificationError('archived generator is not the documented #1335 '
+                                        'override: ' + rel + '/archived_generators/' + generator)
+            old = json.loads(json.dumps(old))
+            old['archived_generators'][generator] = current
+            overridden += 1
             continue
         if entry != current:
             raise VerificationError('archived generator bytes changed: ' + rel
                                     + '/archived_generators/' + generator)
     accepted = validate_record_diff(old, new, rel, context)
+    if overridden:
+        accepted['comparator_override'] = overridden
     return new, accepted
 
 
@@ -622,7 +665,7 @@ def import_refresh(repo, artifacts_dir, digests_path, run_id, candidate,
     predecessor_snapshot = predecessor_snapshot.pop()
     lock_bytes, lock_digest = candidate_lock(repo, candidate)
     context = CheckContext(snapshot or '', predecessor_snapshot, candidate,
-                           lock_bytes, lock_digest)
+                           lock_bytes, lock_digest, generator_overrides(repo, candidate))
     snapshot_holder = [snapshot]
     records = {}
     artifacts_report = []

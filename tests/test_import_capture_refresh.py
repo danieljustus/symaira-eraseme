@@ -175,6 +175,30 @@ class CaptureRefreshImport(unittest.TestCase):
                     self.assertIn(label, str(caught.exception).lower()
                                   if label == 'digest' else str(caught.exception))
 
+    def test_comparator_override_digest_is_the_only_generator_change(self):
+        # #1335: a retired comparator's archived digest may move only from its
+        # 22615ae entry to the entry with the reviewed chrono edits applied.
+        candidate = git('rev-parse', 'HEAD').decode().strip()
+        overrides = IMPORT.generator_overrides(ROOT, candidate)
+        self.assertEqual(IMPORT.generator_overrides(ROOT, CANDIDATE), {})
+        name = 'crates/symeraseme-core/tests/campaign_smtp.rs'
+        rel = 'smtp/darwin-arm64/campaign.json'
+        old_bytes = (FIXTURES / 'refresh-711fd570' / rel).read_bytes()
+        old = json.loads(old_bytes)
+        retired, expected = overrides[name]
+        self.assertEqual(old['archived_generators'][name], retired)
+        revision = old['source_revision']
+        context = IMPORT.CheckContext(revision, revision, candidate, 0, '', overrides)
+        new = json.loads(old_bytes)
+        new['archived_generators'][name] = expected
+        _, accepted = IMPORT.validate_provenance(old_bytes, json.dumps(new).encode('utf-8'),
+                                                 rel, 'darwin/arm64', context, revision)
+        self.assertEqual(accepted, {'comparator_override': 1})
+        new['archived_generators'][name] = {'bytes': expected['bytes'], 'sha256': 'f' * 64}
+        with self.assertRaisesRegex(IMPORT.VerificationError, '#1335'):
+            IMPORT.validate_provenance(old_bytes, json.dumps(new).encode('utf-8'),
+                                       rel, 'darwin/arm64', context, revision)
+
     def test_typed_validators_reject_out_of_category_changes(self):
         context = IMPORT.CheckContext(SNAPSHOT, PRED_SNAPSHOT, CANDIDATE, 80218, 'a' * 64)
         self.assertIsNotNone(IMPORT.valid_build_info(

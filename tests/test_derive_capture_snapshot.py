@@ -65,6 +65,26 @@ class CaptureSnapshotDerivation(unittest.TestCase):
                     finally:
                         git('worktree', 'remove', '--force', str(scratch))
 
+    def test_comparator_override_table_ports_only_chrono_calls(self):
+        # #1335: the edits apply exactly `count` times to the 22615ae bytes and
+        # leave no chrono reference; the replay candidate above still locks
+        # chrono, so it carries no override.
+        candidate = git('rev-parse', 'HEAD').decode().strip()
+        table = DERIVE.comparator_overrides(ROOT, candidate)
+        self.assertEqual(sorted(table), [
+            'crates/symeraseme-cli/tests/mcp_http_headers_process.rs',
+            'crates/symeraseme-cli/tests/plan_execute_live_process.rs',
+            'crates/symeraseme-core/tests/campaign_smtp.rs',
+        ])
+        for path, edits in table.items():
+            ported = DERIVE.comparator_blob(ROOT, path, edits)
+            self.assertNotIn(b'chrono', ported, path)
+            self.assertNotEqual(ported, DERIVE.blob_at(ROOT, DERIVE.RETIREMENT, path))
+        self.assertEqual(DERIVE.comparator_overrides(ROOT, CANDIDATE), {})
+        with self.assertRaisesRegex(DERIVE.DerivationError, 'expected 2 of'):
+            DERIVE.apply_overrides(b'now.to_utc(),', [
+                {'old': 'now.to_utc(),', 'new': 'now,', 'count': 2}], 'campaign')
+
     def test_dirty_or_primary_checkout_is_refused(self):
         with self.assertRaisesRegex(DERIVE.DerivationError, 'must not be the caller checkout'):
             DERIVE.derive(ROOT, ROOT, CANDIDATE, TAG)
