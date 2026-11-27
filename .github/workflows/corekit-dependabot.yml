@@ -12,6 +12,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   corekit:
@@ -19,6 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: danieljustus/symaira-corekit/.github/actions/dependabot-corekit@12afa75c07b209ff13943ad0fb148d00f3ebf7cf # v0.27.1
+      - uses: danieljustus/symaira-corekit/.github/actions/dependabot-corekit@d314b43572613ae6adacdcb40f2b67e40bfee19f # v0.28.0
         with:
           ssh-key: ${{ secrets.COREKIT_SYNC_DEPLOY_KEY }}
