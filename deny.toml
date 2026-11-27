@@ -4,6 +4,12 @@ ignore = [
     # Time-boxed until chrono is replaced (option 1 in #1335); that swap changes
     # Cargo.lock and needs its own native evidence refresh.
     { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no fixed version; replace with time or jiff (#1335)" },
+    # Time-boxed until keyring's Linux Secret Service store moves to zbus 6;
+    # keyring 4.2.0 pins the zbus 5 stack that still uses these crates, and the
+    # advisories have no safe upgrade. Revisit on the next keyring/zbus bump.
+    { id = "RUSTSEC-2026-0370", reason = "zvariant 5 unmaintained upstream; no safe upgrade in keyring 4.2.0's zbus 5 Linux stack" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names 4 unmaintained upstream; no safe upgrade in keyring 4.2.0's zbus 5 Linux stack" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive 5 unmaintained upstream; no safe upgrade in keyring 4.2.0's zbus 5 Linux stack" },
 ]
 
 [bans]
