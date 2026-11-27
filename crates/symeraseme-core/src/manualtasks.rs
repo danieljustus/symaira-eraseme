@@ -5,11 +5,10 @@
 //!
 //! Deviations from Go, all deliberate:
 //! - The clock is injected instead of read from the environment, matching the
-//!   rest of this crate (`chrono` is compiled without its `clock` feature).
+//!   rest of this crate (the `time` crate has no clock feature enabled).
 //! - `create`/`save_screenshot` therefore take the instant that Go reads from
 //!   `time.Now()`.
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use regex::Regex;
 use rusqlite::{OptionalExtension, params};
 use serde::Serialize;
@@ -20,6 +19,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use time::{Date, OffsetDateTime, PrimitiveDateTime, Time};
 
 use crate::identity::Profile;
 use crate::storage::Store;
@@ -198,7 +198,7 @@ pub fn handle_complete(
     store: &Store,
     task_id: i64,
     notes: &str,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> rusqlite::Result<ServiceResult> {
     if complete(store, task_id, notes, true, now)?.is_none() {
         return Ok(missing_task(task_id));
@@ -459,8 +459,12 @@ pub fn instructions_for_reason(reason: &str, broker_name: &str) -> String {
 ///
 /// This is neither `format_iso` (`+00:00` suffix) nor `format_sql` (space
 /// separator), so it is spelled out here rather than reusing either.
-pub(crate) fn sql_timestamp(now: DateTime<Utc>) -> String {
-    now.format("%Y-%m-%dT%H:%M:%S").to_string()
+pub(crate) fn sql_timestamp(now: OffsetDateTime) -> String {
+    crate::timeutil::format_manual_task_timestamp(now)
+}
+
+fn timestamp_nanos(now: OffsetDateTime) -> i64 {
+    i64::try_from(now.unix_timestamp_nanos()).unwrap_or_default()
 }
 
 fn non_nil_fields(fields: &BTreeMap<String, String>) -> &BTreeMap<String, String> {
@@ -473,7 +477,7 @@ pub fn create(
     store: &Store,
     opts: &CreateOpts,
     profile: Option<&Profile>,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> rusqlite::Result<ManualTask> {
     let reason = if FALLBACK_REASONS.contains(&opts.reason.as_str()) {
         opts.reason.clone()
@@ -515,10 +519,7 @@ pub fn create(
     let mut wrote_html = false;
     if !opts.html_snapshot.is_empty() {
         ensure_tasks_dir(&tasks_dir).map_err(to_sql_error)?;
-        let candidate = tasks_dir.join(format!(
-            "snapshot_{}.html",
-            now.timestamp_nanos_opt().unwrap_or_default()
-        ));
+        let candidate = tasks_dir.join(format!("snapshot_{}.html", timestamp_nanos(now)));
         let redacted = redact_identity_values(&opts.html_snapshot, profile);
         match write_private(&candidate, redacted.as_bytes()) {
             // The Python implementation logs snapshot failures and continues
@@ -651,51 +652,47 @@ fn scan_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<ManualTask> {
 /// into the rendered value, so only the naive layouts report `Z`. A value none
 /// of the layouts accept is passed through unchanged.
 fn driver_timestamp(value: String) -> String {
-    const NAIVE_LAYOUTS: [&str; 5] = [
-        "%Y-%m-%d %H:%M:%S%.f",
-        "%Y-%m-%dT%H:%M:%S%.f",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%dT%H:%M",
-        "%Y-%m-%d",
-    ];
-    // `parse_from_rfc3339` is the offset-bearing pair: it accepts both the
-    // offset and `Z`, and the space-separated layout reaches it by way of the
+    // `parse_rfc3339` is the offset-bearing pair: it accepts both the offset
+    // and `Z`, and the space-separated layout reaches it by way of the
     // separator Go's first layout writes.
     let offset_bearing =
-        DateTime::parse_from_rfc3339(&value).or_else(|error| match value.split_once(' ') {
-            Some((date, time)) => DateTime::parse_from_rfc3339(&format!("{date}T{time}")),
+        crate::timeutil::parse_rfc3339(&value).or_else(|error| match value.split_once(' ') {
+            Some((date, time)) => crate::timeutil::parse_rfc3339(&format!("{date}T{time}")),
             None => Err(error),
         });
     let instant = if let Ok(parsed) = offset_bearing {
         parsed
-    } else if let Some(parsed) = NAIVE_LAYOUTS.iter().find_map(|layout| {
-        NaiveDateTime::parse_from_str(&value, layout)
-            .ok()
-            .or_else(|| {
-                NaiveDate::parse_from_str(&value, layout)
-                    .ok()
-                    .and_then(|date| date.and_hms_opt(0, 0, 0))
-            })
-    }) {
-        parsed.and_utc().fixed_offset()
+    } else if let Ok(parsed) = crate::timeutil::parse(&value) {
+        parsed
+    } else if let Some(parsed) = minute_precision(&value) {
+        parsed
+    } else if let Some(parsed) = date_only(&value) {
+        parsed
     } else {
         return value;
     };
     // Go's RFC3339Nano drops the trailing zeros of the fraction and writes a
     // zero offset as `Z`.
-    let mut rendered = instant.format("%Y-%m-%dT%H:%M:%S%.9f").to_string();
-    if rendered.contains('.') {
-        rendered = rendered
-            .trim_end_matches('0')
-            .trim_end_matches('.')
-            .to_owned();
+    crate::timeutil::format_rfc3339_nano(instant)
+}
+
+fn minute_precision(value: &str) -> Option<OffsetDateTime> {
+    for layout in [
+        time::macros::format_description!("[year]-[month]-[day]T[hour]:[minute]"),
+        time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]"),
+    ] {
+        if let Ok(parsed) = PrimitiveDateTime::parse(value, layout) {
+            return Some(parsed.assume_utc());
+        }
     }
-    if instant.offset().local_minus_utc() == 0 {
-        rendered.push('Z');
-    } else {
-        rendered.push_str(&instant.format("%:z").to_string());
-    }
-    rendered
+    None
+}
+
+fn date_only(value: &str) -> Option<OffsetDateTime> {
+    let layout = time::macros::format_description!("[year]-[month]-[day]");
+    Date::parse(value, layout)
+        .ok()
+        .map(|date| PrimitiveDateTime::new(date, Time::MIDNIGHT).assume_utc())
 }
 
 /// Retrieves one task, returning `None` when it does not exist.
@@ -737,7 +734,7 @@ pub fn complete(
     task_id: i64,
     notes: &str,
     completed: bool,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> rusqlite::Result<Option<ManualTask>> {
     let transaction = store.connection().unchecked_transaction()?;
     let query = format!("SELECT {TASK_COLUMNS} FROM manual_tasks WHERE id = ?");
@@ -816,16 +813,36 @@ fn is_artifact(name: &str) -> bool {
 
 /// Stores a screenshot in the artifact directory with restrictive permissions.
 /// An empty screenshot is ignored so evidence capture stays best effort.
-pub fn save_screenshot(data: &[u8], now: DateTime<Utc>) -> io::Result<Option<String>> {
+pub fn save_screenshot(data: &[u8], now: OffsetDateTime) -> io::Result<Option<String>> {
     if data.is_empty() {
         return Ok(None);
     }
     let dir = tasks_dir()?;
     ensure_tasks_dir(&dir)?;
-    let path = dir.join(format!(
-        "screenshot_{}.png",
-        now.timestamp_nanos_opt().unwrap_or_default()
-    ));
+    let path = dir.join(format!("screenshot_{}.png", timestamp_nanos(now)));
     write_private(&path, data)?;
     Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::driver_timestamp;
+
+    #[test]
+    fn characterization_sql_driver_timestamp_bytes() {
+        for (input, expected) in [
+            ("2026-01-02 03:04:05", "2026-01-02T03:04:05Z"),
+            ("2026-01-02T03:04:05Z", "2026-01-02T03:04:05Z"),
+            ("2026-01-02T03:04:05+02:00", "2026-01-02T03:04:05+02:00"),
+            (
+                "2026-01-02 03:04:05.120000+02:00",
+                "2026-01-02T03:04:05.12+02:00",
+            ),
+            ("2026-01-02 03:04", "2026-01-02T03:04:00Z"),
+            ("2026-01-02", "2026-01-02T00:00:00Z"),
+            ("not-a-timestamp", "not-a-timestamp"),
+        ] {
+            assert_eq!(driver_timestamp(input.to_owned()), expected, "{input}");
+        }
+    }
 }

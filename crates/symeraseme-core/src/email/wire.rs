@@ -14,33 +14,12 @@
 //! compares them character for character.
 
 use crate::email::types::{MatchedMessage, Message};
-use chrono::{DateTime, FixedOffset};
+use time::OffsetDateTime;
 
 /// Go's `time.Time` JSON form: RFC 3339 with nanoseconds, trailing zeros
 /// trimmed, and `Z` for a zero offset.
-pub fn format_go_timestamp(value: &DateTime<FixedOffset>) -> String {
-    let offset = value.offset().local_minus_utc();
-    let mut formatted = value.naive_local().format("%Y-%m-%dT%H:%M:%S").to_string();
-    let nanos = value.timestamp_subsec_nanos();
-    if nanos != 0 {
-        let mut fraction = format!(".{nanos:09}");
-        while fraction.ends_with('0') {
-            fraction.pop();
-        }
-        formatted.push_str(&fraction);
-    }
-    if offset == 0 {
-        formatted.push('Z');
-    } else {
-        let sign = if offset < 0 { '-' } else { '+' };
-        let absolute = offset.abs();
-        formatted.push_str(&format!(
-            "{sign}{:02}:{:02}",
-            absolute / 3600,
-            (absolute % 3600) / 60
-        ));
-    }
-    formatted
+pub fn format_go_timestamp(value: &OffsetDateTime) -> String {
+    crate::timeutil::format_rfc3339_nano(*value)
 }
 
 /// Go's `encoding/json` string encoding, including HTML escaping and the

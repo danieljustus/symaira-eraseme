@@ -14,55 +14,55 @@ const RECORDS: &[(&str, &str, &str, &str, &[u8])] = &[
     (
         "darwin/arm64",
         "cli",
-        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
-        "f64f496bbfb2058ca5bee7919959f9e7b6a1b4c87d1937010f8138e037a93bcb",
+        "e0a4c294542b09f53ef8e8b7cd1585c574a8c365",
+        "db7ad83bbb7fbe0b61d3a2028880f61e308483d617594e4243e5ac45f829d09b",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-711fd570/native-triage/darwin-arm64/cli.json"
+            "../../../../tests/fixtures/go-frozen/refresh-8dc0b7bb/native-triage/darwin-arm64/cli.json"
         ),
     ),
     (
         "darwin/arm64",
         "mcp",
-        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
-        "0b95d8d3182f93dcb70d51e4b34030e8552431a51ef836dc5deafa2f4ab65094",
+        "e0a4c294542b09f53ef8e8b7cd1585c574a8c365",
+        "6d20aea25b33fed18d5c2ba2b59eb50367c7f6dd33f087044fbf967f52cd191d",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-711fd570/native-triage/darwin-arm64/mcp.json"
+            "../../../../tests/fixtures/go-frozen/refresh-8dc0b7bb/native-triage/darwin-arm64/mcp.json"
         ),
     ),
     (
         "linux/amd64",
         "cli",
-        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
-        "b941fb0d8a089a4874a044df7e70d737f432d520646af942c956482dadf4eb49",
+        "e0a4c294542b09f53ef8e8b7cd1585c574a8c365",
+        "92dee108c61c6fc36173a4b94b1603c4ee59add7ce4cb2f7f428eea92b8c5e4e",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-711fd570/native-triage/linux-amd64/cli.json"
+            "../../../../tests/fixtures/go-frozen/refresh-8dc0b7bb/native-triage/linux-amd64/cli.json"
         ),
     ),
     (
         "linux/amd64",
         "mcp",
-        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
-        "3ec744aee076b9b25d25c2f897394fef4bf0d33deeadf51baada640fcdd70308",
+        "e0a4c294542b09f53ef8e8b7cd1585c574a8c365",
+        "2f5131091e82363fcfdd0d655e1c73a7f8b8517fb85a3e0945bbefa0820eb218",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-711fd570/native-triage/linux-amd64/mcp.json"
+            "../../../../tests/fixtures/go-frozen/refresh-8dc0b7bb/native-triage/linux-amd64/mcp.json"
         ),
     ),
     (
         "linux/arm64",
         "cli",
-        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
-        "62fcdadb424321371902e39e67eba80a9e2ab1e5ae7b4d63d2111864489a23dc",
+        "e0a4c294542b09f53ef8e8b7cd1585c574a8c365",
+        "8d63f627aa605ab4c38375f190e99689f850875947c8d142cacbd5aa138aab92",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-711fd570/native-triage/linux-arm64/cli.json"
+            "../../../../tests/fixtures/go-frozen/refresh-8dc0b7bb/native-triage/linux-arm64/cli.json"
         ),
     ),
     (
         "linux/arm64",
         "mcp",
-        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
-        "006c96c9309bbb16371889ac307cb61be07f423f1b8bf82dfc56596ed36cf3fb",
+        "e0a4c294542b09f53ef8e8b7cd1585c574a8c365",
+        "4df4f0ad7ed0b4759e97d5270bbc8f16abb3706c0c8ecb27b57695be9b752e11",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-711fd570/native-triage/linux-arm64/mcp.json"
+            "../../../../tests/fixtures/go-frozen/refresh-8dc0b7bb/native-triage/linux-arm64/mcp.json"
         ),
     ),
 ];

@@ -13,26 +13,26 @@ const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 const RECORDS: &[(&str, &str, &str, &[u8])] = &[
     (
         "darwin/arm64",
-        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
-        "c9c53175658e83d9be011fc27df06b971925c51fae575a4ddbee7988cbced5bb",
+        "e0a4c294542b09f53ef8e8b7cd1585c574a8c365",
+        "96c342e2d141e3c498ac0dbd77709d454bfe9fcf8126b8c6cd6b5ee5b2a6655a",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-headers/darwin-arm64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-8dc0b7bb/http-headers/darwin-arm64/headers.json"
         ),
     ),
     (
         "linux/amd64",
-        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
-        "4dd958a3d2304c8801bda43c582b466808279f6f4f8630a25ba5b0e85429072d",
+        "e0a4c294542b09f53ef8e8b7cd1585c574a8c365",
+        "c702610c7d7457ca08dbebad1d82c57cd4f8efd5e6c4b19923231b07812478c7",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-headers/linux-amd64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-8dc0b7bb/http-headers/linux-amd64/headers.json"
         ),
     ),
     (
         "linux/arm64",
-        "09d8269371cbd3111c8b6584a402caa8ff6ce6df",
-        "b5a76f4dce4c1ca87d4c6e7232929983d0b90c6d927be9ec56da782e804edac3",
+        "e0a4c294542b09f53ef8e8b7cd1585c574a8c365",
+        "1e0c2678f9ed0f70fe9d44bbf01a6515ba000f20816c0f047010db97af52296d",
         include_bytes!(
-            "../../../../tests/fixtures/go-frozen/refresh-711fd570/http-headers/linux-arm64/headers.json"
+            "../../../../tests/fixtures/go-frozen/refresh-8dc0b7bb/http-headers/linux-arm64/headers.json"
         ),
     ),
 ];

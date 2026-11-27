@@ -1,7 +1,6 @@
 #[path = "../../symeraseme-cli/tests/support/go_source_pin.rs"]
 mod go_source_pin;
 
-use chrono::{TimeZone, Utc};
 use rusqlite::{Connection, params};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
@@ -11,6 +10,7 @@ use symeraseme_core::storage::{
     EventType, ProjectionError, ProjectionState, Repository, Source, Store,
 };
 use tempfile::{TempDir, tempdir};
+use time::OffsetDateTime;
 
 const GO_ORACLE_COMMIT: &str = "bf53346eec234929bedf0314b99e3da85dbb991b";
 
@@ -348,10 +348,18 @@ const GOLDEN_PROJECTION: &str = concat!(
     "/../../tests/fixtures/event-store/golden-projection.json"
 );
 
-fn timestamp(year: i32, month: u32, day: u32, hour: u32, minute: u32) -> chrono::DateTime<Utc> {
-    Utc.with_ymd_and_hms(year, month, day, hour, minute, 0)
-        .single()
-        .expect("valid contract timestamp")
+fn timestamp(year: i32, month: u32, day: u32, hour: u32, minute: u32) -> OffsetDateTime {
+    let date = time::Date::from_calendar_date(
+        year,
+        time::Month::try_from(month as u8).expect("valid month"),
+        day as u8,
+    )
+    .expect("valid contract date");
+    time::PrimitiveDateTime::new(
+        date,
+        time::Time::from_hms(hour as u8, minute as u8, 0).expect("valid contract time"),
+    )
+    .assume_utc()
 }
 
 fn empty_payload() -> Map<String, Value> {

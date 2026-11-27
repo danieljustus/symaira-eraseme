@@ -94,10 +94,40 @@ pub fn assert_retired_generator_matches_archive(root: &str, name: &str, archived
         pinned.status.success(),
         "retired capture producer unavailable: {name}"
     );
+    let overridden = capture_comparator_override(root, name, &pinned.stdout);
     assert!(
-        archived == pinned.stdout,
+        archived == pinned.stdout || overridden.as_deref() == Some(archived),
         "retired capture producer mismatch: {name}"
     );
+}
+
+/// The #1335 comparator override: once chrono has left `Cargo.lock`, a capture
+/// snapshot ports only the chrono calls of three retired comparators to `time`.
+/// Returns the pinned bytes with exactly the reviewed edits of
+/// `scripts/capture_overrides.json` applied, or `None` for any other file.
+#[allow(dead_code)]
+fn capture_comparator_override(root: &str, name: &str, pinned: &[u8]) -> Option<Vec<u8>> {
+    let table = std::fs::read(Path::new(root).join("scripts/capture_overrides.json")).ok()?;
+    let table: serde_json::Value =
+        serde_json::from_slice(&table).expect("capture override table is JSON");
+    assert_eq!(
+        table["retirement_revision"], RETIREMENT_SOURCE_REVISION,
+        "capture override table names another retirement revision"
+    );
+    let edits = table["comparators"].get(name)?.as_array()?;
+    let mut bytes = String::from_utf8(pinned.to_vec()).ok()?;
+    for edit in edits {
+        let old = edit["old"].as_str().expect("override edit old");
+        let new = edit["new"].as_str().expect("override edit new");
+        let count = edit["count"].as_u64().expect("override edit count");
+        assert_eq!(
+            bytes.matches(old).count() as u64,
+            count,
+            "capture override edit count for {name}"
+        );
+        bytes = bytes.replace(old, new);
+    }
+    Some(bytes.into_bytes())
 }
 
 /// Retired Go sources/scripts come from history; all other inputs keep their checkout bytes.

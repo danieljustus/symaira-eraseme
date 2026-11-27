@@ -1,7 +1,6 @@
 //! `plan delete` (#1297): a post-cutover command with no Go counterpart, so it
 //! is tested against its own contract rather than a recorded oracle.
 
-use chrono::{TimeZone, Utc};
 use serde_json::{Map, Value};
 use std::path::Path;
 use std::process::{Command, Output};
@@ -43,7 +42,7 @@ fn plan(store: &Store, campaign: &str, brokers: &[&str]) -> Vec<i64> {
                     &EventType::Planned,
                     &Map::new(),
                     &Source::System,
-                    Utc.with_ymd_and_hms(2026, 11, 10, 12, 0, 0).unwrap(),
+                    time::macros::datetime!(2026-11-10 12:00:00 +00:00),
                 )
                 .unwrap();
             id
@@ -201,7 +200,7 @@ fn refuses_sent_requests_and_attached_evidence_without_deleting() {
                         &EventType::Sent,
                         &Map::new(),
                         &Source::System,
-                        Utc.with_ymd_and_hms(2026, 11, 10, 13, 0, 0).unwrap(),
+                        time::macros::datetime!(2026-11-10 13:00:00 +00:00),
                     )
                     .unwrap();
             }

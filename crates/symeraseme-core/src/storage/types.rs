@@ -1,8 +1,8 @@
 //! Typed rows shared by the SQLite store and repository query layer.
 
-use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
 use std::fmt;
+use time::OffsetDateTime;
 
 /// A row from the `campaigns` table.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -60,8 +60,8 @@ pub struct RemovalRequestRow {
 pub struct EventRecord {
     pub id: i64,
     pub request_id: i64,
-    pub occurred_at: DateTime<Utc>,
-    pub recorded_at: DateTime<Utc>,
+    pub occurred_at: OffsetDateTime,
+    pub recorded_at: OffsetDateTime,
     pub event_type: EventType,
     pub payload: Map<String, Value>,
     pub source: Source,

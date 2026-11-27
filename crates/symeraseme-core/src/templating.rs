@@ -9,12 +9,12 @@ use std::fmt;
 use std::io::{self, Write};
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Object, Value, ValueKind};
 use minijinja::{AutoEscape, Environment, Error, ErrorKind, State, UndefinedBehavior};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
+use time::OffsetDateTime;
 
 const MAX_NAME_BYTES: usize = 256;
 const MAX_ERROR_BYTES: usize = 256;
@@ -176,7 +176,7 @@ impl FrozenDateTime {
     /// Creates a frozen timestamp from an RFC 3339 value.
     pub fn from_rfc3339(value: impl Into<String>) -> Result<Self, TemplateError> {
         let value = value.into();
-        DateTime::parse_from_rfc3339(&value)
+        crate::timeutil::parse_rfc3339(&value)
             .map(|_| Self(value))
             .map_err(|_| TemplateError::new("invalid frozen timestamp"))
     }
@@ -195,7 +195,7 @@ impl Default for FrozenDateTime {
 
 #[derive(Debug)]
 struct FrozenDateTimeObject {
-    value: DateTime<chrono::FixedOffset>,
+    value: OffsetDateTime,
 }
 
 impl Object for FrozenDateTimeObject {
@@ -222,12 +222,9 @@ impl Object for FrozenDateTimeObject {
                 "unsupported datetime format",
             ));
         }
-        Ok(Value::from(
-            self.value
-                .with_timezone(&Utc)
-                .format("%Y-%m-%d %H:%M UTC")
-                .to_string(),
-        ))
+        Ok(Value::from(crate::timeutil::format_template_utc(
+            self.value,
+        )))
     }
 }
 
@@ -656,7 +653,7 @@ fn validate_context(context: &RenderContext) -> Result<(), TemplateError> {
     budget.add_json(&context.data, 0)?;
 
     budget.add_string(context.now.as_str())?;
-    DateTime::parse_from_rfc3339(context.now.as_str())
+    crate::timeutil::parse_rfc3339(context.now.as_str())
         .map_err(|_| TemplateError::new("invalid frozen timestamp"))?;
 
     budget.add_collection(context.extra.len())?;
@@ -681,7 +678,7 @@ fn context_values(context: &RenderContext) -> Result<BTreeMap<String, Value>, Te
         .get("now")
         .and_then(JsonValue::as_str)
         .ok_or_else(|| TemplateError::new("invalid frozen timestamp"))?;
-    let now = DateTime::parse_from_rfc3339(now)
+    let now = crate::timeutil::parse_rfc3339(now)
         .map_err(|_| TemplateError::new("invalid frozen timestamp"))?;
 
     let mut values = BTreeMap::new();

@@ -1,3 +1,11 @@
+// The immutable #1296 dashboard override names its clock with the retired
+// crate's path; resolve that path to the shim in this test crate.
+#[allow(unused_extern_crates)]
+extern crate self as chrono;
+#[path = "../src/mcp/chrono_shim.rs"]
+mod chrono_shim;
+pub(crate) use chrono_shim::{DateTime, Utc};
+
 // `tools_list` now shares the Go-compatible HTML escaping with the response
 // envelope, so the envelope module has to be compiled in here too.
 #[path = "../src/mcp/envelope.rs"]

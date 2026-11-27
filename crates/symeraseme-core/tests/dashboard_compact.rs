@@ -5,7 +5,6 @@
 //! stays what the Go-recorded goldens pin (`reporting_contract.rs`); this file
 //! pins the new behaviour on a synthetic store far larger than any golden.
 
-use chrono::{DateTime, Utc};
 use serde_json::Value;
 use symeraseme_core::reporting::{
     DEFAULT_DASHBOARD_BROKER_LIMIT, DashboardOptions, get_campaign_status, get_dashboard_data,
@@ -13,16 +12,15 @@ use symeraseme_core::reporting::{
 };
 use symeraseme_core::storage::store::Store;
 use tempfile::tempdir;
+use time::OffsetDateTime;
 
 const BROKERS: usize = 300;
 const PER_BROKER: usize = 10;
 /// Brokers holding one `AWAITING_ACK` request that is past its deadline.
 const STALE_BROKERS: [usize; 5] = [7, 42, 99, 150, 250];
 
-fn now() -> DateTime<Utc> {
-    DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-        .expect("pinned instant")
-        .with_timezone(&Utc)
+fn now() -> OffsetDateTime {
+    symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00").expect("pinned instant")
 }
 
 fn broker_name(index: usize) -> String {

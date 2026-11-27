@@ -7,10 +7,9 @@
 //! does the same, so a wrong integer/float choice still fails while float
 //! formatting differences do not.
 
-use chrono::{DateTime, Datelike, FixedOffset, NaiveDateTime, Utc};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
-use std::str::FromStr;
+use time::{Duration, OffsetDateTime};
 
 use crate::jsonorder::go_map_order;
 use crate::storage::Store;
@@ -18,7 +17,7 @@ use crate::templating::{FrozenDateTime, RenderContext, render};
 use crate::timeutil::format_iso;
 
 /// Selects campaigns. The clock is injected rather than read from the
-/// environment, matching the rest of this crate: `chrono` is compiled without
+/// environment, matching the rest of this crate: `time` is built without
 /// its `clock` feature.
 #[derive(Debug, Clone, Default)]
 pub struct ReportOpts {
@@ -59,7 +58,7 @@ pub struct RequestRow {
 ///
 /// ponytail: a sub-second `now` would keep its fraction in Go and lose it here;
 /// the shared golden fixture and every caller pin whole seconds.
-pub(crate) fn iso(t: DateTime<Utc>) -> String {
+pub(crate) fn iso(t: OffsetDateTime) -> String {
     format_iso(t)
 }
 
@@ -73,29 +72,17 @@ pub(crate) fn py_timestamp(value: &str) -> String {
 
 /// Go's `parseTime`: RFC3339 first, then the two naive layouts, then a naive
 /// timestamp followed by a numeric offset (the zone abbreviation is ignored).
-pub(crate) fn parse_time(value: &str) -> Option<DateTime<Utc>> {
+pub(crate) fn parse_time(value: &str) -> Option<OffsetDateTime> {
     if value.is_empty() {
         return None;
     }
-    if let Ok(parsed) = DateTime::parse_from_rfc3339(value) {
-        return Some(parsed.with_timezone(&Utc));
+    if let Ok(parsed) = crate::timeutil::parse_rfc3339(value) {
+        return Some(parsed);
     }
-    for layout in ["%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"] {
-        if let Ok(naive) = NaiveDateTime::parse_from_str(value, layout) {
-            return Some(naive.and_utc());
-        }
-    }
-    if value.len() >= 25 {
-        let naive = NaiveDateTime::parse_from_str(&value[..19], "%Y-%m-%d %H:%M:%S").ok();
-        let offset = FixedOffset::from_str(&value[20..25]).ok();
-        if let (Some(naive), Some(offset)) = (naive, offset) {
-            return naive
-                .and_local_timezone(offset)
-                .single()
-                .map(|parsed| parsed.with_timezone(&Utc));
-        }
-    }
-    None
+    // Go's two naive layouts, plus a naive value followed by a numeric zone
+    // (the alphabetic zone abbreviation is ignored). `parse` applies the same
+    // rules and normalizes every accepted instant to UTC.
+    crate::timeutil::parse(value).ok()
 }
 
 /// Go's `nullable`: an empty string becomes JSON null.
@@ -255,7 +242,7 @@ fn load_scope(
 pub fn get_campaign_status(
     store: &Store,
     campaign_id: &str,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> rusqlite::Result<Value> {
     let (_, requests) = load_scope(store, campaign_id)?;
     let statuses = count_statuses(&requests);
@@ -276,10 +263,10 @@ pub fn get_campaign_status(
             overdue += 1;
         }
         if let Some(deadline) = parse_time(&request.deadline_at) {
-            if deadline >= now && deadline <= now + chrono::Duration::days(7) {
+            if deadline >= now && deadline <= now + Duration::days(7) {
                 due7 += 1;
             }
-            if deadline >= now && deadline <= now + chrono::Duration::days(30) {
+            if deadline >= now && deadline <= now + Duration::days(30) {
                 due30 += 1;
             }
         }
@@ -321,9 +308,9 @@ pub fn get_calendar(
     store: &Store,
     campaign_id: &str,
     weeks: i64,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> rusqlite::Result<Value> {
-    let horizon = now + chrono::Duration::days(weeks * 7);
+    let horizon = now + Duration::days(weeks * 7);
     let (_, requests) = load_scope(store, campaign_id)?;
     let mut buckets: BTreeMap<String, Vec<Value>> = BTreeMap::new();
     let (mut entries, mut overdue) = (0i64, 0i64);
@@ -342,8 +329,8 @@ pub fn get_calendar(
         if at > horizon {
             continue;
         }
-        let mut days = (at - now).num_hours() / 24;
-        if at < now && chrono::Duration::days(days) != at - now {
+        let mut days = (at - now).whole_hours() / 24;
+        if at < now && Duration::days(days) != at - now {
             days -= 1;
         }
         let is_overdue = days < 0;
@@ -365,9 +352,9 @@ pub fn get_calendar(
             "escalation_level": request.escalation_level,
             "reminders_sent": request.reminders_sent,
         });
-        let iso_week = at.iso_week();
+        let (iso_year, iso_week, _) = at.date().to_iso_week_date();
         buckets
-            .entry(format!("{:04}-W{:02}", iso_week.year(), iso_week.week()))
+            .entry(format!("{iso_year:04}-W{iso_week:02}"))
             .or_default()
             .push(entry);
         entries += 1;
@@ -438,7 +425,7 @@ fn response_times(rows: &[RequestRow]) -> Vec<f64> {
         if let (Some(sent), Some(resolved)) =
             (parse_time(&row.sent_at), parse_time(&row.resolved_at))
         {
-            times.push((resolved - sent).num_seconds() as f64 / 86_400.0);
+            times.push((resolved - sent).whole_seconds() as f64 / 86_400.0);
         }
     }
     times
@@ -513,7 +500,7 @@ fn dashboard_request_map(request: &RequestRow) -> Value {
 /// so the numbers cannot drift apart again (#1296). It deliberately ignores
 /// `current_status`: a request that is still `AWAITING_ACK` after its deadline
 /// is overdue even before the tick engine has moved it to `OVERDUE`.
-pub(crate) fn is_past_deadline(request: &RequestRow, now: DateTime<Utc>) -> bool {
+pub(crate) fn is_past_deadline(request: &RequestRow, now: OffsetDateTime) -> bool {
     request.resolved_at.is_empty()
         && parse_time(&request.deadline_at).is_some_and(|deadline| deadline <= now)
 }
@@ -576,7 +563,7 @@ fn aggregate_campaign(
 }
 
 /// Go's `emptyReport`.
-fn empty_report(id: &str, now: DateTime<Utc>) -> Value {
+fn empty_report(id: &str, now: OffsetDateTime) -> Value {
     let id = if id.is_empty() { "none" } else { id };
     json!({
         "generated_at": iso(now),
@@ -643,7 +630,7 @@ fn broker_leaderboard(requests: &[RequestRow]) -> Vec<BrokerStat> {
             parse_time(&request.resolved_at),
         ) {
             stat.times
-                .push((resolved - sent).num_seconds() as f64 / 86_400.0);
+                .push((resolved - sent).whole_seconds() as f64 / 86_400.0);
         }
     }
     // Total descending, then broker_id ascending. Go derives its ordering
@@ -693,7 +680,7 @@ fn broker_leaderboard_value(requests: &[RequestRow]) -> Vec<Value> {
 /// number of brokers before the limit.
 fn broker_dashboard(
     requests: &[RequestRow],
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
     limit: Option<usize>,
 ) -> (Vec<Value>, usize) {
     let mut overdue: BTreeMap<&str, i64> = BTreeMap::new();
@@ -893,7 +880,7 @@ fn success_metrics(requests: &[RequestRow]) -> Value {
 pub fn get_report_data(
     store: &Store,
     opts: &ReportOpts,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> rusqlite::Result<Value> {
     let campaigns = load_campaigns(store, &opts.campaign_id, opts.all_campaigns)?;
     if campaigns.is_empty() {
@@ -1004,7 +991,7 @@ impl DashboardOptions {
 pub fn get_dashboard_data(
     store: &Store,
     campaign_id: &str,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> rusqlite::Result<Value> {
     build_dashboard(store, campaign_id, now, DashboardOptions::full(), false)
 }
@@ -1015,7 +1002,7 @@ pub fn get_dashboard_data(
 pub fn get_dashboard_data_with(
     store: &Store,
     campaign_id: &str,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
     options: DashboardOptions,
 ) -> rusqlite::Result<Value> {
     build_dashboard(store, campaign_id, now, options, true)
@@ -1024,7 +1011,7 @@ pub fn get_dashboard_data_with(
 fn build_dashboard(
     store: &Store,
     campaign_id: &str,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
     options: DashboardOptions,
     extras: bool,
 ) -> rusqlite::Result<Value> {
@@ -1116,11 +1103,12 @@ fn build_dashboard(
 pub fn generate_dashboard(
     data: &Value,
     refresh: i64,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> Result<String, String> {
     let context = RenderContext {
         data: data.clone(),
-        now: FrozenDateTime::from_rfc3339(now.to_rfc3339()).map_err(|error| error.to_string())?,
+        now: FrozenDateTime::from_rfc3339(crate::timeutil::format_rfc3339_auto_si(now, false))
+            .map_err(|error| error.to_string())?,
         extra: BTreeMap::from([("auto_refresh_seconds".to_owned(), json!(refresh))]),
         ..RenderContext::default()
     };
@@ -1129,7 +1117,7 @@ pub fn generate_dashboard(
 
 /// Go's `GenerateReport`: JSON, CSV or HTML over the report data. The format
 /// match is ASCII case-insensitive, like Go's `strings.ToLower`.
-pub fn generate_report(data: &Value, format: &str, now: DateTime<Utc>) -> Result<String, String> {
+pub fn generate_report(data: &Value, format: &str, now: OffsetDateTime) -> Result<String, String> {
     match format.to_ascii_lowercase().as_str() {
         "json" => export_json(data),
         "csv" => Ok(export_csv(data)),
@@ -1240,12 +1228,13 @@ fn export_csv(data: &Value) -> String {
 }
 
 /// Go's `ExportHTML`: the report template over the report data.
-fn export_html(data: &Value, now: DateTime<Utc>) -> Result<String, String> {
+fn export_html(data: &Value, now: OffsetDateTime) -> Result<String, String> {
     // The HTML export is Symaira-designed and no longer byte-compatible with Go:
     // no blank-line compaction and the timeline lists its event counts.
     let context = RenderContext {
         data: data.clone(),
-        now: FrozenDateTime::from_rfc3339(now.to_rfc3339()).map_err(|error| error.to_string())?,
+        now: FrozenDateTime::from_rfc3339(crate::timeutil::format_rfc3339_auto_si(now, false))
+            .map_err(|error| error.to_string())?,
         ..RenderContext::default()
     };
     render("report.html.j2", &context).map_err(|error| error.to_string())
@@ -1259,10 +1248,23 @@ mod report_html_tests {
     #[test]
     fn html_report_preserves_multiline_dynamic_fields() {
         let data = json!({"campaigns": [{"campaign_id": "first\n\n\nlast\u{e000}\u{e001}"}]});
-        let now = DateTime::parse_from_rfc3339("2026-01-02T03:04:00Z")
-            .unwrap()
-            .to_utc();
+        let now = crate::timeutil::parse_rfc3339("2026-01-02T03:04:00Z").unwrap();
         let html = export_html(&data, now).expect("render report");
         assert!(html.contains("Campaign: first\n\n\nlast\u{e000}\u{e001}"));
+    }
+
+    #[test]
+    fn characterization_report_time_layouts() {
+        for (input, expected) in [
+            ("2026-01-02T03:04:05Z", "2026-01-02T03:04:05+00:00"),
+            ("2026-01-02T03:04:05+02:00", "2026-01-02T01:04:05+00:00"),
+            ("2026-01-02T03:04:05", "2026-01-02T03:04:05+00:00"),
+            ("2026-01-02 03:04:05", "2026-01-02T03:04:05+00:00"),
+        ] {
+            let parsed = parse_time(input).unwrap_or_else(|| panic!("{input} must parse"));
+            assert_eq!(format_iso(parsed), expected, "{input}");
+        }
+        assert_eq!(parse_time(""), None);
+        assert_eq!(parse_time("not-a-time"), None);
     }
 }

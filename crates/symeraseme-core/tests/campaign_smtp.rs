@@ -1,8 +1,8 @@
 //! Real network SMTP campaign differential; no external mailbox or credentials.
 
-use chrono::{DateTime, FixedOffset};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use time::UtcOffset;
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -153,7 +153,7 @@ fn real_smtp_campaign_bytes_events_and_projections_match_go() {
         timeout: Duration::from_secs(3),
         ..SmtpConfig::default()
     });
-    let now = DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z").unwrap();
+    let now = symeraseme_core::timeutil::parse_rfc3339("2026-01-01T00:00:00Z").unwrap();
     let store = Store::open(root.path().join("rust.sqlite")).unwrap();
     let repository = Repository::new(&store);
     repository
@@ -173,7 +173,7 @@ fn real_smtp_campaign_bytes_events_and_projections_match_go() {
                     .as_object()
                     .unwrap(),
                 &Source::System,
-                now.to_utc(),
+                now,
             )
             .unwrap();
     }
@@ -194,7 +194,7 @@ fn real_smtp_campaign_bytes_events_and_projections_match_go() {
             &message,
             "sender@example.invalid",
             now,
-            FixedOffset::east_opt(0).unwrap(),
+            UtcOffset::UTC,
             "<070707070707070707070707@symeraseme>",
             &transport,
         )
@@ -210,7 +210,7 @@ fn real_smtp_campaign_bytes_events_and_projections_match_go() {
         },
         Ok(Some(&profile)),
         5,
-        now.to_utc(),
+        now,
     )
     .unwrap();
     let mut events = Vec::new();

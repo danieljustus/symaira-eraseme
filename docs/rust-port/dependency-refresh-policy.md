@@ -89,6 +89,30 @@ observations are unchanged, the product candidate keeps its real version, and
 the frozen readers keep checking the real product. This override is not an
 assertion relaxation for any other field.
 
+## Capture comparator override (#1335)
+
+Maintainer decision (2026-11-27): chrono is replaced with `time`, so the
+candidate's `Cargo.lock` no longer contains chrono. Three retired live
+comparators that a capture snapshot restores from `22615ae` still call chrono
+and would not compile: `crates/symeraseme-cli/tests/plan_execute_live_process.rs`,
+`crates/symeraseme-cli/tests/mcp_http_headers_process.rs` and
+`crates/symeraseme-core/tests/campaign_smtp.rs`. For a candidate without chrono
+in `Cargo.lock`, the snapshot ports only those chrono calls to `time`.
+`scripts/capture_overrides.json` lists every edit as an exact `old`/`new` pair
+with its occurrence count in the `22615ae` file; nothing else in those files may
+differ, and the Go observations are unchanged.
+
+The same table is the single source for every check:
+`scripts/derive_capture_snapshot.py` writes the ported files and, on the first
+chrono-free snapshot, inserts the matching check into the predecessor capture
+workflow (later snapshots inherit it); the workflow's identity check reads the
+table from the candidate commit; `scripts/import_capture_refresh.py` accepts an
+`archived_generators` digest change for these three files only from the
+`22615ae` entry to the ported entry; and
+`go_source_pin::assert_retired_generator_matches_archive` accepts exactly the
+`22615ae` bytes or those bytes with the table applied. No other assertion is
+relaxed.
+
 ## Lock-binding decision (#1263)
 
 The strict whole-`Cargo.lock` binding in `go_source_pin::assert_current_matches_archive`
@@ -185,6 +209,22 @@ for Windows after #1281.
   tag stays reachable as `frozen-go-captures/dependency-refresh-a44d3ac8`.
   The superseded CoreKit v0.27.0 snapshot `c9970318` (run `45921428609`) is
   kept as `frozen-go-captures/dependency-refresh-f09d6aa5`.
+
+- `refresh-8dc0b7bb` captures candidate `8dc0b7bb91a60cab2409fa7c998875b6dcfbeef1`
+  (chrono replaced with `time` 0.3.55, #1335) at snapshot
+  `e0a4c294542b09f53ef8e8b7cd1585c574a8c365` (tag
+  `frozen-go-captures/dependency-refresh-8dc0b7bb`), run `46067295620`;
+  artifacts `15231198614` (macOS arm64,
+  `sha256:6261b3cbecee6b4fa0d33baaf3657a0d2c50fd65448ba12637343721f3db4e22`),
+  `15231766315` (Linux amd64,
+  `sha256:48d39abf580a67ff24bd5821e0032e271955b2d914e1a57fc654f9b592be4eb8`)
+  and `15232105319` (Linux arm64,
+  `sha256:f20312416f12aea89d0c129df00cc89ea8d9bee61edb0d1d861d6dfb2ca5b38d`)
+  match their GitHub API digests. It is the first snapshot with the #1335
+  comparator override. The import report accepted the documented volatile
+  categories for all 48 records plus 15 `archived_generators` digests of the
+  three ported comparators, each moved from its `22615ae` entry to the entry
+  of the reviewed edits.
 
 ## Automated refresh preparation (#1345)
 

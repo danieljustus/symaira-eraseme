@@ -24,7 +24,7 @@ base64 = "0.23.1"
 cap-fs-ext = "4.0.3"
 cap-std = "4.0.3"
 cbc = "0.2.1"
-chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+time = { version = "=0.3.55", default-features = false, features = ["formatting", "macros", "parsing", "std"] }
 crypto-common = { version = "0.2.2", features = ["zeroize"] }
 http = "1.5.0"
 http-body-util = "0.1.3"

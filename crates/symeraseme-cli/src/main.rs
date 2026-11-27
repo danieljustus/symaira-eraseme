@@ -1,5 +1,13 @@
 #![deny(unsafe_code)]
 
+// The immutable #1296 dashboard override in `rust-tests/` still names its
+// clock with the retired crate's path; resolve that path to this crate.
+#[cfg(test)]
+#[allow(unused_extern_crates)]
+extern crate self as chrono;
+#[cfg(test)]
+pub(crate) use mcp::chrono_shim::{DateTime, Utc};
+
 mod cli;
 mod command_surface;
 mod commands;

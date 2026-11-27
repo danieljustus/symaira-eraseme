@@ -1,3 +1,11 @@
+// The immutable #1296 dashboard override names its clock with the retired
+// crate's path; resolve that path to the shim in this test crate.
+#[allow(unused_extern_crates)]
+extern crate self as chrono;
+#[path = "../src/mcp/chrono_shim.rs"]
+mod chrono_shim;
+pub(crate) use chrono_shim::{DateTime, Utc};
+
 #[path = "support/migration_oracle.rs"]
 mod migration_oracle;
 // #1296: the recorded `dashboard` output is compared through a narrow override.
@@ -29,6 +37,7 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use time::OffsetDateTime;
 
 const BEHAVIOR: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -556,13 +565,14 @@ const TICK_STATUS_ORACLE_DAY: &str = "2026-09-20 00:00:00";
 /// keeps the effective clock within one day after [`TICK_STATUS_ORACLE_DAY`],
 /// well inside the window in which the recorded outcome is valid.
 fn seed_store_at_oracle_distance(database: &Path) {
-    const LAYOUT: &str = "%Y-%m-%d %H:%M:%S";
-    let oracle_day = chrono::NaiveDateTime::parse_from_str(TICK_STATUS_ORACLE_DAY, LAYOUT)
+    const LAYOUT: &[time::format_description::FormatItem<'static>] =
+        time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
+    let oracle_day = time::PrimitiveDateTime::parse(TICK_STATUS_ORACLE_DAY, LAYOUT)
         .expect("oracle day")
-        .and_utc();
-    let now = chrono::DateTime::<chrono::Utc>::from(SystemTime::now());
-    let elapsed_days = (now - oracle_day).num_days().max(0);
-    let shift = chrono::Duration::days(elapsed_days);
+        .assume_utc();
+    let now = OffsetDateTime::from(SystemTime::now());
+    let elapsed_days = (now - oracle_day).whole_days().max(0);
+    let shift = time::Duration::days(elapsed_days);
     let mut shifted = String::with_capacity(TICK_STATUS_SEED.len());
     let mut instants = 0;
     for line in TICK_STATUS_SEED.lines() {
@@ -575,10 +585,12 @@ fn seed_store_at_oracle_distance(database: &Path) {
                 shifted.push_str(before);
                 let end = quoted.find('\'').expect("terminated SQL literal");
                 let literal = &quoted[..end];
-                match chrono::NaiveDateTime::parse_from_str(literal, LAYOUT) {
+                match time::PrimitiveDateTime::parse(literal, LAYOUT) {
                     Ok(instant) => {
                         instants += 1;
-                        shifted.push_str(&(instant + shift).format(LAYOUT).to_string());
+                        shifted.push_str(
+                            &(instant + shift).format(LAYOUT).expect("shifted timestamp"),
+                        );
                     }
                     Err(_) => shifted.push_str(literal),
                 }
@@ -615,7 +627,7 @@ fn mask_wall_clock(payload: &[u8]) -> Vec<u8> {
             let start = search_from + relative + prefix.len();
             let end = start + text[start..].find('"').expect("a terminated instant");
             let instant = &text[start..end];
-            chrono::DateTime::parse_from_rfc3339(instant)
+            symeraseme_core::timeutil::parse_rfc3339(instant)
                 .unwrap_or_else(|_| panic!("{key} is an RFC 3339 instant"));
             text = format!("{}<TIMESTAMP>\"{}", &text[..start], &text[end + 1..]);
             search_from = start + "<TIMESTAMP>\"".len();
@@ -1722,8 +1734,6 @@ fn init_profile_round_trips_through_show_profile() {
 /// and `HandleCleanup` are covered here instead.
 #[test]
 fn manual_tasks_populated_paths_match_the_go_bodies() {
-    use chrono::{DateTime, Utc};
-
     let root = unique_root();
     let home = root.join("home");
     let cwd = root.join("cwd");
@@ -1736,9 +1746,8 @@ fn manual_tasks_populated_paths_match_the_go_bodies() {
     fs::create_dir_all(&tasks_dir).expect("isolated artifact directory");
     let _cleanup = Cleanup(root.clone());
 
-    let now = "2026-01-02T03:04:05Z"
-        .parse::<DateTime<Utc>>()
-        .expect("fixed instant");
+    let now =
+        symeraseme_core::timeutil::parse_rfc3339("2026-01-02T03:04:05Z").expect("fixed instant");
     {
         let store = symeraseme_core::storage::Store::open(data_dir.join("symeraseme.db"))
             .expect("open the seeded store");
@@ -1777,7 +1786,7 @@ fn manual_tasks_populated_paths_match_the_go_bodies() {
     // Go's SQL driver renders the `TIMESTAMP` columns as RFC3339 in UTC.
     let created_at = payload["created_at"].as_str().expect("created_at");
     assert!(
-        created_at.ends_with('Z') && created_at.parse::<chrono::DateTime<chrono::Utc>>().is_ok(),
+        created_at.ends_with('Z') && symeraseme_core::timeutil::parse_rfc3339(created_at).is_ok(),
         "created_at is an RFC3339 instant: {created_at}"
     );
     let message = payload["message"].as_str().expect("show message");
@@ -1959,8 +1968,6 @@ fn manual_tasks_populated_paths_match_the_go_bodies() {
 /// value — only the naive layouts report `Z`.
 #[test]
 fn manual_task_timestamps_match_the_go_sql_driver() {
-    use chrono::{DateTime, Utc};
-
     const CASES: [(&str, &str); 16] = [
         ("2026-09-21 18:39:46+02:00", "2026-09-21T18:39:46+02:00"),
         ("2026-09-21T18:39:46+02:00", "2026-09-21T18:39:46+02:00"),
@@ -1997,9 +2004,8 @@ fn manual_task_timestamps_match_the_go_sql_driver() {
     let _cleanup = Cleanup(root.clone());
 
     let database = data_dir.join("symeraseme.db");
-    let now = "2026-01-02T03:04:05Z"
-        .parse::<DateTime<Utc>>()
-        .expect("fixed instant");
+    let now =
+        symeraseme_core::timeutil::parse_rfc3339("2026-01-02T03:04:05Z").expect("fixed instant");
     let store = symeraseme_core::storage::Store::open(database).expect("open the seeded store");
     symeraseme_core::manualtasks::create(
         &store,

@@ -15,7 +15,8 @@ use crate::triage_contract::{
 use crate::triage_prompts::{build_rebuttal_classifier_prompt, build_user_prompt};
 use rusqlite::{OptionalExtension, params};
 use serde_json::{Value, json};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
+use time::OffsetDateTime;
 
 pub const CLASSIFIER_SYSTEM_PROMPT: &str = "You are a precise email classifier for a data broker removal tool.\n\nYour task is to classify incoming broker reply emails into one of these categories:\n\n- ack: Broker acknowledges receipt. They are processing the request.\n- confirmed: Broker confirms the data has been deleted or account closed.\n- rejected: Broker explicitly rejects the request.\n- verification: Broker asks for more information or identity verification.\n- human_required: The reply requires manual human review.\n- autoresponder: Automated out-of-office, delivery receipt, or receipt notice.\n- bounce: Hard bounce — email address does not exist or mailbox is full.\n- unclear: Cannot confidently classify into any of the above.\n\nRespond with ONLY a JSON object on a single line:\n{\"classification\": \"<label>\", \"confidence\": <0.0-1.0>, \"summary\": \"<text>\", \"extracted_fields\": {}}\nIf confidence < 0.4, use \"unclear\" as the fallback classification.";
 
@@ -185,8 +186,9 @@ pub fn generate_rebuttal(
         "original_request_date".to_owned(),
         Value::String(options.original_request_date.clone()),
     );
-    let now = FrozenDateTime::from_rfc3339(system_now().to_rfc3339())
-        .map_err(|error| RebuttalError(error.to_string()))?;
+    let now =
+        FrozenDateTime::from_rfc3339(crate::timeutil::format_rfc3339_auto_si(system_now(), false))
+            .map_err(|error| RebuttalError(error.to_string()))?;
     let context = render_context(profile, options, extra, now);
     let body =
         templating::render(name, &context).map_err(|error| RebuttalError(error.to_string()))?;
@@ -373,15 +375,8 @@ fn truncate_bytes(value: &str, limit: usize) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 
-fn system_now() -> chrono::DateTime<chrono::Utc> {
-    let elapsed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    chrono::DateTime::<chrono::Utc>::from_timestamp(
-        elapsed.as_secs() as i64,
-        elapsed.subsec_nanos(),
-    )
-    .unwrap_or_default()
+fn system_now() -> OffsetDateTime {
+    OffsetDateTime::from(SystemTime::now())
 }
 
 fn rejection_template(key: &str) -> (&'static str, &'static str, &'static str, &'static str) {

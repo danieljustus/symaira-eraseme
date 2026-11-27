@@ -14,7 +14,6 @@ mod go_source_pin;
 
 use std::fs;
 
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -24,6 +23,7 @@ use symeraseme_core::reporting::{
 };
 use symeraseme_core::storage::store::Store;
 use tempfile::tempdir;
+use time::OffsetDateTime;
 
 const GOLDEN_REPORTING_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -84,10 +84,8 @@ fn fixture_store() -> (tempfile::TempDir, Store) {
     (tree, store)
 }
 
-fn pinned_now() -> DateTime<Utc> {
-    DateTime::parse_from_rfc3339("2026-08-06T12:00:00+00:00")
-        .expect("pinned instant")
-        .with_timezone(&Utc)
+fn pinned_now() -> OffsetDateTime {
+    symeraseme_core::timeutil::parse_rfc3339("2026-08-06T12:00:00+00:00").expect("pinned instant")
 }
 
 /// Canonicalises integral floats the way Go's encoding/json does before the

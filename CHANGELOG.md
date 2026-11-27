@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Security
+
+- Replace the unmaintained `chrono` (RUSTSEC-2026-0543) with `time` 0.3.55 in
+  `symeraseme-core` and `symeraseme-cli`; the `deny.toml` ignore is removed.
+  Timestamp bytes stay identical. An RFC 3339 leap second such as
+  `12:34:60Z` is now rejected, as Go's `time.Parse` does (#1335).
+
+### Changed
+
+- Capture snapshots port only the chrono calls of three retired live
+  comparators to `time`, as listed in `scripts/capture_overrides.json`; the
+  native evidence is refreshed as `refresh-8dc0b7bb` (#1335).
+
 ## [v0.18.0] - 2026-11-27
 
 ### Security

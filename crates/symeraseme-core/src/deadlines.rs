@@ -8,9 +8,9 @@ use crate::storage::projection::ProjectionError;
 use crate::storage::repository::Repository;
 use crate::storage::types::{EventType, Source};
 use crate::{storage::TickCandidate, timeutil};
-use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
+use time::{Duration, OffsetDateTime};
 
 pub const REMINDER_DAYS: i64 = 7;
 pub const DPA_ESCALATION_DAYS: i64 = 14;
@@ -33,7 +33,7 @@ pub struct TickAction {
 /// Evaluate one projected request without reading or writing SQLite.
 pub fn actions_for_candidate(
     request: &TickCandidate,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
     dry_run: bool,
 ) -> Vec<TickAction> {
     let status = if request.current_status.is_empty() {
@@ -58,7 +58,7 @@ fn jurisdiction_days(jurisdiction: &str) -> i64 {
     }
 }
 
-fn reminder(request: &TickCandidate, now: DateTime<Utc>, dry_run: bool) -> Option<TickAction> {
+fn reminder(request: &TickCandidate, now: OffsetDateTime, dry_run: bool) -> Option<TickAction> {
     let sent = parsed(&request.sent_at)?;
     let days = days_between(now, sent);
     if days < REMINDER_DAYS {
@@ -91,7 +91,7 @@ fn reminder(request: &TickCandidate, now: DateTime<Utc>, dry_run: bool) -> Optio
     })
 }
 
-fn deadline(request: &TickCandidate, now: DateTime<Utc>, dry_run: bool) -> Option<TickAction> {
+fn deadline(request: &TickCandidate, now: OffsetDateTime, dry_run: bool) -> Option<TickAction> {
     let days = jurisdiction_days(&request.jurisdiction);
     let explicit = parsed(&request.deadline_at);
     let deadline =
@@ -125,7 +125,7 @@ fn deadline(request: &TickCandidate, now: DateTime<Utc>, dry_run: bool) -> Optio
     })
 }
 
-fn dpa(request: &TickCandidate, now: DateTime<Utc>, dry_run: bool) -> Option<TickAction> {
+fn dpa(request: &TickCandidate, now: OffsetDateTime, dry_run: bool) -> Option<TickAction> {
     let deadline = parsed(&request.deadline_at)?;
     if request.escalation_level >= 2 {
         return None;
@@ -147,7 +147,7 @@ fn dpa(request: &TickCandidate, now: DateTime<Utc>, dry_run: bool) -> Option<Tic
     })
 }
 
-fn rescan(request: &TickCandidate, now: DateTime<Utc>, dry_run: bool) -> Option<TickAction> {
+fn rescan(request: &TickCandidate, now: OffsetDateTime, dry_run: bool) -> Option<TickAction> {
     let resolved = parsed(&request.resolved_at)?;
     let days = days_between(now, resolved);
     if days < RESCAN_DAYS {
@@ -166,18 +166,18 @@ fn rescan(request: &TickCandidate, now: DateTime<Utc>, dry_run: bool) -> Option<
     })
 }
 
-fn parsed(value: &str) -> Option<DateTime<Utc>> {
+fn parsed(value: &str) -> Option<OffsetDateTime> {
     (!value.is_empty())
         .then(|| timeutil::parse_timestamp(value).ok())
         .flatten()
 }
 
-fn days_between(now: DateTime<Utc>, then: DateTime<Utc>) -> i64 {
-    (now - then).num_hours() / 24
+fn days_between(now: OffsetDateTime, then: OffsetDateTime) -> i64 {
+    (now - then).whole_hours() / 24
 }
 
 fn python_timedelta(duration: Duration) -> String {
-    let seconds = duration.num_seconds();
+    let seconds = duration.whole_seconds();
     let days = seconds / 86_400;
     let remainder = seconds % 86_400;
     let hours = remainder / 3_600;
@@ -229,7 +229,7 @@ impl From<rusqlite::Error> for DeadlinesError {
 pub fn run_tick(
     store: &Store,
     opts: &RunOpts,
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> Result<Vec<TickAction>, DeadlinesError> {
     let repository = Repository::new(store);
     let candidates =
@@ -265,7 +265,7 @@ fn is_false(value: &bool) -> bool {
 pub fn apply_tick_actions(
     store: &Store,
     actions: &[TickAction],
-    now: DateTime<Utc>,
+    now: OffsetDateTime,
 ) -> Result<Vec<ApplyResult>, DeadlinesError> {
     if actions.is_empty() {
         return Ok(Vec::new());
@@ -321,7 +321,7 @@ pub fn apply_tick_actions(
 mod tests {
     use super::*;
 
-    fn parsed_instant(value: &str) -> DateTime<Utc> {
+    fn parsed_instant(value: &str) -> OffsetDateTime {
         timeutil::parse_timestamp(value).expect("instant parses")
     }
 

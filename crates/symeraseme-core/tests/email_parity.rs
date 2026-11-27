@@ -5,7 +5,6 @@
 //! order of the fields is part of the contract, so the fixture text is compared
 //! with insignificant whitespace removed instead of being parsed into a map.
 
-use chrono::{DateTime, FixedOffset, Utc};
 use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
@@ -22,6 +21,7 @@ use symeraseme_core::email::wire::{matched_messages_json, optional_messages_json
 use symeraseme_core::email::{
     match_reply_to_request, normalize_subject, parse_fetched_message, subject_matches,
 };
+use time::OffsetDateTime;
 
 const FIXTURE: &str = include_str!("../../../rust-tests/parity/oracle/email/email_cases.json");
 
@@ -74,7 +74,7 @@ struct FetchedSpec {
     header: Vec<u8>,
     body: Vec<u8>,
     flags: Option<Vec<String>>,
-    internal_date: Option<DateTime<Utc>>,
+    internal_date: Option<OffsetDateTime>,
 }
 
 #[derive(Clone, Default)]
@@ -132,7 +132,7 @@ impl ImapSession for ScriptedSession {
     fn search_uid(
         &mut self,
         uid_range: &str,
-        since: Option<DateTime<Utc>>,
+        since: Option<OffsetDateTime>,
     ) -> Result<Vec<u32>, String> {
         self.recorder.lock().expect("recorder lock").searches.push((
             self.folder.clone(),
@@ -215,8 +215,7 @@ fn build_script(value: &Value) -> HashMap<String, FolderScript> {
                             .collect()
                     }),
                     internal_date: text(&message["internal_date"])
-                        .and_then(|value| DateTime::parse_from_rfc3339(&value).ok())
-                        .map(|value| value.with_timezone(&Utc)),
+                        .and_then(|value| symeraseme_core::timeutil::parse_rfc3339(&value).ok()),
                 })
                 .collect();
         }
@@ -397,8 +396,7 @@ fn recorded_parsed_messages_match() {
                     .collect()
             }),
             internal_date: text(&case["internal_date"])
-                .and_then(|value| DateTime::parse_from_rfc3339(&value).ok())
-                .map(|value| value.with_timezone(&Utc)),
+                .and_then(|value| symeraseme_core::timeutil::parse_rfc3339(&value).ok()),
         };
         // The fixture records the UID as a running index over the case list.
         let index = fixture()["parse_fetched_message"]
@@ -663,12 +661,13 @@ fn recorded_imap_configs_agree() {
 
 #[test]
 fn fixed_offset_dates_render_like_go() {
-    let date = DateTime::parse_from_rfc3339("2026-07-21T10:00:00+02:00").unwrap();
+    let date = symeraseme_core::timeutil::parse_rfc3339("2026-07-21T10:00:00+02:00").unwrap();
     assert_eq!(
         symeraseme_core::email::wire::format_go_timestamp(&date),
         "2026-07-21T10:00:00+02:00"
     );
-    let utc: DateTime<FixedOffset> = DateTime::parse_from_rfc3339("2026-07-22T09:30:00Z").unwrap();
+    let utc: OffsetDateTime =
+        symeraseme_core::timeutil::parse_rfc3339("2026-07-22T09:30:00Z").unwrap();
     assert_eq!(
         symeraseme_core::email::wire::format_go_timestamp(&utc),
         "2026-07-22T09:30:00Z"

@@ -9,7 +9,6 @@ use std::collections::BTreeMap;
 use std::env;
 use std::path::Path;
 
-use chrono::{DateTime, Utc};
 use symeraseme_core::campaign;
 use symeraseme_core::config::{Config, ConfigContext};
 use symeraseme_core::deadlines::{self, RunOpts, TickAction};
@@ -29,6 +28,7 @@ use symeraseme_core::triage_service::{self, ClassifyRequest, LlmResponse, Rebutt
 use symeraseme_core::version;
 use symeraseme_engine::scheduler::install::{self, InstallOptions};
 use symeraseme_engine::scheduler::{Config as SchedulerConfig, Platform};
+use time::OffsetDateTime;
 
 const ROOT_NAME: &str = "symeraseme";
 
@@ -863,10 +863,10 @@ fn schedule_status(parsed: &Parsed) -> Outcome {
     }
 }
 
-/// The wall clock, as Go's `time.Now().UTC()`. `chrono` is built without its
-/// `clock` feature here, so the instant comes from `std`.
-fn now_utc() -> DateTime<Utc> {
-    DateTime::<Utc>::from(std::time::SystemTime::now())
+/// The wall clock, as Go's `time.Now().UTC()`. The `time` crate is built
+/// without its `local-offset` feature here, so the instant comes from `std`.
+fn now_utc() -> OffsetDateTime {
+    OffsetDateTime::from(std::time::SystemTime::now())
 }
 
 /// The process environment as a [`ConfigContext`], as every command sees it.

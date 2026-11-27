@@ -1,0 +1,49 @@
+{
+  "schema": "symeraseme.capture-overrides.v1",
+  "decision": "#1335 (maintainer decision 2026-11-27): chrono left Cargo.lock. A capture snapshot ports only the chrono calls of these retired live comparators to time. Each edit replaces exactly `count` occurrences of `old` in the file at the retirement revision 22615ae; nothing else in those files may differ. Go observations are unchanged.",
+  "retirement_revision": "22615ae67325c581fbe60cb0f2d3d2b2139cf900",
+  "applies_when": "the candidate Cargo.lock has no chrono package",
+  "comparators": {
+    "crates/symeraseme-cli/tests/plan_execute_live_process.rs": [
+      {
+        "old": "chrono::DateTime::from_timestamp(1_800_000_000, 0).unwrap(),",
+        "new": "time::OffsetDateTime::from_unix_timestamp(1_800_000_000).unwrap(),",
+        "count": 1
+      }
+    ],
+    "crates/symeraseme-cli/tests/mcp_http_headers_process.rs": [
+      {
+        "old": "chrono::DateTime::parse_from_rfc2822(date).expect(\"valid HTTP Date\");",
+        "new": "time::OffsetDateTime::parse(date, &time::format_description::well_known::Rfc2822)\n                .expect(\"valid HTTP Date\");",
+        "count": 1
+      },
+      {
+        "old": "                parsed\n                    .with_timezone(&chrono::Utc)\n                    .format(\"%a, %d %b %Y %H:%M:%S GMT\")\n                    .to_string(),",
+        "new": "                parsed\n                    .to_offset(time::UtcOffset::UTC)\n                    .format(&time::macros::format_description!(\n                        \"[weekday repr:short], [day] [month repr:short] [year] [hour]:[minute]:[second] GMT\"\n                    ))\n                    .expect(\"formatted HTTP Date\"),",
+        "count": 1
+      }
+    ],
+    "crates/symeraseme-core/tests/campaign_smtp.rs": [
+      {
+        "old": "use chrono::{DateTime, FixedOffset};\n",
+        "new": "use time::UtcOffset;\n",
+        "count": 1
+      },
+      {
+        "old": "let now = DateTime::parse_from_rfc3339(\"2026-01-01T00:00:00Z\").unwrap();",
+        "new": "let now = symeraseme_core::timeutil::parse_rfc3339(\"2026-01-01T00:00:00Z\").unwrap();",
+        "count": 1
+      },
+      {
+        "old": "now.to_utc(),",
+        "new": "now,",
+        "count": 2
+      },
+      {
+        "old": "FixedOffset::east_opt(0).unwrap(),",
+        "new": "UtcOffset::UTC,",
+        "count": 1
+      }
+    ]
+  }
+}
