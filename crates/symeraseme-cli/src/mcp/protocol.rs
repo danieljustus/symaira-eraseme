@@ -212,7 +212,7 @@ pub(crate) fn initialize_cancellable(
             protocol_version: "2025-06-18",
             server_info: ServerInfo {
                 name: "symeraseme",
-                version: env!("CARGO_PKG_VERSION"),
+                version: "dev",
             },
         };
         InitializeOutcome::Response(encode_response(&Response {
