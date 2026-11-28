@@ -14,7 +14,7 @@ Symaira EraseMe helps you exercise your GDPR/CCPA right to erasure against
 data brokers. It is a local-first Rust CLI with a native SwiftUI macOS app and
 an authenticated MCP JSON-RPC interface.
 
-**Current source tree:** Rust-only CLI and native SwiftUI macOS app, version 0.19.0.
+**Current source tree:** Rust-only CLI and native SwiftUI macOS app, version 0.19.1.
 The 0.15 line is the first without Go sources and supports macOS on Apple Silicon
 and Linux (amd64/arm64) only; 0.15.1 patched the bundled SQLite
 (RUSTSEC-2026-0459), 0.16.0 added `plan delete` and a compact
@@ -22,9 +22,11 @@ and Linux (amd64/arm64) only; 0.15.1 patched the bundled SQLite
 help and secret-provider timeout cleanup, 0.17.1 patched dependency
 advisories and macOS app server shutdown, 0.18.0 stored the identity master
 key in the real platform keyring, paged `list_brokers` and showed failed sends
-on the dashboard, and 0.19.0 runs Claude Code without tools, retires the
-Hermes and Copilot agent backends and no longer re-plans brokers already in a
-campaign. The Rust-only package layout
+on the dashboard, 0.19.0 runs Claude Code without tools, retires the Hermes
+and Copilot agent backends and no longer re-plans brokers already in a
+campaign, and 0.19.1 makes the daily `tick` apply its deadline transitions and
+queue due reminders and DPA complaints as manual tasks. The Rust-only package
+layout
 was introduced in the
 [`v0.14.0` canary prerelease](https://github.com/danieljustus/symaira-eraseme/releases/tag/v0.14.0).
 The historical `v0.13.0` prerelease remains dual-backend, and `v0.12.1` is the
@@ -209,7 +211,7 @@ make app-test
 ./app/SymairaEraseMe/build.sh
 
 # Local development packaging example only; not a release-version claim
-VERSION=0.19.0 ./scripts/package-dmg.sh
+VERSION=0.19.1 ./scripts/package-dmg.sh
 ```
 
 Use a full-history clone. Even then, squash merges and deleted feature branches
@@ -286,7 +288,9 @@ instead of an in-memory store, pages `list_brokers`, shows failed sends on the
 dashboard and builds against CoreKit v0.28.0; version 0.19.0 runs Claude Code
 without tools for the `agent` provider, retires the Hermes and Copilot agent
 backends, redacts the identity profile in reply triage and skips brokers that a
-repeated plan already covers. Canary publication alone
+repeated plan already covers; version 0.19.1 makes a non-dry `tick` record
+deadline and re-scan transitions and queue due reminders and DPA complaints as
+manual tasks. Canary publication alone
 does not complete stable acceptance or Go-retirement technical gates. The
 maintainer's
 2026-10-12 decision separately authorizes source retirement and waives only

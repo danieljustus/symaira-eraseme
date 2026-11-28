@@ -1725,7 +1725,7 @@ dependencies = [
 
 [[package]]
 name = "parity"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "rusqlite",
  "serde_json",
@@ -2547,7 +2547,7 @@ dependencies = [
 
 [[package]]
 name = "symeraseme-cli"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "base64 0.23.1",
  "clap",
@@ -2572,7 +2572,7 @@ dependencies = [
 
 [[package]]
 name = "symeraseme-core"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -2615,7 +2615,7 @@ dependencies = [
 
 [[package]]
 name = "symeraseme-engine"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "hex",
  "serde",
