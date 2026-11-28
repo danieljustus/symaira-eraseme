@@ -118,6 +118,22 @@ fn compact_default_is_bounded_and_keeps_totals_by_status_and_campaigns() {
         campaigns[0].get("requests").is_none(),
         "the compact default must not list every request"
     );
+    // Each campaign carries its own full breakdown: the flat counters omit
+    // statuses such as ACK, so only `by_status` sums to the campaign total.
+    let campaign_breakdown = campaigns[0]["by_status"]
+        .as_object()
+        .expect("campaign by_status");
+    assert_eq!(
+        campaign_breakdown,
+        compact["by_status"].as_object().unwrap()
+    );
+    assert_eq!(
+        campaign_breakdown
+            .values()
+            .map(|count| count.as_i64().expect("count"))
+            .sum::<i64>(),
+        total
+    );
 
     assert_eq!(
         compact["broker_status"].as_array().expect("brokers").len(),
@@ -148,6 +164,10 @@ fn compact_default_is_bounded_and_keeps_totals_by_status_and_campaigns() {
     for key in ["by_status", "broker_total", "broker_status_truncated"] {
         assert!(full.get(key).is_none(), "legacy shape gained {key}");
     }
+    assert!(
+        full["campaigns"][0].get("by_status").is_none(),
+        "legacy campaign shape gained by_status"
+    );
 }
 
 #[test]

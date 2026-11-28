@@ -26,9 +26,37 @@ struct StatusBadge: View {
         "COMPLETED": ("Completed", .positive),
     ]
 
+    /// Shorter labels for table cells. `SymairaBadge` never truncates, so the
+    /// full "Awaiting confirmation of receipt" pill (about 221 pt) covered the
+    /// next column in Requests and Calendar. The full label stays the tooltip
+    /// and the accessibility label.
+    static let compactLabels: [String: String] = [
+        "AWAITING_ACK": "Awaiting Receipt",
+    ]
+
+    /// Status column width that fits the widest compact pill ("Awaiting
+    /// Response", about 135 pt); the table adds its own cell padding.
+    /// ponytail: fixed for the current English labels and label font; measure
+    /// the widest compact label instead once labels are localized.
+    static let compactColumnWidth: CGFloat = 140
+
+    var compact = false
+
+    /// The pill text: the compact label in tables when one exists.
+    static func label(for status: String, compact: Bool) -> String {
+        let full = vocabulary[status.uppercased()]?.label ?? status
+        return compact ? compactLabels[status.uppercased()] ?? full : full
+    }
+
     var body: some View {
         let entry = Self.vocabulary[status.uppercased()] ?? (status, .neutral)
-        SymairaBadge(entry.label, tone: entry.tone, icon: entry.tone.symairaIcon)
+        let shown = Self.label(for: status, compact: compact)
+        let badge = SymairaBadge(shown, tone: entry.tone, icon: entry.tone.symairaIcon)
+        if shown == entry.label {
+            badge
+        } else {
+            badge.help(entry.label).accessibilityLabel(entry.label)
+        }
     }
 }
 

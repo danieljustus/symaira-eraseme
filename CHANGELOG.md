@@ -17,6 +17,16 @@ All notable changes to this project are documented in this file.
   it is a dry run and lists each failed request with its error. It used to
   print `executed N request(s)` for every attempted request, even when all of
   them failed (#1358). `--output json` is unchanged.
+- The app's dashboard counts acknowledged requests (and every other sent,
+  unresolved status) as In Progress and In Flight, so the tiles add up to the
+  total again; `get_dashboard_data` returns `by_status` per campaign for this
+  (#1363). The dashboard's campaign table is visible again instead of
+  collapsing to its title inside the page's scroll view.
+- The Campaigns table fits the default window size, so the Execute button is
+  no longer hidden behind a horizontal scroll (#1364).
+- Status pills in the Requests and Calendar tables no longer cover the next
+  column: tables show "Awaiting Receipt" for AWAITING_ACK, with the full label
+  as tooltip and accessibility label (#1365).
 
 ### Changed
 

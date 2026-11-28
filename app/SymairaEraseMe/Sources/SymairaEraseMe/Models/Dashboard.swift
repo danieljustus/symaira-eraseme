@@ -13,6 +13,8 @@ struct DashboardCampaign: Codable, Identifiable {
     let confirmed: Int
     let rejected: Int
     let overdue: Int
+    /// This campaign's authoritative status counts; absent from older payloads.
+    let byStatus: [String: Int]?
     let requests: [RemovalRequest]?
 
     enum CodingKeys: String, CodingKey {
@@ -22,10 +24,34 @@ struct DashboardCampaign: Codable, Identifiable {
         case awaitingAck = "awaiting_ack"
         case awaitingResponse = "awaiting_response"
         case confirmed, rejected, overdue
+        case byStatus = "by_status"
         case requests
     }
 
     var createdDate: Date? { BackendDate.parse(createdAt) }
+
+    /// Sent and unresolved requests of this campaign ("In Flight").
+    var inProgress: Int {
+        RequestProgress.inProgress(byStatus: byStatus, fallback: sent + awaitingAck + awaitingResponse)
+    }
+}
+
+/// Which request statuses count as in progress: sent and still open.
+enum RequestProgress {
+    /// Not yet sent, resolved, failed to send, or a confirmed request whose
+    /// re-scan is due. Every other status, including unknown ones, is open work.
+    static let excluded: Set<String> = [
+        "PLANNED", "CONFIRMED", "REJECTED", "REJECTED_FINAL", "SEND_FAILED", "BOUNCE", "RE_SCAN_DUE",
+    ]
+
+    /// Sums `byStatus` without the excluded statuses. Payloads without a
+    /// breakdown fall back to the flat counters, which omit ACK and others.
+    static func inProgress(byStatus: [String: Int]?, fallback: Int) -> Int {
+        guard let byStatus else { return fallback }
+        return byStatus.reduce(0) { sum, entry in
+            excluded.contains(entry.key.uppercased()) ? sum : sum + entry.value
+        }
+    }
 }
 
 /// Full dashboard data from `get_dashboard_data`.

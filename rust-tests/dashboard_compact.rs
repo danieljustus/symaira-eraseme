@@ -10,8 +10,9 @@
 //! * `get_dashboard_data` default result: per-campaign `requests` are gone,
 //!   `by_status`, `broker_total` and `broker_status_truncated` are new, and
 //!   `overdue` (top level, per campaign, per broker) counts unresolved
-//!   requests past their deadline instead of the `OVERDUE` status. Every
-//!   other field must still equal the recorded value.
+//!   requests past their deadline instead of the `OVERDUE` status. Each
+//!   campaign also carries its own `by_status` (#1363). Every other field
+//!   must still equal the recorded value.
 //! * `tools/list`: the `get_dashboard_data` entry, and only that entry, is
 //!   replaced by the compact schema.
 //!
@@ -71,6 +72,7 @@ pub fn compact_default_result(frozen: &Value, now: Option<DateTime<Utc>>) -> Val
             .map(|requests| requests.as_array().cloned().expect("requests array"))
             .unwrap_or_default();
         let mut campaign_overdue = 0i64;
+        let mut campaign_by_status: BTreeMap<String, i64> = BTreeMap::new();
         for request in &requests {
             total_requests += 1;
             let status = request["current_status"]
@@ -82,6 +84,7 @@ pub fn compact_default_result(frozen: &Value, now: Option<DateTime<Utc>>) -> Val
             } else {
                 status
             };
+            *campaign_by_status.entry(status.clone()).or_insert(0) += 1;
             *by_status.entry(status).or_insert(0) += 1;
             if let Some(now) = now
                 && past_deadline(request, now)
@@ -95,6 +98,7 @@ pub fn compact_default_result(frozen: &Value, now: Option<DateTime<Utc>>) -> Val
         if now.is_some() {
             campaign.insert("overdue".to_owned(), json!(campaign_overdue));
         }
+        campaign.insert("by_status".to_owned(), status_map(&campaign_by_status));
         overdue_total += campaign_overdue;
     }
     assert_eq!(

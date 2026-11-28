@@ -116,17 +116,20 @@ struct DashboardView: View {
                 // every figure keeps its text label.
                 Table(campaigns) {
                     TableColumn("Campaign") { Text($0.id).lineLimit(1) }
-                        .width(min: 90, ideal: 140)
+                        .width(min: 80, ideal: 110)
                     TableColumn("Total") { Text("\($0.total.plainDigits)").monospacedDigit() }
+                        .width(min: 50, ideal: 60, max: 80)
                     TableColumn("In Flight") {
-                        Text("\($0.sent + $0.awaitingAck + $0.awaitingResponse)")
+                        Text("\($0.inProgress.plainDigits)")
                             .monospacedDigit()
                     }
+                    .width(min: 60, ideal: 70, max: 90)
                     TableColumn("Confirmed") {
                         Text("\($0.confirmed.plainDigits)")
                             .foregroundStyle(BrandColors.confirmed)
                             .monospacedDigit()
                     }
+                    .width(min: 70, ideal: 80, max: 100)
                     TableColumn("Needs Attention") { campaign in
                         HStack(spacing: SymairaSpacing.xSmall) {
                             if campaign.rejected > 0 {
@@ -143,7 +146,12 @@ struct DashboardView: View {
                         }
                         .symairaText(.caption)
                     }
+                    .width(min: 210)
                 }
+                // Inside the page's scroll view a Table without a height
+                // collapses to nothing: header and rows were clipped away.
+                // Same sizing as the calendar's week tables.
+                .frame(minHeight: 60, idealHeight: CGFloat(min(campaigns.count, 8)) * 24 + 36)
             } else {
                 Text("No campaigns yet")
                     .foregroundStyle(BrandColors.textMuted)

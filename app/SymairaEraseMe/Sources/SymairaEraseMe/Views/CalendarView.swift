@@ -94,9 +94,11 @@ struct CalendarView: View {
                             .foregroundStyle(entry.overdue ? BrandColors.overdue : BrandColors.textMuted)
                     }
                 }
-                .width(min: 190)
-                TableColumn("Status") { StatusBadge(status: $0.currentStatus.flatMap { $0.isEmpty ? nil : $0 } ?? "UNKNOWN") }
-                    .width(min: 90, ideal: 110)
+                .width(min: 160)
+                TableColumn("Status") {
+                    StatusBadge(status: $0.currentStatus.flatMap { $0.isEmpty ? nil : $0 } ?? "UNKNOWN", compact: true)
+                }
+                .width(min: StatusBadge.compactColumnWidth, ideal: StatusBadge.compactColumnWidth)
                 TableColumn("Escalation") { Text(Self.escalationLabel(for: $0.escalationKey)) }
                     .width(min: 110)
             }

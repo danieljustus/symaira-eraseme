@@ -78,8 +78,9 @@ struct RequestsView: View {
                 .width(min: 40, ideal: 50)
             TableColumn("Broker") { Text($0.brokerId) }
             TableColumn("Channel") { Text($0.channel) }
-            TableColumn("Status") { StatusBadge(status: $0.statusDisplay) }
-                .width(min: 110, ideal: 140)
+            // The column fits the widest compact pill; a pill never truncates.
+            TableColumn("Status") { StatusBadge(status: $0.statusDisplay, compact: true) }
+                .width(min: StatusBadge.compactColumnWidth, ideal: StatusBadge.compactColumnWidth)
             TableColumn("Jurisdiction") { Text($0.jurisdiction) }
             TableColumn("Deadline") { request in
                 if let date = request.deadlineDate {

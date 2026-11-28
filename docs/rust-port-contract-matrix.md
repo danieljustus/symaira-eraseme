@@ -84,7 +84,11 @@ broad normalization.
   unchanged leaderboard order (total descending, `broker_id`), so the order of
   a list that fits does not move. `summary_only` drops `broker_status`,
   `recent_events` and `requests`. `limit: 0` plus `include_requests: true`
-  restores the pre-#1296 content. A negative `limit` is an error.
+  restores the pre-#1296 content. A negative `limit` is an error. Each
+  campaign also carries its own `by_status` (#1363): the flat counters omit
+  `ACK` and the other open statuses, so the app's In Progress and In Flight
+  figures need the full breakdown. The legacy shape behind
+  `generate-dashboard` and the goldens gains no field.
 - **One overdue rule.** `reporting::is_past_deadline` (unresolved and
   `deadline_at <= now`) is the single definition behind `status`
   `upcoming.overdue` and the dashboard `overdue` at all three levels (top-level

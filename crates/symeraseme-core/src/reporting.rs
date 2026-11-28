@@ -1049,6 +1049,11 @@ fn build_dashboard(
                 "rejected": count_of(&counts, "REJECTED_FINAL"),
                 "overdue": scoped.iter().filter(|request| is_past_deadline(request, now)).count() as i64,
             });
+            // The flat counters omit statuses such as ACK and SEND_FAILED, so
+            // the app reads each campaign's full breakdown, as for the totals.
+            if extras {
+                value["by_status"] = counts_to_value(&counts);
+            }
             if with_requests {
                 value["requests"] = Value::Array(
                     scoped

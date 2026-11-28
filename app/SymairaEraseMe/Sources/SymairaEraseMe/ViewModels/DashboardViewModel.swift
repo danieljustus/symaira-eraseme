@@ -86,9 +86,11 @@ final class DashboardViewModel: ObservableObject {
     }
 
     var totalRequests: Int { data?.totalRequests ?? 0 }
+    /// Sent and unresolved requests, from `by_status` when present: the flat
+    /// counters omit ACK and other open statuses.
     var inProgress: Int {
         guard let d = data else { return 0 }
-        return d.sent + d.awaitingAck + d.awaitingResponse
+        return RequestProgress.inProgress(byStatus: d.byStatus, fallback: d.sent + d.awaitingAck + d.awaitingResponse)
     }
     var confirmed: Int { data?.confirmed ?? 0 }
     var rejected: Int { data?.rejected ?? 0 }

@@ -60,13 +60,22 @@ struct CampaignsView: View {
 
     private func campaignsTable(_ campaigns: [DashboardCampaign]) -> some View {
         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
+            // Explicit widths: with the default column width the seven columns
+            // overflowed the card at the default window size and hid Execute
+            // behind a horizontal scroll. Each cell adds about 17 pt padding.
             Table(campaigns) {
-                TableColumn("ID") { Text($0.id) }
+                TableColumn("ID") { Text($0.id).lineLimit(1) }
+                    .width(min: 70, ideal: 104)
                 TableColumn("Kind") { Text($0.kind ?? "—") }
-                TableColumn("Total") { Text("\($0.total.plainDigits)") }
+                    .width(min: 50, ideal: 56)
+                TableColumn("Total") { Text("\($0.total.plainDigits)").monospacedDigit() }
+                    .width(min: 44, ideal: 50)
                 TableColumn("Confirmed") { Text("\($0.confirmed.plainDigits)").foregroundStyle(BrandColors.confirmed) }
+                    .width(min: 64, ideal: 70)
                 TableColumn("Rejected") { Text("\($0.rejected.plainDigits)").foregroundStyle(BrandColors.rejected) }
+                    .width(min: 56, ideal: 60)
                 TableColumn("Overdue") { Text("\($0.overdue.plainDigits)").foregroundStyle(BrandColors.overdue) }
+                    .width(min: 56, ideal: 60)
                 TableColumn("Actions") { campaign in
                     Button("Execute") {
                         pendingExecuteId = campaign.id
@@ -75,6 +84,7 @@ struct CampaignsView: View {
                     .symairaButtonStyle(.secondary)
                     .controlSize(.small)
                 }
+                .width(min: 80, ideal: 80)
             }
             .frame(minHeight: 200)
         }

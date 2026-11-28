@@ -324,7 +324,7 @@ Parameters:
 
 ### `get_dashboard_data`
 
-Return aggregated dashboard data: campaigns, request status counts (totals and `by_status`), broker status, and recent events. Compact by default: the 20 brokers needing the most attention and no per-campaign request lists (post-cutover change #1296, recorded in `docs/rust-port-contract-matrix.md`; the frozen Go baseline took no parameters).
+Return aggregated dashboard data: campaigns, request status counts (totals and `by_status`, also per campaign), broker status, and recent events. Compact by default: the 20 brokers needing the most attention and no per-campaign request lists (post-cutover change #1296, recorded in `docs/rust-port-contract-matrix.md`; the frozen Go baseline took no parameters).
 
 Required: `—`
 
