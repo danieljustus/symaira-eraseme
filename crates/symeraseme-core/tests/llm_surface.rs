@@ -11,8 +11,9 @@ use std::time::Duration;
 
 use serde_json::Value;
 use symeraseme_core::llm::{
-    AgentClient, BaseClient, ClassifyOptions, ClientError, CreateOptions, LlmError, RateLimitError,
-    UsageRecord, create_with, hash_cache_key, list_available_providers,
+    AgentClient, BaseClient, ClassifyOptions, ClientError, CreateOptions, LlmError,
+    NO_AGENT_CLI_MESSAGE, RateLimitError, UsageRecord, create_with, hash_cache_key,
+    list_available_providers,
 };
 
 const FIXTURE: &str = include_str!(concat!(
@@ -314,6 +315,17 @@ fn retry_cases_match_the_recorded_attempt_accounting() {
         }
 
         let recorded_error = case["error"].as_str();
+        // Post-cutover change #1357: the no-CLI message stops naming Hermes
+        // and GitHub Copilot CLI, which no longer run. Exactly that recorded
+        // string is replaced; every other recorded error passes through.
+        const GO_NO_AGENT_CLI_MESSAGE: &str = "no host agent CLI detected. Install Claude Code, Hermes or GitHub Copilot CLI, or set SYMERASEME_AGENT_BACKEND";
+        let recorded_error = recorded_error.map(|recorded| {
+            if recorded == GO_NO_AGENT_CLI_MESSAGE {
+                NO_AGENT_CLI_MESSAGE
+            } else {
+                recorded
+            }
+        });
         match (&result, recorded_error) {
             (Ok(_), None) | (Err(_), Some(_)) => {}
             _ => panic!(

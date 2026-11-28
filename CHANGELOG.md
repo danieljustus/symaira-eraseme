@@ -15,13 +15,19 @@ All notable changes to this project are documented in this file.
   failed. The invocation now passes `--tools ""`, `--strict-mcp-config` and
   `--no-session-persistence`, so untrusted broker mail in the prompt cannot
   drive file, shell or MCP tools and no transcript is saved (#1356). The
-  Hermes and Copilot command lines are still obsolete (#1357).
+  Hermes and Copilot command lines are retired, see below (#1357).
 - `classify-reply` and `generate-rebuttal` (CLI and MCP) use the identity
   profile when one exists and the request's broker. Before, the user's name in
   a broker reply reached the model unredacted, and a rebuttal was signed
   `<no value>` without the profile's identity details. A profile that exists
   but cannot be read now fails the call instead of sending an unredacted
   prompt (#1359).
+- The `agent` provider no longer runs Hermes or GitHub Copilot CLI. Their
+  command lines were obsolete, and the replacements are agents that load
+  tools (`hermes -z` even auto-approves them) and would receive untrusted
+  broker mail as the prompt. Automatic selection now considers only Claude
+  Code; `SYMERASEME_AGENT_BACKEND=hermes` or `copilot` fails with a clear
+  "not supported" error before any process starts (#1357).
 
 ### Fixed
 

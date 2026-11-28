@@ -204,6 +204,25 @@ fn host_agent_subprocess_protocol_matches_real_go_oracle() {
             )
         });
 
+        // Post-cutover change #1357: Go's Hermes and Copilot cases recorded a
+        // successful run of their obsolete command lines. Those backends no
+        // longer run; the request fails with a named error and the fake CLI
+        // never starts (it would write to the capture directory).
+        if super::UNSUPPORTED_AGENT_BACKENDS.contains(&backend) {
+            let error = result.expect_err("an unsupported backend must not run");
+            assert_eq!(
+                error.to_string(),
+                super::unsupported_agent_backend_message(backend),
+                "{id} error text"
+            );
+            assert_eq!(error_type(&error), "Error", "{id} error type");
+            assert_eq!(
+                fs::read_dir(&capture).expect("capture directory").count(),
+                0,
+                "{id}: the host agent must not start"
+            );
+            continue;
+        }
         let expected = &case["result"];
         match result {
             Ok((text, usage)) => {
@@ -447,4 +466,28 @@ fn cancelling_host_agent_kills_the_child_and_returns_context_canceled() {
 fn unique_seq() -> u64 {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+/// #1357: with only Hermes and the GitHub CLI on PATH nothing is detected,
+/// and an explicit request for either backend fails with a named error
+/// instead of running its obsolete command line.
+#[test]
+fn hermes_and_copilot_are_neither_detected_nor_run() {
+    let auto = AgentClient::with_probe("auto", "", Vec::new(), &|name| {
+        name == "hermes" || name == "gh"
+    });
+    assert!(!auto.is_available());
+    assert_eq!(auto.resolved_backend(), "");
+    for backend in ["hermes", "Copilot"] {
+        let mut agent = AgentClient::with_probe("auto", backend, Vec::new(), &|_| true);
+        agent.base.max_retries = 1;
+        assert!(!agent.is_available(), "{backend}");
+        let error = agent
+            .classify("system", "user", &super::ClassifyOptions::default())
+            .expect_err("an unsupported backend must not run");
+        assert_eq!(
+            error.to_string(),
+            super::unsupported_agent_backend_message(&backend.to_lowercase())
+        );
+    }
 }
