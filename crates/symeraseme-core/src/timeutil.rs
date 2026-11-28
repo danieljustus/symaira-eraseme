@@ -244,11 +244,11 @@ fn parse_iso(value: &str) -> Option<OffsetDateTime> {
     };
     let date = Date::from_calendar_date(year, Month::try_from(month).ok()?, day).ok()?;
     let time = Time::from_hms_nano(hour, minute, second, nanos).ok()?;
-    Some(
-        PrimitiveDateTime::new(date, time)
-            .assume_offset(offset)
-            .to_offset(UtcOffset::UTC),
-    )
+    // An offset can move the UTC instant past year 9999 or before -9999;
+    // such input is malformed, not a reason to panic.
+    PrimitiveDateTime::new(date, time)
+        .assume_offset(offset)
+        .checked_to_offset(UtcOffset::UTC)
 }
 
 fn parse_fraction(rest: &str) -> Option<(u32, &str)> {
@@ -299,11 +299,7 @@ fn parse_rfc1123_numeric(input: &str) -> Option<OffsetDateTime> {
     let prefix = without_weekday(rfc1123_prefix(prefix)?)?;
     let value = parse_rfc1123_datetime(prefix)?;
     let zone = parse_numeric_offset(zone)?;
-    Some(
-        (value - Duration::seconds(zone))
-            .assume_utc()
-            .to_offset(UtcOffset::UTC),
-    )
+    Some(value.checked_sub(Duration::seconds(zone))?.assume_utc())
 }
 
 fn parse_rfc1123_alpha(input: &str) -> Option<OffsetDateTime> {
@@ -541,6 +537,19 @@ mod tests {
     fn trims_and_distinguishes_empty_from_malformed() {
         assert_eq!(parse(" \t\n "), Err(TimestampError::Empty));
         assert_eq!(parse("not-a-timestamp"), Err(TimestampError::Malformed));
+    }
+
+    #[test]
+    fn rejects_offsets_whose_utc_instant_leaves_the_year_range() {
+        for input in [
+            "9999-12-31T23:59:59-23:59",
+            "9999-12-31 23:59:59-2359",
+            "Fri, 31 Dec 9999 23:59:59 -2400",
+            "Mon, 01 Jan -9999 00:00:00 +2400",
+        ] {
+            assert_eq!(parse(input), Err(TimestampError::Malformed), "{input:?}");
+        }
+        assert!(parse("Fri, 31 Dec 9999 23:59:59 GMT").is_ok());
     }
 
     #[test]

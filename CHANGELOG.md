@@ -39,6 +39,9 @@ All notable changes to this project are documented in this file.
 - Status pills in the Requests and Calendar tables no longer cover the next
   column: tables show "Awaiting Receipt" for AWAITING_ACK, with the full label
   as tooltip and accessibility label (#1365).
+- Timestamps whose offset moves the UTC instant past year 9999 (or before
+  -9999), such as `9999-12-31T23:59:59-23:59`, are rejected as malformed
+  instead of crashing the command that reads them (#1369).
 
 ### Changed
 
