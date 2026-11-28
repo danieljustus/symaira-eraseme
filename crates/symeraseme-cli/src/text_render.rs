@@ -161,6 +161,40 @@ pub fn dashboard(result: &Value) -> String {
     )
 }
 
+/// `plan execute`: how many requests of the batch succeeded, then one line per
+/// failed request. Each request's own `success` decides; a captured failure is
+/// never counted as executed.
+pub fn plan_execute(result: &Value, dry_run: bool) -> String {
+    let results = result
+        .get("results")
+        .and_then(Value::as_array)
+        .map_or(&[][..], Vec::as_slice);
+    let failed = results
+        .iter()
+        .filter(|entry| entry.get("success").and_then(Value::as_bool) != Some(true))
+        .collect::<Vec<_>>();
+    let succeeded = results.len() - failed.len();
+    let mut out = if dry_run {
+        format!(
+            "dry run: {succeeded} of {} request(s) ready to send",
+            results.len()
+        )
+    } else {
+        format!("executed {succeeded} of {} request(s)", results.len())
+    };
+    if !failed.is_empty() {
+        out.push_str(&format!(", {} failed", failed.len()));
+    }
+    for entry in failed {
+        out.push_str(&format!(
+            "\n  #{}: {}",
+            number(entry, "request_id"),
+            text(entry, "error")
+        ));
+    }
+    out
+}
+
 /// `schedule status`: the platform, then one line per scheduler unit.
 pub fn schedule_status(result: &Value) -> String {
     let mut out = format!("Scheduler platform: {}", text(result, "Platform"));
@@ -194,6 +228,27 @@ pub fn schedule_status(result: &Value) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn plan_execute_counts_only_successful_requests() {
+        let ready = json!({"batch_size": 1, "results": [
+            {"request_id": 1, "success": true, "dry_run": true, "to": "privacy@example.test"},
+        ]});
+        assert_eq!(
+            plan_execute(&ready, true),
+            "dry run: 1 of 1 request(s) ready to send"
+        );
+        let mixed = json!({"batch_size": 2, "results": [
+            {"request_id": 3, "success": true},
+            {"request_id": 4, "success": false, "error": "smtp: connection refused"},
+        ]});
+        assert_eq!(
+            plan_execute(&mixed, false),
+            "executed 1 of 2 request(s), 1 failed\n  #4: smtp: connection refused"
+        );
+        let empty = json!({"batch_size": 0, "results": []});
+        assert_eq!(plan_execute(&empty, false), "executed 0 of 0 request(s)");
+    }
 
     #[test]
     fn requests_list_prints_counts_and_one_line_per_request() {

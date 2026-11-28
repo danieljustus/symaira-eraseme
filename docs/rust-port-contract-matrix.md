@@ -159,6 +159,7 @@ payload unless `--output json` was given. Text mode now prints the data
 | `calendar` | totals header, then entries grouped by ISO week with days until or past the marker |
 | `dashboard` | the request counters on one line plus the campaign count |
 | `schedule status` | `Scheduler platform: P`, then one `label: installed/not installed, active/inactive[, legacy] (path)[ - error]` line per unit |
+| `plan execute` (#1358) | `executed X of N request(s)` or, with `--dry-run`, `dry run: X of N request(s) ready to send`, where X counts results with `success: true`; `, F failed` and one `#id: error` line per failed request follow when any failed. Previously `executed N request(s)` with N = attempted requests |
 
 Unchanged: the mutating commands (`manual-tasks complete|cleanup`, `grant`,
 `generate-*`, `redact-file`) keep `success`; exit codes, stderr and error

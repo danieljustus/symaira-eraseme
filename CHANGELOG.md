@@ -11,6 +11,13 @@ All notable changes to this project are documented in this file.
   Timestamp bytes stay identical. An RFC 3339 leap second such as
   `12:34:60Z` is now rejected, as Go's `time.Parse` does (#1335).
 
+### Fixed
+
+- `plan execute` in text mode counts only requests that succeeded, says when
+  it is a dry run and lists each failed request with its error. It used to
+  print `executed N request(s)` for every attempted request, even when all of
+  them failed (#1358). `--output json` is unchanged.
+
 ### Changed
 
 - Capture snapshots port only the chrono calls of three retired live

@@ -1121,9 +1121,8 @@ fn plan_execute(parsed: &Parsed) -> Outcome {
                 Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
             };
         }
-        Outcome::Stdout(
-            format!("executed {} request(s)\n", go_value(&result["batch_size"])).into_bytes(),
-        )
+        let text = text_render::plan_execute(&Value::Object(result), dry_run);
+        Outcome::Stdout(format!("{text}\n").into_bytes())
     })
 }
 

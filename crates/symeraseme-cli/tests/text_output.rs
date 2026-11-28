@@ -207,6 +207,36 @@ fn schedule_status_text_lists_every_unit() {
 }
 
 #[test]
+fn plan_execute_text_reports_failed_requests_instead_of_executed() {
+    // No identity profile exists, so the planned request cannot be prepared.
+    let dir = seeded();
+    let json: Value = serde_json::from_str(&stdout(
+        dir.path(),
+        &[
+            "plan",
+            "execute",
+            "--campaign",
+            "pop",
+            "--dry-run",
+            "--output",
+            "json",
+        ],
+    ))
+    .unwrap();
+    assert_eq!(json["batch_size"], 1, "{json}");
+    assert_eq!(json["results"][0]["success"], false, "{json}");
+    let error = json["results"][0]["error"].as_str().expect("failure error");
+
+    assert_eq!(
+        stdout(
+            dir.path(),
+            &["plan", "execute", "--campaign", "pop", "--dry-run"]
+        ),
+        format!("dry run: 0 of 1 request(s) ready to send, 1 failed\n  #2: {error}\n")
+    );
+}
+
+#[test]
 fn mutating_commands_keep_the_success_line() {
     let dir = seeded();
     assert_eq!(
