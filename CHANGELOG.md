@@ -16,6 +16,12 @@ All notable changes to this project are documented in this file.
   `--no-session-persistence`, so untrusted broker mail in the prompt cannot
   drive file, shell or MCP tools and no transcript is saved (#1356). The
   Hermes and Copilot command lines are still obsolete (#1357).
+- `classify-reply` and `generate-rebuttal` (CLI and MCP) use the identity
+  profile when one exists and the request's broker. Before, the user's name in
+  a broker reply reached the model unredacted, and a rebuttal was signed
+  `<no value>` without the profile's identity details. A profile that exists
+  but cannot be read now fails the call instead of sending an unredacted
+  prompt (#1359).
 
 ### Fixed
 

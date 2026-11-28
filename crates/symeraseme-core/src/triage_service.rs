@@ -6,6 +6,7 @@
 use crate::identity::Profile;
 use crate::llm::UsageRecord;
 use crate::redaction::{Address as RedactionAddress, RedactionProfile};
+use crate::registry::Broker;
 use crate::storage::{EventType, Source, Store};
 use crate::templating::{self, Address, FrozenDateTime, RenderContext};
 use crate::triage_contract::{
@@ -320,6 +321,63 @@ pub struct RebuttalRequest {
     pub original_request_date: String,
 }
 
+impl ClassifyRequest {
+    /// The registry name and website of `request_id`'s broker. A request or
+    /// broker the store or registry does not know leaves them empty.
+    pub fn for_request(store: &Store, brokers: &[Broker], request_id: i64) -> Result<Self, String> {
+        let (broker, _) = request_facts(store, brokers, request_id)?;
+        Ok(Self {
+            broker_name: broker.map(|broker| broker.name.clone()).unwrap_or_default(),
+            broker_website: broker
+                .map(|broker| broker.website.clone())
+                .unwrap_or_default(),
+            ..Self::default()
+        })
+    }
+}
+
+impl RebuttalRequest {
+    /// Like [`ClassifyRequest::for_request`], plus the date (`YYYY-MM-DD`) the
+    /// request was sent, when it was.
+    pub fn for_request(store: &Store, brokers: &[Broker], request_id: i64) -> Result<Self, String> {
+        let (broker, sent_at) = request_facts(store, brokers, request_id)?;
+        Ok(Self {
+            broker_name: broker.map(|broker| broker.name.clone()).unwrap_or_default(),
+            broker_website: broker
+                .map(|broker| broker.website.clone())
+                .unwrap_or_default(),
+            original_request_date: sent_at
+                .and_then(|sent_at| sent_at.get(..10).map(str::to_owned))
+                .unwrap_or_default(),
+            ..Self::default()
+        })
+    }
+}
+
+fn request_facts<'a>(
+    store: &Store,
+    brokers: &'a [Broker],
+    request_id: i64,
+) -> Result<(Option<&'a Broker>, Option<String>), String> {
+    let row = store
+        .connection()
+        .query_row(
+            "SELECT r.broker_id, s.sent_at FROM removal_requests r
+             LEFT JOIN request_state s ON s.request_id = r.id WHERE r.id = ?1",
+            [request_id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+        )
+        .optional()
+        .map_err(|error| error.to_string())?;
+    Ok(match row {
+        Some((broker_id, sent_at)) => (
+            brokers.iter().find(|broker| broker.id == broker_id),
+            sent_at,
+        ),
+        None => (None, None),
+    })
+}
+
 #[derive(Clone)]
 struct ReplyRow {
     id: i64,
@@ -403,7 +461,8 @@ fn rejection_template(key: &str) -> (&'static str, &'static str, &'static str, &
     }
 }
 
-fn redaction_profile(profile: &Profile) -> RedactionProfile {
+/// The identity values a prompt must not carry.
+pub fn redaction_profile(profile: &Profile) -> RedactionProfile {
     RedactionProfile {
         full_name: profile.full_name.clone(),
         name_variants: profile.name_variants.clone(),
