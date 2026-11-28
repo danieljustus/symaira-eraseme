@@ -25,7 +25,7 @@ struct CalendarView: View {
                     )
                 } else {
                     ForEach(data.weeks) { week in
-                        weekSection(week)
+                        weekSection(week, asOf: data.asOf)
                     }
                 }
             }
@@ -77,7 +77,7 @@ struct CalendarView: View {
         }
     }
 
-    private func weekSection(_ week: CalendarWeek) -> some View {
+    private func weekSection(_ week: CalendarWeek, asOf: String?) -> some View {
         VStack(alignment: .leading, spacing: SymairaSpacing.small) {
             Text(week.week)
                 .symairaText(.subheading)
@@ -88,7 +88,7 @@ struct CalendarView: View {
                 TableColumn("Due") { entry in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(Self.markerDate(entry.markerAt))
-                        Text("\(Self.markerLabel(for: entry.marker)) · \(entry.relativeDay)")
+                        Text("\(Self.markerLabel(for: entry.marker)) · \(entry.relativeDay(asOf: asOf))")
                             // The role color would win over the overdue tint otherwise.
                             .symairaText(.caption, respectsForeground: false)
                             .foregroundStyle(entry.overdue ? BrandColors.overdue : BrandColors.textMuted)

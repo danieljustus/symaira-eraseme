@@ -96,6 +96,20 @@ pub fn events(result: &Value) -> String {
     out
 }
 
+/// Whole days that have passed since an overdue marker, measured from the
+/// result's `as_of`.
+///
+/// `days_from_now` stays the Go-compatible floor, so a marker 13 days and
+/// 10 minutes ago carries -14 (#1367). Without parseable timestamps the wire
+/// value is used as before.
+fn days_overdue(as_of: &str, entry: &Value) -> i64 {
+    let parse = symeraseme_core::timeutil::parse;
+    match (parse(as_of), parse(text(entry, "marker_at"))) {
+        (Ok(now), Ok(at)) if at <= now => (now - at).whole_days(),
+        _ => -number(entry, "days_from_now"),
+    }
+}
+
 /// `calendar`: a header with the totals, then the entries grouped by week.
 pub fn calendar(result: &Value) -> String {
     let totals = result.get("totals").unwrap_or(&Value::Null);
@@ -123,11 +137,18 @@ pub fn calendar(result: &Value) -> String {
             .and_then(Value::as_array)
             .map_or(&[][..], Vec::as_slice);
         for entry in entries {
-            let days = number(entry, "days_from_now");
             let when = if entry.get("overdue").and_then(Value::as_bool) == Some(true) {
-                format!("{} days overdue", -days)
+                match days_overdue(text(result, "as_of"), entry) {
+                    0 => "overdue today".to_owned(),
+                    1 => "1 day overdue".to_owned(),
+                    days => format!("{days} days overdue"),
+                }
             } else {
-                format!("in {days} days")
+                match number(entry, "days_from_now") {
+                    0 => "today".to_owned(),
+                    1 => "in 1 day".to_owned(),
+                    days => format!("in {days} days"),
+                }
             };
             out.push_str(&format!(
                 "\n  #{} {} [{}] {} {} ({when})",
@@ -308,6 +329,39 @@ mod tests {
         let empty = json!({"horizon_weeks": 4, "horizon_until": "u", "scope": {"campaign_id": "all"},
             "totals": {"entries": 0, "overdue": 0}, "weeks": []});
         assert!(calendar(&empty).ends_with("\nNo unresolved actions in this period."));
+    }
+
+    #[test]
+    fn calendar_counts_elapsed_whole_days_for_overdue_markers() {
+        // `days_from_now` is the floored wire value: -14 for 13 days and
+        // 10 minutes ago. The text counts the whole days that have passed.
+        let entry = |id: i64, at: &str, days: i64, overdue: bool| {
+            json!({"request_id": id, "broker_id": "b", "current_status": "SENT",
+                   "marker": "deadline", "marker_at": at, "days_from_now": days,
+                   "overdue": overdue})
+        };
+        let result = json!({
+            "as_of": "2026-11-28T01:55:00+00:00",
+            "horizon_weeks": 4, "horizon_until": "u", "scope": {"campaign_id": "all"},
+            "totals": {"entries": 5, "overdue": 3},
+            "weeks": [{"week": "2026-W46", "entries": [
+                entry(1, "2026-11-15 01:45:00", -14, true),
+                entry(2, "2026-11-26T01:55:00Z", -2, true),
+                entry(3, "2026-11-28 01:45:00", -1, true),
+                entry(4, "2026-11-28T12:00:00Z", 0, false),
+                entry(5, "2026-11-29T12:00:00Z", 1, false),
+            ]}],
+        });
+        let text = calendar(&result);
+        for expected in [
+            "#1 b [SENT] deadline 2026-11-15 01:45:00 (13 days overdue)",
+            "#2 b [SENT] deadline 2026-11-26T01:55:00Z (2 days overdue)",
+            "#3 b [SENT] deadline 2026-11-28 01:45:00 (overdue today)",
+            "#4 b [SENT] deadline 2026-11-28T12:00:00Z (today)",
+            "#5 b [SENT] deadline 2026-11-29T12:00:00Z (in 1 day)",
+        ] {
+            assert!(text.contains(expected), "missing {expected:?} in\n{text}");
+        }
     }
 
     #[test]

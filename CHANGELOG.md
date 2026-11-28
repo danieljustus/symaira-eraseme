@@ -42,6 +42,10 @@ All notable changes to this project are documented in this file.
 - Timestamps whose offset moves the UTC instant past year 9999 (or before
   -9999), such as `9999-12-31T23:59:59-23:59`, are rejected as malformed
   instead of crashing the command that reads them (#1369).
+- Overdue calendar entries count the whole days that have passed: a deadline
+  13 days and 10 minutes ago reads "13 days overdue" in `calendar` text mode
+  and in the app, not "14 days overdue", and one from earlier today reads
+  "overdue today". The JSON `days_from_now` is unchanged (#1367).
 
 ### Changed
 

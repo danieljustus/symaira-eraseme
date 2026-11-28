@@ -160,7 +160,7 @@ payload unless `--output json` was given. Text mode now prints the data
 | `manual-tasks list`, `manual-tasks show` | the tool's own `message` (task count and one line per task; the detail block); a `success: false` payload prints its `error` instead |
 | `requests list` | `Requests: N of TOTAL (page P, S per page)`, then one `#id [status] broker via channel campaign=... created=... deadline=...` line per request |
 | `events show` | `Events (N):`, then `#id occurred-at TYPE (source)` per event; `No events found.` when empty |
-| `calendar` | totals header, then entries grouped by ISO week with days until or past the marker |
+| `calendar` | totals header, then entries grouped by ISO week with `in N days` / `today`, or for an overdue marker the whole days elapsed since `marker_at`, measured from `as_of` (`N days overdue`, `overdue today`; #1367). The JSON `days_from_now` stays the Go floor (-14 for 13 days and 10 minutes ago); the app's calendar label counts the same way |
 | `dashboard` | the request counters on one line plus the campaign count |
 | `schedule status` | `Scheduler platform: P`, then one `label: installed/not installed, active/inactive[, legacy] (path)[ - error]` line per unit |
 | `plan execute` (#1358) | `executed X of N request(s)` or, with `--dry-run`, `dry run: X of N request(s) ready to send`, where X counts results with `success: true`; `, F failed` and one `#id: error` line per failed request follow when any failed. Previously `executed N request(s)` with N = attempted requests |

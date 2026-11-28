@@ -78,7 +78,11 @@ final class BackendContractDecodingTests: XCTestCase {
         XCTAssertEqual(entry.requestId, 2)
         XCTAssertEqual(entry.marker, "next_action")
         XCTAssertTrue(entry.overdue)
-        XCTAssertEqual(entry.relativeDay, "2 days overdue")
+        // 27 hours before `as_of`: one whole day has passed, although the
+        // floored wire value `days_from_now` is -2 (#1367).
+        XCTAssertEqual(entry.daysFromNow, -2)
+        XCTAssertEqual(entry.relativeDay(asOf: calendar.asOf), "1 day overdue")
+        XCTAssertEqual(entry.relativeDay(asOf: nil), "2 days overdue", "without as_of the wire value is used")
         XCTAssertEqual(CalendarView.escalationLabel(for: entry.escalationKey), "DPA pending")
         XCTAssertEqual(CalendarView.markerLabel(for: entry.marker), "Next action")
         XCTAssertNotEqual(CalendarView.markerDate(entry.markerAt), entry.markerAt, "RFC 3339 marker must parse")
@@ -88,6 +92,22 @@ final class BackendContractDecodingTests: XCTestCase {
                        CalendarView.markerDate("2026-08-14T09:00:00Z"),
                        "SQLite-layout markers are UTC")
         XCTAssertEqual(CalendarView.markerDate("not a timestamp"), "not a timestamp")
+    }
+
+    func testOverdueLabelCountsElapsedWholeDays() throws {
+        func entry(_ markerAt: String, _ days: Int, overdue: Bool = true) throws -> CalendarEntry {
+            let json = """
+            {"request_id": 1, "broker_id": "b", "campaign_id": "c", "marker": "deadline",
+             "marker_at": "\(markerAt)", "days_from_now": \(days), "overdue": \(overdue)}
+            """
+            return try JSONDecoder().decode(CalendarEntry.self, from: Data(json.utf8))
+        }
+        let asOf = "2026-11-28T01:55:00+00:00"
+        XCTAssertEqual(try entry("2026-11-15 01:45:00", -14).relativeDay(asOf: asOf), "13 days overdue")
+        XCTAssertEqual(try entry("2026-11-26T01:55:00Z", -2).relativeDay(asOf: asOf), "2 days overdue")
+        XCTAssertEqual(try entry("2026-11-28 01:45:00", -1).relativeDay(asOf: asOf), "overdue today")
+        XCTAssertEqual(try entry("2026-11-28T12:00:00Z", 0, overdue: false).relativeDay(asOf: asOf), "today")
+        XCTAssertEqual(try entry("2026-11-30T12:00:00Z", 2, overdue: false).relativeDay(asOf: asOf), "in 2 days")
     }
 
     func testEmptyCalendarDecodes() throws {

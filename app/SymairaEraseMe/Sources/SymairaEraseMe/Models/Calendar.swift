@@ -91,14 +91,30 @@ struct CalendarEntry: Codable, Identifiable {
         }
     }
 
-    /// "today", "in 3 days", "2 days overdue".
-    var relativeDay: String {
+    /// "today", "in 3 days", "overdue today", "2 days overdue".
+    ///
+    /// `days_from_now` is the backend's floored day count, so a marker 13 days
+    /// and 10 minutes ago carries -14 (#1367). Overdue markers therefore count
+    /// the whole days elapsed since `marker_at`, measured from the response's
+    /// `as_of`; without parseable timestamps the wire value is used.
+    func relativeDay(asOf: String?) -> String {
+        if overdue {
+            let elapsed: Int
+            if let now = BackendDate.parse(asOf), let at = BackendDate.parse(markerAt), at <= now {
+                elapsed = Int(now.timeIntervalSince(at) / 86_400)
+            } else {
+                elapsed = -daysFromNow
+            }
+            switch elapsed {
+            case 0: return "overdue today"
+            case 1: return "1 day overdue"
+            default: return "\(elapsed) days overdue"
+            }
+        }
         switch daysFromNow {
         case 0: return "today"
         case 1: return "in 1 day"
-        case -1: return "1 day overdue"
-        case let days where days > 1: return "in \(days) days"
-        case let days: return "\(-days) days overdue"
+        default: return "in \(daysFromNow) days"
         }
     }
 }
