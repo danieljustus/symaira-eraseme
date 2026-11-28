@@ -430,7 +430,7 @@ pub struct AgentDef {
     pub invoke_template: &'static [&'static str],
 }
 
-/// Go's `agentDefs`.
+/// Go's `agentDefs`, reduced to the backends that still work.
 ///
 /// Claude Code deliberately differs from Go: current releases reject Go's
 /// `--no-input` (`unknown option`), so it is replaced by flags that run the
@@ -438,39 +438,47 @@ pub struct AgentDef {
 /// prompt carries untrusted broker mail that may only be classified, and it
 /// must not land in the agent's transcript store. `--tools` takes a variadic
 /// value, so `--model` (appended later) must keep following it as an option.
-pub const AGENT_DEFS: [AgentDef; 3] = [
-    AgentDef {
-        name: "claude",
-        cli: "claude",
-        check_cmd: &["claude", "--version"],
-        invoke_template: &[
-            "claude",
-            "-p",
-            "{prompt}",
-            "--output-format",
-            "text",
-            "--no-session-persistence",
-            "--strict-mcp-config",
-            "--tools",
-            "",
-        ],
-    },
-    AgentDef {
-        name: "hermes",
-        cli: "hermes",
-        check_cmd: &["hermes", "--version"],
-        invoke_template: &["hermes", "-p", "{prompt}"],
-    },
-    AgentDef {
-        name: "copilot",
-        cli: "gh",
-        check_cmd: &["gh", "copilot", "--version"],
-        invoke_template: &["gh", "copilot", "suggest", "-p", "{prompt}"],
-    },
-];
+///
+/// Go's Hermes (`hermes -p <prompt>`) and Copilot (`gh copilot suggest -p
+/// <prompt>`) entries are gone: see [`UNSUPPORTED_AGENT_BACKENDS`].
+pub const AGENT_DEFS: [AgentDef; 1] = [AgentDef {
+    name: "claude",
+    cli: "claude",
+    check_cmd: &["claude", "--version"],
+    invoke_template: &[
+        "claude",
+        "-p",
+        "{prompt}",
+        "--output-format",
+        "text",
+        "--no-session-persistence",
+        "--strict-mcp-config",
+        "--tools",
+        "",
+    ],
+}];
 
-/// Go's `agentPreference`: Claude Code, then Hermes, then Copilot.
-pub const AGENT_PREFERENCE: [&str; 3] = ["claude", "hermes", "copilot"];
+/// Go's `agentPreference` was Claude Code, then Hermes, then Copilot; only
+/// Claude Code is still selected automatically.
+pub const AGENT_PREFERENCE: [&str; 1] = ["claude"];
+
+/// Host-agent backends Go supported that no longer run (post-cutover #1357).
+///
+/// Their Go command lines are obsolete (`hermes -p` is `--profile`; `gh
+/// copilot` has no `suggest` any more), and both replacements are agents that
+/// load tools: `hermes -z` auto-approves them. The prompt carries untrusted
+/// broker mail, so without a verified tool-free invocation these backends are
+/// never selected automatically and an explicit request fails before any
+/// process starts.
+pub const UNSUPPORTED_AGENT_BACKENDS: [&str; 2] = ["hermes", "copilot"];
+
+/// The error for an explicitly requested backend from
+/// [`UNSUPPORTED_AGENT_BACKENDS`].
+pub fn unsupported_agent_backend_message(name: &str) -> String {
+    format!(
+        "host agent backend {name:?} is not supported: its command line no longer works and no tool-free mode is verified. Use Claude Code or another SYMERASEME_LLM_PROVIDER"
+    )
+}
 
 /// The EraseMe-side client: only the host-agent provider has one in Rust.
 #[derive(Debug)]
@@ -481,8 +489,10 @@ pub struct AgentClient {
     provider_client: Option<LlmkitClient>,
 }
 
-/// The message Go's agent `callAPI` returns when no CLI is reachable.
-pub const NO_AGENT_CLI_MESSAGE: &str = "no host agent CLI detected. Install Claude Code, Hermes or GitHub Copilot CLI, or set SYMERASEME_AGENT_BACKEND";
+/// The message the agent `callAPI` returns when no CLI is reachable. Go also
+/// named Hermes and GitHub Copilot CLI here (#1357).
+pub const NO_AGENT_CLI_MESSAGE: &str =
+    "no host agent CLI detected. Install Claude Code or choose another SYMERASEME_LLM_PROVIDER";
 const AGENT_SUBPROCESS_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Clone, Copy)]
@@ -705,6 +715,12 @@ impl AgentClient {
         config: AgentCommandConfig<'_>,
         cancellation: &CancellationToken,
     ) -> Result<(String, UsageRecord), ClientError> {
+        let requested = self.requested_backend.to_lowercase();
+        if UNSUPPORTED_AGENT_BACKENDS.contains(&requested.as_str()) {
+            return Err(ClientError::Provider(LlmError::new(
+                unsupported_agent_backend_message(&requested),
+            )));
+        }
         let backend = self.resolved_backend();
         let Some(def) = AGENT_DEFS.iter().find(|def| def.name == backend) else {
             return Err(self.unavailable_error());
