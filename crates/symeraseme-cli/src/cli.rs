@@ -1446,6 +1446,15 @@ fn triage_error_bytes(raw_error: &std::sync::Mutex<Option<Vec<u8>>>, message: &s
     bytes
 }
 
+/// The identity profile (when one exists) and the registry for reply triage.
+/// A profile that exists but cannot be read is an error, so a prompt is never
+/// sent unredacted by accident.
+fn triage_context(parsed: &Parsed) -> Result<(Option<Profile>, Vec<Broker>), String> {
+    let profile = planning_profile(parsed)?;
+    let brokers = load_brokers().map_err(|error| error.to_string())?;
+    Ok((profile, brokers))
+}
+
 fn classify_reply_command(parsed: &Parsed) -> Outcome {
     let request_id = match triage_request_id(parsed) {
         Ok(request_id) => request_id,
@@ -1460,12 +1469,22 @@ fn classify_reply_command(parsed: &Parsed) -> Outcome {
             Ok(agent) => agent,
             Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
+        let (profile, request) = match triage_context(parsed) {
+            Ok((profile, brokers)) => {
+                match ClassifyRequest::for_request(store, &brokers, request_id) {
+                    Ok(request) => (profile, request),
+                    Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+                }
+            }
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
+        let redaction = profile.as_ref().map(triage_service::redaction_profile);
         let raw_error = std::sync::Mutex::new(None);
         let call = triage_agent_call(&agent, &raw_error);
         let outcome = match triage_service::Service::new(store).classify_reply(
             request_id,
-            &ClassifyRequest::default(),
-            None,
+            &request,
+            redaction.as_ref(),
             Some(&call),
             bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
         ) {
@@ -1500,12 +1519,21 @@ fn generate_rebuttal_command(parsed: &Parsed) -> Outcome {
             Ok(agent) => agent,
             Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
+        let (profile, request) = match triage_context(parsed) {
+            Ok((profile, brokers)) => {
+                match RebuttalRequest::for_request(store, &brokers, request_id) {
+                    Ok(request) => (profile, request),
+                    Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+                }
+            }
+            Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
+        };
         let raw_error = std::sync::Mutex::new(None);
         let call = triage_agent_call(&agent, &raw_error);
         let result = match triage_service::Service::new(store).generate_rebuttal(
             request_id,
-            &RebuttalRequest::default(),
-            None,
+            &request,
+            profile.as_ref(),
             Some(&call),
             bool_flag(parsed, "save") || !parsed.flags.contains_key("save"),
         ) {

@@ -133,6 +133,27 @@ fn go_struct_text(value: &impl serde::Serialize) -> Result<Value, ToolError> {
     ))
 }
 
+/// The identity profile (when one exists) and the registry for reply triage.
+/// A profile that exists but cannot be read is an error, so a prompt is never
+/// sent unredacted by accident.
+fn triage_context() -> Result<
+    (
+        Option<symeraseme_core::identity::Profile>,
+        Vec<registry::Broker>,
+    ),
+    ToolError,
+> {
+    let paths = ProfilePaths::from_process();
+    let mut keys = MasterKeyResolver::from_process();
+    let profile = match load_profile(Path::new(""), &paths, &mut keys) {
+        Ok(profile) => Some(profile),
+        Err(ProfileError::NotFound) => None,
+        Err(error) => return Err(ToolError(error.to_string())),
+    };
+    let brokers = load_embedded().map_err(|error| ToolError(error.to_string()))?;
+    Ok((profile, brokers))
+}
+
 fn triage_agent_call<'a>(
     agent: &'a AgentClient,
     cancellation: Option<&'a llm::CancellationToken>,
@@ -660,13 +681,18 @@ impl ContractHandler {
     ) -> Result<Value, ToolError> {
         self.with_open_store(|store| {
             let agent = self.triage_agent(arguments)?;
+            let request_id = get_int(arguments, "request_id", 0);
+            let (profile, brokers) = triage_context()?;
+            let request =
+                ClassifyRequest::for_request(store, &brokers, request_id).map_err(ToolError)?;
+            let redaction = profile.as_ref().map(triage_service::redaction_profile);
             let raw_error = std::sync::Mutex::new(None);
             let call = triage_agent_call(&agent, cancellation, &raw_error);
             let outcome = triage_service::Service::new(store)
                 .classify_reply(
-                    get_int(arguments, "request_id", 0),
-                    &ClassifyRequest::default(),
-                    None,
+                    request_id,
+                    &request,
+                    redaction.as_ref(),
                     Some(&call),
                     get_bool(arguments, "save", true),
                 )
@@ -688,13 +714,17 @@ impl ContractHandler {
     ) -> Result<Value, ToolError> {
         self.with_open_store(|store| {
         let agent = self.triage_agent(arguments)?;
+        let request_id = get_int(arguments, "request_id", 0);
+        let (profile, brokers) = triage_context()?;
+        let request =
+            RebuttalRequest::for_request(store, &brokers, request_id).map_err(ToolError)?;
         let raw_error = std::sync::Mutex::new(None);
         let call = triage_agent_call(&agent, cancellation, &raw_error);
         let result = triage_service::Service::new(store)
             .generate_rebuttal(
-                get_int(arguments, "request_id", 0),
-                &RebuttalRequest::default(),
-                None,
+                request_id,
+                &request,
+                profile.as_ref(),
                 Some(&call),
                 get_bool(arguments, "save", true),
             )
