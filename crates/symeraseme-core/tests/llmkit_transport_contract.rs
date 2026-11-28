@@ -167,8 +167,11 @@ fn cancelling_classification_closes_the_inflight_provider_connection() {
         )
     });
 
+    // Generous on purpose: under a full parallel test run, client setup, the
+    // first connect and the request write took longer than 3 s. The bound only
+    // delays a failure; the cancellation checks below are unchanged.
     started_rx
-        .recv_timeout(Duration::from_secs(3))
+        .recv_timeout(Duration::from_secs(20))
         .expect("provider request reached the waiting response");
     cancellation.cancel();
     let error = request
