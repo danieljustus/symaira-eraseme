@@ -61,13 +61,7 @@ struct CalendarView: View {
     /// Short date for a marker as stored: RFC 3339 or SQLite's UTC
     /// `yyyy-MM-dd HH:mm:ss`; the raw value when neither parses.
     static func markerDate(_ value: String) -> String {
-        let sqlite = DateFormatter()
-        sqlite.locale = Locale(identifier: "en_US_POSIX")
-        sqlite.timeZone = TimeZone(identifier: "UTC")
-        sqlite.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        guard let date = ISO8601DateFormatter().date(from: value) ?? sqlite.date(from: value) else {
-            return value
-        }
+        guard let date = BackendDate.parse(value) else { return value }
         return date.formatted(.dateTime.day().month(.abbreviated).hour().minute())
     }
 

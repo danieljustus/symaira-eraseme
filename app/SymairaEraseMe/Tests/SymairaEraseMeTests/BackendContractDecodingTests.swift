@@ -84,6 +84,9 @@ final class BackendContractDecodingTests: XCTestCase {
         XCTAssertNotEqual(CalendarView.markerDate(entry.markerAt), entry.markerAt, "RFC 3339 marker must parse")
         XCTAssertNotEqual(CalendarView.markerDate("2026-08-14 09:00:00"), "2026-08-14 09:00:00",
                           "SQLite-layout marker must parse")
+        XCTAssertEqual(CalendarView.markerDate("2026-08-14 09:00:00"),
+                       CalendarView.markerDate("2026-08-14T09:00:00Z"),
+                       "SQLite-layout markers are UTC")
         XCTAssertEqual(CalendarView.markerDate("not a timestamp"), "not a timestamp")
     }
 

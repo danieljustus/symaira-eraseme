@@ -37,6 +37,10 @@ pub(crate) mod tools_call {
     }
 }
 
+// The production Go-compatible JSON string escaping, shared with `protocol`.
+#[allow(dead_code)]
+#[path = "../../../crates/symeraseme-cli/src/mcp/envelope.rs"]
+pub(crate) mod envelope;
 #[path = "../../../crates/symeraseme-cli/src/mcp/protocol.rs"]
 pub(crate) mod protocol;
 #[path = "../../../crates/symeraseme-cli/src/mcp/stream.rs"]

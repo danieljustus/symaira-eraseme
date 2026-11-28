@@ -324,7 +324,7 @@ fn parse_date(value: &str) -> Option<OffsetDateTime> {
     }
     let mut parts = rest.split_whitespace();
     let day: u32 = parts.next()?.parse().ok()?;
-    let month = month_number(parts.next()?)?;
+    let month = crate::timeutil::month_number(parts.next()?)?;
     let year_text = parts.next()?;
     let (year, clock_text) =
         if year_text.len() == 4 && year_text.chars().all(|c| c.is_ascii_digit()) {
@@ -349,9 +349,7 @@ fn parse_date(value: &str) -> Option<OffsetDateTime> {
     let zone_text = parts.next()?;
     let offset = parse_zone(zone_text)?;
     let day = u8::try_from(day).ok()?;
-    let date =
-        Date::from_calendar_date(year, Month::try_from(u8::try_from(month).ok()?).ok()?, day)
-            .ok()?;
+    let date = Date::from_calendar_date(year, Month::try_from(month).ok()?, day).ok()?;
     let time = Time::from_hms(
         u8::try_from(hour).ok()?,
         u8::try_from(minute).ok()?,
@@ -359,17 +357,6 @@ fn parse_date(value: &str) -> Option<OffsetDateTime> {
     )
     .ok()?;
     Some(PrimitiveDateTime::new(date, time).assume_offset(offset))
-}
-
-fn month_number(name: &str) -> Option<u32> {
-    const MONTHS: [&str; 12] = [
-        "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
-    ];
-    let lowered = name.to_ascii_lowercase();
-    MONTHS
-        .iter()
-        .position(|month| *month == lowered)
-        .map(|index| index as u32 + 1)
 }
 
 fn parse_zone(value: &str) -> Option<UtcOffset> {

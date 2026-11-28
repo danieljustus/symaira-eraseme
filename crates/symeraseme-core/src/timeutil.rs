@@ -111,20 +111,25 @@ pub fn parse_rfc3339(value: &str) -> Result<OffsetDateTime, Parse> {
     OffsetDateTime::parse(value, &Rfc3339)
 }
 
-/// Format a timestamp as canonical UTC ISO text with seconds precision.
-pub fn format_iso(timestamp: OffsetDateTime) -> String {
+/// Format `timestamp` in UTC with one of the layouts above.
+fn format_utc(
+    timestamp: OffsetDateTime,
+    layout: &[time::format_description::FormatItem<'_>],
+) -> String {
     timestamp
         .to_offset(UtcOffset::UTC)
-        .format(&SECONDS_UTC)
+        .format(&layout)
         .expect("timestamp fields are in range")
+}
+
+/// Format a timestamp as canonical UTC ISO text with seconds precision.
+pub fn format_iso(timestamp: OffsetDateTime) -> String {
+    format_utc(timestamp, SECONDS_UTC)
 }
 
 /// Format a timestamp as the UTC SQLite wall-clock form with seconds precision.
 pub fn format_sql(timestamp: OffsetDateTime) -> String {
-    timestamp
-        .to_offset(UtcOffset::UTC)
-        .format(&SECONDS_SQL)
-        .expect("timestamp fields are in range")
+    format_utc(timestamp, SECONDS_SQL)
 }
 
 /// Return the SQL representation as its exact stored bytes.
@@ -135,20 +140,12 @@ pub fn format_sql_bytes(timestamp: OffsetDateTime) -> Vec<u8> {
 /// Go's `time.Now().UTC().Format("2006-01-02T15:04:05")`, used by manual-task
 /// columns. Neither `format_iso` nor `format_sql` has these exact bytes.
 pub fn format_manual_task_timestamp(timestamp: OffsetDateTime) -> String {
-    timestamp
-        .to_offset(UtcOffset::UTC)
-        .format(&format_description!(
-            "[year]-[month]-[day]T[hour]:[minute]:[second]"
-        ))
-        .expect("timestamp fields are in range")
+    format_utc(timestamp, SECONDS)
 }
 
 /// The minijinja `strftime("%Y-%m-%d %H:%M UTC")` form, rendered in UTC.
 pub fn format_template_utc(timestamp: OffsetDateTime) -> String {
-    timestamp
-        .to_offset(UtcOffset::UTC)
-        .format(&TEMPLATE_UTC)
-        .expect("timestamp fields are in range")
+    format_utc(timestamp, TEMPLATE_UTC)
 }
 
 /// Go's `time.Time` JSON / RFC3339Nano form: trailing zeros of the fraction
@@ -401,7 +398,8 @@ fn parse_clock(text: &str) -> Option<(Time, &str)> {
     Some((Time::from_hms_nano(hour, minute, second, nanos).ok()?, rest))
 }
 
-fn month_number(name: &str) -> Option<u8> {
+/// `jan`..`dec` (ASCII case-insensitive) as 1..12.
+pub(crate) fn month_number(name: &str) -> Option<u8> {
     const MONTHS: [&str; 12] = [
         "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
     ];

@@ -252,27 +252,9 @@ fn append_id(output: &mut Vec<u8>, id: &GoId) {
 }
 
 fn go_json_string(value: &str) -> Vec<u8> {
-    let encoded = serde_json::to_vec(value).expect("JSON-RPC string ID is serializable");
-    let mut output = Vec::with_capacity(encoded.len());
-    let mut index = 0;
-    while index < encoded.len() {
-        if encoded[index..].starts_with(&[0xe2, 0x80, 0xa8]) {
-            output.extend_from_slice(b"\\u2028");
-            index += 3;
-        } else if encoded[index..].starts_with(&[0xe2, 0x80, 0xa9]) {
-            output.extend_from_slice(b"\\u2029");
-            index += 3;
-        } else {
-            match encoded[index] {
-                b'<' => output.extend_from_slice(b"\\u003c"),
-                b'>' => output.extend_from_slice(b"\\u003e"),
-                b'&' => output.extend_from_slice(b"\\u0026"),
-                byte => output.push(byte),
-            }
-            index += 1;
-        }
-    }
-    output
+    super::envelope::go_escape_json_strings(
+        &serde_json::to_vec(value).expect("JSON-RPC string ID is serializable"),
+    )
 }
 
 fn normalize_finite_number(value: f64, negative_zero: bool) -> Option<GoId> {
@@ -1052,6 +1034,10 @@ mod tests {
             (
                 r#"{"jsonrpc":"2.0","id":"<&>","method":"ping"}"#,
                 r#"{"jsonrpc":"2.0","result":{},"id":"\u003c\u0026\u003e"}"#,
+            ),
+            (
+                "{\"jsonrpc\":\"2.0\",\"id\":\"a\u{2028}b\u{2029}\\\"<\",\"method\":\"ping\"}",
+                r#"{"jsonrpc":"2.0","result":{},"id":"a\u2028b\u2029\"\u003c"}"#,
             ),
             (
                 r#"{"jsonrpc":"2.0","id":1,"method":"ping","params":[]}"#,

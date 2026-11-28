@@ -34,7 +34,7 @@ struct ManualTask: Codable, Identifiable {
         case notes
     }
 
-    var createdDate: Date? { ISO8601DateFormatter().date(from: createdAt) }
+    var createdDate: Date? { BackendDate.parse(createdAt) }
 }
 
 /// Response from `manual_tasks_list`.

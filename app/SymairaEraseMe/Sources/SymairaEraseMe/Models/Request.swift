@@ -40,8 +40,8 @@ struct RemovalRequest: Codable, Identifiable {
         case escalationLevel = "escalation_level"
     }
 
-    var createdDate: Date? { ISO8601DateFormatter().date(from: createdAt) }
-    var deadlineDate: Date? { deadlineAt.flatMap { ISO8601DateFormatter().date(from: $0) } }
+    var createdDate: Date? { BackendDate.parse(createdAt) }
+    var deadlineDate: Date? { BackendDate.parse(deadlineAt) }
     var statusDisplay: String { currentStatus ?? "UNKNOWN" }
 }
 
