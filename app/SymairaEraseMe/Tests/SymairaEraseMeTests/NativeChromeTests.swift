@@ -39,13 +39,14 @@ final class NativeChromeTests: XCTestCase {
             MCPClient.configuredPort = previousPort
             MCPClient.configuredDataDir = previousDataDir
         }
-        let manager = ServerManager(resourceURL: nil, executableURL: nil)
+        let suite = TestDefaultsSuite("com.symaira.eraseme.chrome")
+        let defaults = suite.defaults
+        defer { suite.remove() }
+        let manager = ServerManager(
+            resourceURL: nil, executableURL: nil, apiKeyStore: TestAPIKeyStore(), defaults: defaults)
         // The manager publishes its own address on init; re-pin the unused port.
         MCPClient.configuredHost = "127.0.0.1"
         MCPClient.configuredPort = 9
-        let suite = "com.symaira.eraseme.chrome.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
         let root = ContentView().environmentObject(manager).defaultAppStorage(defaults)
         let window = NSWindow(contentViewController: NSHostingController(rootView: root))
         window.title = "Symaira EraseMe"

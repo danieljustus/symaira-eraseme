@@ -67,13 +67,14 @@ final class LiquidTopographyTests: XCTestCase {
             MCPClient.configuredPort = oldPort
             MCPClient.configuredDataDir = oldDataDir
         }
-        let manager = ServerManager(resourceURL: nil, executableURL: nil)
+        let suite = TestDefaultsSuite("com.symaira.eraseme.render")
+        let defaults = suite.defaults
+        defer { suite.remove() }
+        let manager = ServerManager(
+            resourceURL: nil, executableURL: nil, apiKeyStore: TestAPIKeyStore(), defaults: defaults)
         // The manager publishes its own address on init; re-pin the unused port.
         MCPClient.configuredHost = "127.0.0.1"
         MCPClient.configuredPort = 9
-        let suiteName = "com.symaira.eraseme.render.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
         for width: CGFloat in [900, 1200] {
             for scheme: ColorScheme in [.light, .dark] {
                 for destination in ContentView.NavItem.allCases {

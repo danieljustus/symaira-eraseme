@@ -6,7 +6,7 @@ import Darwin
 /// Regression tests for #1294: persisted server address validation,
 /// MCPClient address publication, auto-start and shutdown of the child.
 final class ServerManagerSupervisionTests: XCTestCase {
-    private var suiteName = ""
+    private var suite: TestDefaultsSuite!
     private var defaults: UserDefaults!
     private var previousHost = ""
     private var previousPort = 0
@@ -14,15 +14,15 @@ final class ServerManagerSupervisionTests: XCTestCase {
     @MainActor
     override func setUp() {
         super.setUp()
-        suiteName = "com.symaira.eraseme.supervision-test.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
+        suite = TestDefaultsSuite("com.symaira.eraseme.supervision-test")
+        defaults = suite.defaults
         previousHost = MCPClient.configuredHost
         previousPort = MCPClient.configuredPort
     }
 
     @MainActor
     override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
+        suite.remove()
         MCPClient.configuredHost = previousHost
         MCPClient.configuredPort = previousPort
         super.tearDown()

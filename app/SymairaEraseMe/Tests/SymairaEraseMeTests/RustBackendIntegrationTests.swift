@@ -40,13 +40,13 @@ final class RustBackendIntegrationTests: XCTestCase {
     @MainActor
     private func exerciseBackend(binary: String, resourceURL: URL?) async throws {
         // Dedicated suite: the test never touches the user's real preferences.
-        let suiteName = "com.symaira.eraseme.rust-backend-test.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let suite = TestDefaultsSuite("com.symaira.eraseme.rust-backend-test")
+        let defaults = suite.defaults
         let previousHost = MCPClient.configuredHost
         let previousPort = MCPClient.configuredPort
         let previousDataDir = MCPClient.configuredDataDir
         defer {
-            defaults.removePersistentDomain(forName: suiteName)
+            suite.remove()
             MCPClient.configuredHost = previousHost
             MCPClient.configuredPort = previousPort
             MCPClient.configuredDataDir = previousDataDir

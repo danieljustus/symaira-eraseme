@@ -38,17 +38,18 @@ final class APIKeyStorageTests: XCTestCase {
     // Built at runtime so no provider-format literal appears in source.
     private let secret = "sk-" + "ant-test-" + String(repeating: "x", count: 12)
     private let legacyKey = APIKeyMigration.legacyDefaultsKey
-    private var suiteName = ""
+    private var suite: TestDefaultsSuite!
+    private var suiteName: String { suite.name }
     private var defaults: UserDefaults!
 
     override func setUp() {
         super.setUp()
-        suiteName = "APIKeyStorageTests.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: suiteName)
+        suite = TestDefaultsSuite("APIKeyStorageTests")
+        defaults = suite.defaults
     }
 
     override func tearDown() {
-        defaults.removePersistentDomain(forName: suiteName)
+        suite.remove()
         defaults = nil
         super.tearDown()
     }

@@ -22,16 +22,18 @@ final class SettingsAppearanceTests: XCTestCase {
         MCPClient.configuredPort = 9
         MCPClient.configuredDataDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("settings-appearance-no-credentials").path
-        let suite = "com.symaira.eraseme.appearance-test.\(UUID().uuidString)"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let suite = TestDefaultsSuite("com.symaira.eraseme.appearance-test")
+        let defaults = suite.defaults
         defer {
-            defaults.removePersistentDomain(forName: suite)
+            suite.remove()
             NSApp.appearance = previousAppearance
             MCPClient.configuredHost = previousHost
             MCPClient.configuredPort = previousPort
             MCPClient.configuredDataDir = previousDataDir
         }
-        let manager = ServerManager(resourceURL: nil, executableURL: nil)
+        // The test suite and an in-memory key store: never the host's settings.
+        let manager = ServerManager(
+            resourceURL: nil, executableURL: nil, apiKeyStore: TestAPIKeyStore(), defaults: defaults)
         // The manager publishes its own address on init; re-pin the unused port.
         MCPClient.configuredHost = "127.0.0.1"
         MCPClient.configuredPort = 9
