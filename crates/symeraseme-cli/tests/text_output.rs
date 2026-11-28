@@ -327,6 +327,146 @@ fn repeated_plan_create_skips_brokers_already_in_the_campaign() {
     assert!(listed.starts_with("Requests: 3 of 3 "), "{listed}");
 }
 
+/// #1362: a non-dry `tick` records the deadline transition, queues the due
+/// reminder as a manual task instead of claiming it was sent, and completing
+/// the task records the reminder. A second tick has nothing left to do.
+#[test]
+fn tick_applies_transitions_and_queues_the_reminder_as_a_task() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open(dir.path().join("symeraseme.db")).unwrap();
+    let now = time::OffsetDateTime::now_utc();
+    let sent = |broker: &str, days_ago: i64| {
+        store
+            .connection()
+            .execute(
+                "INSERT INTO removal_requests (broker_id, campaign_id, jurisdiction)
+                 VALUES (?1, 'pop', 'GDPR')",
+                [broker],
+            )
+            .unwrap();
+        let id = store.connection().last_insert_rowid();
+        let mut payload = Map::new();
+        payload.insert("expected_response_days".into(), 30.into());
+        store
+            .append_and_project(
+                id,
+                &EventType::Sent,
+                &payload,
+                &Source::User,
+                now - time::Duration::days(days_ago),
+            )
+            .unwrap();
+        id
+    };
+    // 21 days without acknowledgement: the first reminder is due.
+    let waiting = sent("acme", 21);
+    // Verified 38 days ago, deadline passed 10 days ago: it becomes overdue.
+    let verified = sent("beta", 40);
+    store
+        .append_and_project(
+            verified,
+            &EventType::VerificationProvided,
+            &Map::new(),
+            &Source::User,
+            now - time::Duration::days(38),
+        )
+        .unwrap();
+    drop(store);
+
+    let json: Value =
+        serde_json::from_str(&stdout(dir.path(), &["tick", "--output", "json"])).unwrap();
+    assert_eq!(json["dry_run"], false);
+    let mut applied: Vec<(i64, String, String, bool)> = json["applied"]
+        .as_array()
+        .expect("applied outcomes")
+        .iter()
+        .map(|outcome| {
+            (
+                outcome["request_id"].as_i64().unwrap(),
+                outcome["action"].as_str().unwrap().to_owned(),
+                outcome["event_type"].as_str().unwrap().to_owned(),
+                outcome["manual_task_id"].is_i64(),
+            )
+        })
+        .collect();
+    applied.sort();
+    assert_eq!(
+        applied,
+        [
+            (
+                waiting,
+                "send_reminder".into(),
+                "HUMAN_ACTION_REQUIRED".into(),
+                true
+            ),
+            (
+                verified,
+                "mark_overdue".into(),
+                "DEADLINE_REACHED".into(),
+                false
+            ),
+        ]
+    );
+    assert_eq!(
+        stdout(dir.path(), &["tick"]),
+        "tick complete: 0 action(s)\n"
+    );
+
+    let store = Store::open(dir.path().join("symeraseme.db")).unwrap();
+    let events = |id: i64| -> Vec<(String, String)> {
+        let connection = store.connection();
+        let mut statement = connection
+            .prepare(
+                "SELECT event_type, source FROM request_events WHERE request_id = ? ORDER BY id",
+            )
+            .unwrap();
+        statement
+            .query_map([id], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    };
+    let pair = |event: &str, source: &str| (event.to_owned(), source.to_owned());
+    assert_eq!(
+        events(waiting),
+        [
+            pair("SENT", "user"),
+            pair("HUMAN_ACTION_REQUIRED", "system")
+        ]
+    );
+    assert_eq!(
+        events(verified).last(),
+        Some(&pair("DEADLINE_REACHED", "scheduler"))
+    );
+
+    let task = json["applied"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|outcome| outcome["request_id"] == waiting)
+        .unwrap()["manual_task_id"]
+        .as_i64()
+        .unwrap()
+        .to_string();
+    stdout(
+        dir.path(),
+        &["manual-tasks", "complete", &task, "--notes", "sent"],
+    );
+    assert_eq!(
+        events(waiting)[2..],
+        [pair("NOTE_ADDED", "user"), pair("REMINDER_SENT", "user")]
+    );
+    let status: String = store
+        .connection()
+        .query_row(
+            "SELECT current_status FROM request_state WHERE request_id = ?",
+            [waiting],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(status, "AWAITING_ACK");
+}
+
 #[test]
 fn help_lists_a_description_for_every_command() {
     let dir = tempfile::tempdir().unwrap();

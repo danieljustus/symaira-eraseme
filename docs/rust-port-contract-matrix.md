@@ -11,6 +11,33 @@ tracked separately in #1276. Historical rows below preserve what was measured
 and must not be edited to erase those observations. Remove a Windows-only
 fixture only after checking its replay and provenance consumers.
 
+## Post-cutover contract change: a non-dry `tick` applies its actions (2026-11-28, #1362)
+
+Go's `tick` without `--dry-run` reported the due actions and wrote nothing
+(`tickCommandWith` called only `RunTick`), although `--dry-run` is documented
+as "do not mutate requests" and the generated scheduler jobs run the plain
+command daily. Recording Go's `ApplyTickActions` result as is would claim a
+`REMINDER_SENT` or `DPA_COMPLAINT_DRAFTED` nobody performed. Now
+`deadlines::apply_tick` (`crates/symeraseme-core/src/deadlines.rs`) appends
+`DEADLINE_REACHED` and `RE_SCAN_TRIGGERED` with source `scheduler`, and turns a
+due reminder or DPA complaint into a pending manual task with reason
+`reminder_due` or `dpa_escalation_due`. The task's `HUMAN_ACTION_REQUIRED`
+event moves the request to `AWAITING_USER_ACTION`, so later ticks do not queue
+it again. `manual-tasks complete` / `manual_tasks_complete` on such a task
+records `REMINDER_SENT` (`count`, `days_since_sent`) or `DPA_COMPLAINT_DRAFTED`
+(`days_since_deadline`) with source `user` while the request is still
+`AWAITING_USER_ACTION`; otherwise only `NOTE_ADDED`. Output: JSON gains
+`applied` (one outcome per action) and text one line per action, only when a
+non-dry tick has actions. The recorded CLI-013 bytes (dry run and zero
+actions, `tests/fixtures/cli-tick-status`) and Go's `apply_tick_actions`
+replay (`golden_tick_histories_scan_and_persist_all_four_go_actions`) are
+unchanged. New behavior is pinned by
+`apply_tick_records_transitions_and_queues_human_actions_as_tasks`,
+`completing_a_tick_task_after_a_reply_records_only_the_note`
+(`crates/symeraseme-core/tests/tick_apply_contract.rs`) and
+`tick_applies_transitions_and_queues_the_reminder_as_a_task`
+(`crates/symeraseme-cli/tests/text_output.rs`).
+
 ## Post-cutover contract change: Hermes and Copilot host-agent backends retired (2026-11-28, #1357)
 
 The local `agent` provider no longer runs Go's Hermes (`hermes -p <prompt>`)

@@ -82,7 +82,8 @@ This template ties all sub-skills together into a repeatable cycle.
 
 - Daily — run `tick` every morning
 - Use `--dry-run` first to preview what will happen
-- Handles: deadline tracking, reminders, escalation to DPA complaints
+- Handles: deadline tracking and re-scans; due reminders and DPA complaints
+  become manual tasks, recorded when you complete them
 
 ### When to re-scan
 

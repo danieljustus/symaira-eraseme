@@ -6,7 +6,7 @@ re-added data and plan new removal campaigns.
 ## Prerequisites
 
 - Existing campaigns completed or at least 90 days old
-- [Tick engine](daily-tick.md) has marked some requests as `COMPLETE`
+- [Tick engine](daily-tick.md) has moved some requests to `RE_SCAN_DUE`
 
 ## Why re-scan quarterly
 

@@ -39,6 +39,15 @@ pub const FALLBACK_REASONS: [&str; 9] = [
     "generic_error",
 ];
 
+/// Reasons for the tasks a non-dry `tick` queues instead of recording an
+/// action nobody performed (#1362): a due reminder and a due DPA complaint.
+/// Completing such a task records the matching event, see [`complete`].
+pub const TICK_REASONS: [&str; 2] = ["reminder_due", "dpa_escalation_due"];
+
+fn is_known_reason(reason: &str) -> bool {
+    FALLBACK_REASONS.contains(&reason) || TICK_REASONS.contains(&reason)
+}
+
 /// The durable manual-fallback queue record.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ManualTask {
@@ -419,6 +428,19 @@ fn write_private(path: &Path, contents: &[u8]) -> io::Result<()> {
     fs::write(path, contents)
 }
 pub fn instructions_for_reason(reason: &str, broker_name: &str) -> String {
+    match reason {
+        "reminder_due" => {
+            return format!(
+                "{broker_name} has not acknowledged the erasure request yet and a reminder is due. Send the reminder through the channel the request used, then mark this task completed; that records the reminder."
+            );
+        }
+        "dpa_escalation_due" => {
+            return format!(
+                "{broker_name} has not answered within the legal deadline. Prepare a complaint to the data protection authority, then mark this task completed; that records the complaint as drafted."
+            );
+        }
+        _ => {}
+    }
     if !FALLBACK_REASONS.contains(&reason) {
         return format!(
             "Please complete the opt-out process for {broker_name} manually by visiting the URL below."
@@ -479,7 +501,7 @@ pub fn create(
     profile: Option<&Profile>,
     now: OffsetDateTime,
 ) -> rusqlite::Result<ManualTask> {
-    let reason = if FALLBACK_REASONS.contains(&opts.reason.as_str()) {
+    let reason = if is_known_reason(&opts.reason) {
         opts.reason.clone()
     } else {
         "generic_error".to_owned()
@@ -753,6 +775,11 @@ pub fn complete(
     if let Some(request_id) = task.request_id
         && request_id != 0
     {
+        let tick_event = if completed && TICK_REASONS.contains(&task.reason.as_str()) {
+            tick_completion_event(&transaction, request_id, &task.reason, now)?
+        } else {
+            None
+        };
         let mut payload = Map::new();
         payload.insert(
             "note".to_owned(),
@@ -769,12 +796,74 @@ pub fn complete(
             now,
         )
         .map_err(to_sql_error)?;
+        if let Some((event_type, payload)) = tick_event {
+            append_and_project_tx(
+                &transaction,
+                request_id,
+                &event_type,
+                &payload,
+                &Source::User,
+                now,
+            )
+            .map_err(to_sql_error)?;
+        }
     }
     transaction.commit()?;
     task.status = status.to_owned();
     task.completed_at = Some(completed_at);
     task.notes = notes.to_owned();
     Ok(Some(task))
+}
+
+/// The event a completed tick task records (#1362): the user confirms the
+/// reminder was sent or the DPA complaint drafted, so `REMINDER_SENT` or
+/// `DPA_COMPLAINT_DRAFTED` is recorded now, with the payload `tick` would have
+/// written. `None` when the request left `AWAITING_USER_ACTION` meanwhile (a
+/// broker reply arrived, for example): the note alone documents the completion
+/// then, so the event cannot override the newer status.
+fn tick_completion_event(
+    transaction: &rusqlite::Transaction<'_>,
+    request_id: i64,
+    reason: &str,
+    now: OffsetDateTime,
+) -> rusqlite::Result<Option<(EventType, Map<String, serde_json::Value>)>> {
+    type StateRow = (Option<String>, Option<i64>, Option<String>, Option<String>);
+    let state: Option<StateRow> = transaction
+        .query_row(
+            "SELECT current_status, reminders_sent, sent_at, deadline_at
+             FROM request_state WHERE request_id = ?",
+            params![request_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .optional()?;
+    let Some((status, reminders_sent, sent_at, deadline_at)) = state else {
+        return Ok(None);
+    };
+    if status.as_deref() != Some("AWAITING_USER_ACTION") {
+        return Ok(None);
+    }
+    let days_since = |value: Option<String>| {
+        value
+            .and_then(|value| crate::timeutil::parse_timestamp(&value).ok())
+            .map(|then| crate::deadlines::days_between(now, then))
+    };
+    let mut payload = Map::new();
+    let event_type = if reason == "reminder_due" {
+        payload.insert(
+            "count".to_owned(),
+            json!(reminders_sent.unwrap_or(0).wrapping_add(1)),
+        );
+        if let Some(days) = days_since(sent_at) {
+            payload.insert("days_since_sent".to_owned(), json!(days));
+        }
+        EventType::ReminderSent
+    } else {
+        if let Some(days) = days_since(deadline_at) {
+            payload.insert("days_since_deadline".to_owned(), json!(days));
+        }
+        EventType::DpaComplaintDrafted
+    };
+    Ok(Some((event_type, payload)))
 }
 
 /// Removes `.png`, `.html` and `.json` artifacts from the task directory. Task

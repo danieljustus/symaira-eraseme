@@ -227,6 +227,11 @@ Parameters:
     - * `task_id` (integer): Manual task ID
     -   `notes` (string): Completion notes
 
+Completing a task that `tick` queued (reason `reminder_due` or
+`dpa_escalation_due`) also records `REMINDER_SENT` or `DPA_COMPLAINT_DRAFTED`
+with source `user`, as long as the request is still `AWAITING_USER_ACTION`
+(#1362). Otherwise only the `NOTE_ADDED` event is written.
+
 ### `manual_tasks_cleanup`
 
 Remove old screenshot and HTML snapshot files from manual tasks.

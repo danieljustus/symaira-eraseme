@@ -172,7 +172,7 @@ fn parsed(value: &str) -> Option<OffsetDateTime> {
         .flatten()
 }
 
-fn days_between(now: OffsetDateTime, then: OffsetDateTime) -> i64 {
+pub(crate) fn days_between(now: OffsetDateTime, then: OffsetDateTime) -> i64 {
     (now - then).whole_hours() / 24
 }
 
@@ -315,6 +315,108 @@ pub fn apply_tick_actions(
     // Go ignores the rebuild outcome here (Python rebuild_all_states).
     let _ = store.rebuild_all_states(500);
     Ok(results)
+}
+
+/// What a non-dry `tick` did with one action (#1362).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct TickOutcome {
+    pub request_id: i64,
+    pub action: String,
+    /// The event actually written: the action's own event for a state
+    /// transition, `HUMAN_ACTION_REQUIRED` for a newly queued manual task.
+    /// Empty when a pending task for the same action already existed (nothing
+    /// is written then) or on failure.
+    pub event_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub manual_task_id: Option<i64>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub error: String,
+}
+
+/// Applies a non-dry tick without recording anything that did not happen
+/// (#1362). The state transitions `DEADLINE_REACHED` and `RE_SCAN_TRIGGERED`
+/// are appended with source `scheduler`. A due reminder or DPA complaint needs
+/// a person, so it becomes a pending manual task (`reminder_due`,
+/// `dpa_escalation_due`) whose completion records `REMINDER_SENT` or
+/// `DPA_COMPLAINT_DRAFTED`; the task's `HUMAN_ACTION_REQUIRED` event moves the
+/// request to `AWAITING_USER_ACTION`, so later ticks do not queue it again.
+/// Per-action failures are reported and do not abort the batch. Unlike Go's
+/// [`apply_tick_actions`], `REMINDER_SENT` and `DPA_COMPLAINT_DRAFTED` are
+/// never written here.
+pub fn apply_tick(store: &Store, actions: &[TickAction], now: OffsetDateTime) -> Vec<TickOutcome> {
+    actions
+        .iter()
+        .filter(|action| !action.dry_run)
+        .map(|action| {
+            let mut outcome = TickOutcome {
+                request_id: action.request_id,
+                action: action.action_type.clone(),
+                event_type: String::new(),
+                manual_task_id: None,
+                error: String::new(),
+            };
+            let task_reason = match action.action_type.as_str() {
+                "send_reminder" => Some("reminder_due"),
+                "draft_dpa_complaint" => Some("dpa_escalation_due"),
+                _ => None,
+            };
+            if let Some(reason) = task_reason {
+                let pending = crate::manualtasks::list(
+                    store,
+                    &crate::manualtasks::ListOpts {
+                        status: Some("pending".to_owned()),
+                        request_id: Some(action.request_id),
+                    },
+                );
+                match pending {
+                    Ok(tasks) => {
+                        if let Some(task) = tasks.iter().find(|task| task.reason == reason) {
+                            outcome.manual_task_id = Some(task.id);
+                            return outcome;
+                        }
+                    }
+                    Err(error) => {
+                        outcome.error = error.to_string();
+                        return outcome;
+                    }
+                }
+                let opts = crate::manualtasks::CreateOpts {
+                    request_id: Some(action.request_id),
+                    broker_id: action.broker_id.clone(),
+                    broker_name: action.broker_id.clone(),
+                    reason: reason.to_owned(),
+                    extra_instructions: action.description.clone(),
+                    ..Default::default()
+                };
+                match crate::manualtasks::create(store, &opts, None, now) {
+                    Ok(task) => {
+                        outcome.event_type = EventType::HumanActionRequired.to_string();
+                        outcome.manual_task_id = Some(task.id);
+                    }
+                    Err(error) => outcome.error = error.to_string(),
+                }
+                return outcome;
+            }
+            if !matches!(
+                action.action_type.as_str(),
+                "mark_overdue" | "trigger_rescan"
+            ) {
+                outcome.error = format!("unsupported tick action {}", action.action_type);
+                return outcome;
+            }
+            match store.append_and_project(
+                action.request_id,
+                &EventType::from_wire(action.event_type.clone()),
+                &action.payload,
+                &Source::Scheduler,
+                now,
+            ) {
+                Ok(_) => outcome.event_type = action.event_type.clone(),
+                Err(error) => outcome.error = error.to_string(),
+            }
+            outcome
+        })
+        .collect()
 }
 
 #[cfg(test)]

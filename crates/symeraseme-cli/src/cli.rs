@@ -11,7 +11,7 @@ use std::path::Path;
 
 use symeraseme_core::campaign;
 use symeraseme_core::config::{Config, ConfigContext};
-use symeraseme_core::deadlines::{self, RunOpts, TickAction};
+use symeraseme_core::deadlines::{self, RunOpts, TickAction, TickOutcome};
 use symeraseme_core::identity::{
     ConsentOptions, ConsentStore, MasterKeyResolver, Profile, ProfileError, ProfilePaths,
     init_profile, load_profile, profile_exists,
@@ -2156,10 +2156,13 @@ fn go_fmt_value(value: Option<&Value>) -> String {
     }
 }
 
-/// `plan tick` — Go's `tickCommandWith`.
+/// `plan tick` — Go's `tickCommandWith`, batch limit disabled (`batch_size: 0`).
 ///
-/// `--dry-run` only decides whether the tick mutates: Go never calls the apply
-/// step separately and always leaves the batch limit disabled (`batch_size: 0`).
+/// Post-cutover contract change #1362: Go never applied a non-dry tick. Now
+/// [`deadlines::apply_tick`] records the state transitions and queues due
+/// reminders and DPA complaints as manual tasks; `applied` in JSON and one text
+/// line per action report it. Without actions, and with `--dry-run`, the
+/// output stays Go's.
 fn plan_tick(parsed: &Parsed) -> Outcome {
     let store = match open_store() {
         Ok(store) => store,
@@ -2170,32 +2173,61 @@ fn plan_tick(parsed: &Parsed) -> Outcome {
             .flags
             .get("dry-run")
             .is_some_and(|value| value == "true");
+        let format = match output_format(parsed) {
+            Ok(format) => format,
+            Err(outcome) => return outcome,
+        };
+        let now = now_utc();
         let actions = match deadlines::run_tick(
             store,
             &RunOpts {
                 dry_run,
                 batch_size: 0,
             },
-            now_utc(),
+            now,
         ) {
             Ok(actions) => actions,
             Err(error) => return Outcome::Stderr(format!("{error}\n").into_bytes()),
         };
-        let format = match output_format(parsed) {
-            Ok(format) => format,
-            Err(outcome) => return outcome,
+        let applied = if dry_run {
+            Vec::new()
+        } else {
+            deadlines::apply_tick(store, &actions, now)
         };
         if format == "json" {
-            return match tick_actions_json(&actions, dry_run) {
+            return match tick_actions_json(&actions, dry_run, &applied) {
                 Ok(bytes) => Outcome::Stdout(bytes),
                 Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
             };
         }
-        Outcome::Stdout(format!("tick complete: {} action(s)\n", actions.len()).into_bytes())
+        let mut text = format!("tick complete: {} action(s)\n", actions.len());
+        for outcome in &applied {
+            text.push_str(&tick_outcome_line(outcome));
+        }
+        Outcome::Stdout(text.into_bytes())
     })
 }
 
-fn tick_actions_json(actions: &[TickAction], dry_run: bool) -> Result<Vec<u8>, serde_json::Error> {
+fn tick_outcome_line(outcome: &TickOutcome) -> String {
+    let request = outcome.request_id;
+    let action = &outcome.action;
+    if !outcome.error.is_empty() {
+        return format!("  request #{request}: {action} failed: {}\n", outcome.error);
+    }
+    match outcome.manual_task_id {
+        Some(task) if outcome.event_type.is_empty() => {
+            format!("  request #{request}: {action} already queued as manual task #{task}\n")
+        }
+        Some(task) => format!("  request #{request}: {action} queued as manual task #{task}\n"),
+        None => format!("  request #{request}: recorded {}\n", outcome.event_type),
+    }
+}
+
+fn tick_actions_json(
+    actions: &[TickAction],
+    dry_run: bool,
+    applied: &[TickOutcome],
+) -> Result<Vec<u8>, serde_json::Error> {
     // Go's outer map sorts keys, while Action is a struct and retains its
     // declared capitalized field order. Its Payload is a sorted Go map.
     let actions = if actions.is_empty() {
@@ -2220,7 +2252,15 @@ fn tick_actions_json(actions: &[TickAction], dry_run: bool) -> Result<Vec<u8>, s
                 .collect(),
         )
     };
-    json_line(&json!({"actions": actions, "dry_run": dry_run, "success": true}))
+    if applied.is_empty() {
+        return json_line(&json!({"actions": actions, "dry_run": dry_run, "success": true}));
+    }
+    json_line(&json!({
+        "actions": actions,
+        "applied": applied,
+        "dry_run": dry_run,
+        "success": true,
+    }))
 }
 
 fn output_format(parsed: &Parsed) -> Result<&str, Outcome> {
@@ -2952,7 +2992,7 @@ mod tests {
             dry_run: true,
         };
         assert_eq!(
-            tick_actions_json(&[action], true).unwrap(),
+            tick_actions_json(&[action], true, &[]).unwrap(),
             b"{\"actions\":[{\"RequestID\":7,\"BrokerID\":\"broker-a\",\"CampaignID\":\"c\",\"CurrentStatus\":\"OVERDUE\",\"ActionType\":\"draft_dpa_complaint\",\"EventType\":\"DPA_COMPLAINT_DRAFTED\",\"Description\":\"Act \\u003cnow\\u003e\",\"Payload\":{\"a\":1,\"z\":2},\"DryRun\":true}],\"dry_run\":true,\"success\":true}\n"
         );
     }

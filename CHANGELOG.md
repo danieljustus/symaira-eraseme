@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- `symeraseme tick` without `--dry-run` applies the due actions. Before, it
+  reported them and wrote nothing, so the daily scheduler job never marked a
+  request overdue or due for a re-scan. Now it records `DEADLINE_REACHED` and
+  `RE_SCAN_TRIGGERED`. A due reminder or DPA complaint needs a person, so it
+  becomes a pending manual task (`reminder_due`, `dpa_escalation_due`) instead
+  of an event claiming it was sent or drafted; completing the task records
+  `REMINDER_SENT` or `DPA_COMPLAINT_DRAFTED`. JSON adds `applied` and text one
+  line per action when there are actions (#1362).
+
 ## [v0.19.0] - 2026-11-28
 
 ### Security

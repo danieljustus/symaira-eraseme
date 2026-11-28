@@ -132,7 +132,7 @@ manual-task workflow.
 
 | Command | Description |
 |---------|-------------|
-| `symeraseme tick` | Run tick engine (deadlines, reminders) |
+| `symeraseme tick` | Run tick engine (deadlines, re-scans; queues reminders and DPA complaints as manual tasks) |
 
 ### Output Format
 
