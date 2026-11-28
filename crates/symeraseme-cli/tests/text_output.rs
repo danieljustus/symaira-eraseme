@@ -293,6 +293,40 @@ fn generate_report_prints_the_report_or_names_the_written_file() {
     assert!(json["report"].as_str().unwrap().contains("acme"));
 }
 
+/// #1360: a repeated `plan create` skips brokers already in the campaign and
+/// says so; the first plan prints Go's line and JSON without `skipped`.
+#[test]
+fn repeated_plan_create_skips_brokers_already_in_the_campaign() {
+    let dir = tempfile::tempdir().unwrap();
+    let plan = [
+        "plan",
+        "create",
+        "--campaign",
+        "again",
+        "--jurisdiction",
+        "DE",
+        "--max",
+        "2",
+    ];
+    assert_eq!(
+        stdout(dir.path(), &plan),
+        "planned 2 request(s) for campaign again\n"
+    );
+    assert_eq!(
+        stdout(dir.path(), &plan),
+        "planned 0 request(s) for campaign again, skipped 2 broker(s) already in the campaign\n"
+    );
+    let widened: Value = serde_json::from_str(&stdout(
+        dir.path(),
+        &[&["--output", "json"][..], &plan[..6], &["--max", "3"]].concat(),
+    ))
+    .unwrap();
+    assert_eq!(widened["planned"], 1);
+    assert_eq!(widened["skipped"], 2);
+    let listed = stdout(dir.path(), &["requests", "list"]);
+    assert!(listed.starts_with("Requests: 3 of 3 "), "{listed}");
+}
+
 #[test]
 fn help_lists_a_description_for_every_command() {
     let dir = tempfile::tempdir().unwrap();

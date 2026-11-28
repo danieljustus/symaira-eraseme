@@ -46,12 +46,25 @@ struct PlanCreateResponse: Codable {
     let totalBrokers: Int?
     let planned: Int?
     let requests: [PlanRequest]?
+    /// Brokers left out because the campaign already has a request for them;
+    /// absent when none were.
+    let skipped: Int?
 
     enum CodingKeys: String, CodingKey {
         case message
         case campaignId = "campaign_id"
         case totalBrokers = "total_brokers"
-        case planned, requests
+        case planned, requests, skipped
+    }
+
+    /// The notice after planning: how many requests were planned and, for a
+    /// repeated plan, how many brokers were already in the campaign.
+    var summary: String {
+        if let message { return message }
+        guard let planned else { return "Campaign created" }
+        let base = "Planned \(planned) request\(planned == 1 ? "" : "s")"
+        guard let skipped, skipped > 0 else { return base }
+        return "\(base); \(skipped) broker\(skipped == 1 ? " was" : "s were") already in the campaign"
     }
 }
 

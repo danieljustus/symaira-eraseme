@@ -474,3 +474,55 @@ fn max_brokers_caps_planned_but_not_matched() {
     assert_eq!(result.planned, 1);
     assert_eq!(result.requests.len(), 1);
 }
+
+/// #1360: re-running `plan create` for a campaign skips brokers that already
+/// have a request in it instead of planning them twice; new brokers are still
+/// appended, and a first plan carries no `skipped` key (Go's bytes).
+#[test]
+fn repeated_plan_skips_brokers_already_in_the_campaign() {
+    let registry_tree = mini_registry();
+    let brokers = load_from_dir(registry_tree.path()).expect("load mini registry");
+    let store_tree = tempdir().expect("temp dir");
+    let store = Store::open(store_tree.path().join("db.sqlite")).expect("open store");
+    let plan = |max_brokers: i64| {
+        plan_campaign(
+            &store,
+            &brokers,
+            "",
+            &PlanOpts {
+                campaign_id: "again".to_owned(),
+                max_brokers,
+                ..PlanOpts::default()
+            },
+            pinned_now(),
+        )
+        .expect("plan campaign")
+    };
+
+    let first = plan(2);
+    assert_eq!((first.planned, first.skipped), (2, 0));
+    let first_json = serde_json::to_value(&first).unwrap();
+    assert!(first_json.get("skipped").is_none(), "{first_json}");
+
+    let repeated = plan(2);
+    assert_eq!(
+        (repeated.matched, repeated.planned, repeated.skipped),
+        (3, 0, 2)
+    );
+    assert_eq!(serde_json::to_value(&repeated).unwrap()["skipped"], 2);
+
+    let widened = plan(0);
+    assert_eq!((widened.planned, widened.skipped), (1, 2));
+    let mut broker_ids: Vec<String> = db_requests(&store)
+        .iter()
+        .map(|row| row["broker_id"].as_str().unwrap().to_owned())
+        .collect();
+    let total = broker_ids.len();
+    broker_ids.sort();
+    broker_ids.dedup();
+    assert_eq!(
+        (total, broker_ids.len()),
+        (3, 3),
+        "every broker exactly once"
+    );
+}

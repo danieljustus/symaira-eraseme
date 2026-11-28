@@ -11,6 +11,24 @@ tracked separately in #1276. Historical rows below preserve what was measured
 and must not be edited to erase those observations. Remove a Windows-only
 fixture only after checking its replay and provenance consumers.
 
+## Post-cutover contract change: repeated plans skip brokers already in the campaign (2026-11-28, #1360)
+
+Go appended a repeated `plan create` / `plan_create` for an existing campaign
+id and planned the same brokers again, so `plan execute` sent each of them the
+same request twice. After the usual filter and `max_brokers` cut, brokers that
+already have a request in the campaign (any status) are now skipped:
+re-running the same plan creates nothing, and other filters or a larger
+`max_brokers` still append new brokers. `PlanResult` gains `skipped` (count),
+serialized only when it is greater than zero, and the text line gains
+`, skipped N broker(s) already in the campaign` in that case. A first plan for
+a campaign is byte-identical to Go, so the frozen plan oracles (DOM-002
+`golden-plan.json` and `campaign-plan-bytes-oracle.json`, CLI-010) need no
+override. New behavior is pinned by `repeated_plan_skips_brokers_already_in_the_campaign`
+(`crates/symeraseme-core/tests/campaign_plan_contract.rs`) and
+`repeated_plan_create_skips_brokers_already_in_the_campaign`
+(`crates/symeraseme-cli/tests/text_output.rs`). The app's campaign notice
+names the skipped count.
+
 ## Post-cutover contract change: bounded `list_brokers` pages (2026-11-27, #1342)
 
 `list_brokers` answered with all 1,273 active brokers including nested

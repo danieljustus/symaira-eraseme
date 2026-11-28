@@ -50,6 +50,12 @@ All notable changes to this project are documented in this file.
   given, instead of printing `success` and discarding it, and names the file
   (`wrote <path> (<format>)`) when one is given. `--output json` is unchanged
   (#1366).
+- Running `plan create` (or `plan_create`) again for an existing campaign no
+  longer plans the same brokers a second time, which made `plan execute` send
+  them the same request twice. Brokers that already have a request in the
+  campaign are skipped and reported (`skipped` in JSON, `skipped N broker(s)
+  already in the campaign` in text, and in the app's notice); other filters
+  or a larger `--max` still add new brokers (#1360).
 
 ### Changed
 

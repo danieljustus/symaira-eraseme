@@ -62,6 +62,15 @@ pub struct PlanResult {
     /// `null` rather than `[]`.
     #[serde(serialize_with = "serialize_go_appended_slice")]
     pub requests: Vec<PlanRequest>,
+    /// Selected brokers left out because the campaign already has a request
+    /// for them (post-cutover #1360). Omitted when zero, so a first plan
+    /// keeps Go's bytes.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub skipped: i64,
+}
+
+fn is_zero(value: &i64) -> bool {
+    *value == 0
 }
 
 /// Go's zero value for a slice built by `append` is nil, which marshals as
@@ -269,6 +278,14 @@ pub fn plan_campaign(
     if opts.max_brokers > 0 && selected.len() as i64 > opts.max_brokers {
         selected.truncate(opts.max_brokers as usize);
     }
+    // Go appends a repeated plan to the campaign and plans the same brokers
+    // again, so each broker would get the same request twice (#1360). Brokers
+    // that already have a request here are skipped; re-running a plan is a
+    // no-op, and other filters or a larger `max_brokers` still append.
+    let existing = repository.campaign_broker_ids(&opts.campaign_id)?;
+    let before_skip = selected.len();
+    selected.retain(|(broker, _)| !existing.contains(&broker.id));
+    let skipped = (before_skip - selected.len()) as i64;
 
     let mut result = PlanResult {
         campaign_id: opts.campaign_id.clone(),
@@ -276,6 +293,7 @@ pub fn plan_campaign(
         matched,
         planned: 0,
         requests: Vec::new(),
+        skipped,
     };
     for (broker, channel) in selected {
         let template_id = resolve_template(&channel);

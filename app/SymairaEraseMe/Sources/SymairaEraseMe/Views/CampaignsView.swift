@@ -20,7 +20,7 @@ struct CampaignsView: View {
             PageRefreshButton(title: "Campaigns", refresh: vm.refresh)
         } content: {
             if let plan = vm.planResult {
-                SymairaNotice(message: plan.message ?? "Campaign created", tone: .positive)
+                SymairaNotice(message: plan.summary, tone: .positive)
             }
             if let exec = vm.executeResult {
                 SymairaNotice(message: exec.message ?? "Execution complete", tone: .positive)

@@ -57,6 +57,20 @@ impl<'store> Repository<'store> {
             .collect()
     }
 
+    /// The broker ids that already have a removal request in `campaign_id`.
+    pub fn campaign_broker_ids(
+        &self,
+        campaign_id: &str,
+    ) -> rusqlite::Result<std::collections::HashSet<String>> {
+        let mut statement = self
+            .store
+            .connection()
+            .prepare("SELECT DISTINCT broker_id FROM removal_requests WHERE campaign_id = ?1")?;
+        statement
+            .query_map(params![campaign_id], |row| row.get(0))?
+            .collect()
+    }
+
     /// Inserts a removal request and returns its SQLite row id.
     pub fn create_removal_request(
         &self,

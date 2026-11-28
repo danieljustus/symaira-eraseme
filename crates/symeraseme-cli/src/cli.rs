@@ -983,9 +983,19 @@ fn plan_create(parsed: &Parsed) -> Outcome {
                 Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
             };
         }
+        // #1360: name the brokers left out because the campaign already has a
+        // request for them; a first plan prints exactly Go's line.
+        let skipped = if result.skipped > 0 {
+            format!(
+                ", skipped {} broker(s) already in the campaign",
+                result.skipped
+            )
+        } else {
+            String::new()
+        };
         Outcome::Stdout(
             format!(
-                "planned {} request(s) for campaign {}\n",
+                "planned {} request(s) for campaign {}{skipped}\n",
                 result.planned, result.campaign_id
             )
             .into_bytes(),

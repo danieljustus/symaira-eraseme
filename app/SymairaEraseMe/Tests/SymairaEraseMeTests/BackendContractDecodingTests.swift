@@ -110,6 +110,19 @@ final class BackendContractDecodingTests: XCTestCase {
         XCTAssertEqual(try entry("2026-11-30T12:00:00Z", 2, overdue: false).relativeDay(asOf: asOf), "in 2 days")
     }
 
+    func testPlanCreateSummaryNamesSkippedBrokers() throws {
+        func decode(_ json: String) throws -> PlanCreateResponse {
+            try JSONDecoder().decode(PlanCreateResponse.self, from: Data(json.utf8))
+        }
+        let first = try decode(#"{"campaign_id":"c","total_brokers":3,"matched":3,"planned":2,"requests":[]}"#)
+        XCTAssertNil(first.skipped)
+        XCTAssertEqual(first.summary, "Planned 2 requests")
+        let repeated = try decode(#"{"campaign_id":"c","total_brokers":3,"matched":3,"planned":0,"requests":null,"skipped":2}"#)
+        XCTAssertEqual(repeated.summary, "Planned 0 requests; 2 brokers were already in the campaign")
+        let one = try decode(#"{"planned":1,"skipped":1}"#)
+        XCTAssertEqual(one.summary, "Planned 1 request; 1 broker was already in the campaign")
+    }
+
     func testEmptyCalendarDecodes() throws {
         // Shape of a live answer over a store without open markers.
         let payload = Data("""
