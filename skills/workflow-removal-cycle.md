@@ -215,7 +215,7 @@ symeraseme schedule status
 This sets up:
 - **Daily tick**: `symeraseme tick` at 09:00
 - **Daily inbox poll**: `symeraseme poll-inbox` at 10:00
-- **Weekly report**: `symeraseme generate-report` on Mondays
+- **Weekly report**: `symeraseme generate-report --all-campaigns --output weekly-report.html` on Mondays
 
 ## Progress tracking
 

@@ -136,7 +136,7 @@ symeraseme plan delete --campaign initial --dry-run
 
 # Track deadlines and view reports
 symeraseme tick --dry-run
-symeraseme generate-report
+symeraseme generate-report --all-campaigns --output report.html
 ```
 
 Destructive execution requires explicit consent. Review the plan first and use

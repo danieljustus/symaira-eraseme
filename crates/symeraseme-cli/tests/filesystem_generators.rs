@@ -11,6 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[path = "../../../rust-tests/html_exports.rs"]
 mod html_exports;
+#[path = "support/post_cutover_1366.rs"]
+mod post_cutover_1366;
 
 type Manifest = BTreeMap<String, Value>;
 
@@ -248,6 +250,30 @@ fn replay(case: &Value) {
         ("stderr", output.stderr.as_slice()),
     ] {
         let folded = fold_root(bytes, &root);
+        // Post-cutover contract change #1366: text-mode `generate-report`
+        // names the file it wrote instead of Go's recorded `success`.
+        if id == "report-generate" && stream == "stdout" {
+            let argv = process["argv"].as_array().expect("recorded argv");
+            let after = |flag: &str| {
+                let index = argv
+                    .iter()
+                    .position(|arg| arg == flag)
+                    .expect("recorded flag");
+                argv[index + 1].as_str().expect("flag value")
+            };
+            let expected = post_cutover_1366::written_report_text(
+                process["stdout_sha256"].as_str().expect("stdout digest"),
+                after("--output"),
+                after("--format"),
+            )
+            .expect("the recorded stdout is Go's `success`");
+            assert_eq!(
+                String::from_utf8_lossy(&folded),
+                String::from_utf8_lossy(&expected),
+                "{id}: stdout"
+            );
+            continue;
+        }
         assert_eq!(
             folded.len() as u64,
             process[format!("{stream}_bytes")]

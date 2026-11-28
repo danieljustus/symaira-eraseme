@@ -46,6 +46,10 @@ All notable changes to this project are documented in this file.
   13 days and 10 minutes ago reads "13 days overdue" in `calendar` text mode
   and in the app, not "14 days overdue", and one from earlier today reads
   "overdue today". The JSON `days_from_now` is unchanged (#1367).
+- `generate-report` in text mode prints the report when no `--output` file is
+  given, instead of printing `success` and discarding it, and names the file
+  (`wrote <path> (<format>)`) when one is given. `--output json` is unchanged
+  (#1366).
 
 ### Changed
 

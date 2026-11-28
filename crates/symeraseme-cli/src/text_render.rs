@@ -29,6 +29,21 @@ pub fn failure(result: &Value) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// `generate-report` (#1366): the written path and format when `--output`
+/// named a file, otherwise the report itself. Returns the complete stdout,
+/// ending in exactly one newline.
+pub fn generated_report(result: &Value) -> String {
+    if let Some(path) = result.get("output_file").and_then(Value::as_str) {
+        return format!("wrote {path} ({})\n", text(result, "format"));
+    }
+    let report = text(result, "report");
+    if report.ends_with('\n') {
+        report.to_owned()
+    } else {
+        format!("{report}\n")
+    }
+}
+
 fn text<'a>(value: &'a Value, key: &str) -> &'a str {
     value.get(key).and_then(Value::as_str).unwrap_or("")
 }
@@ -362,6 +377,17 @@ mod tests {
         ] {
             assert!(text.contains(expected), "missing {expected:?} in\n{text}");
         }
+    }
+
+    #[test]
+    fn generated_report_prints_the_report_or_names_the_file() {
+        let inline = json!({"success": true, "report": "a,b\n1,2\n", "format": "csv"});
+        assert_eq!(generated_report(&inline), "a,b\n1,2\n");
+        let unterminated = json!({"success": true, "report": "{}", "format": "json"});
+        assert_eq!(generated_report(&unterminated), "{}\n");
+        let written = json!({"success": true, "output_file": "/tmp/r.csv",
+                             "size_bytes": 8, "format": "csv"});
+        assert_eq!(generated_report(&written), "wrote /tmp/r.csv (csv)\n");
     }
 
     #[test]

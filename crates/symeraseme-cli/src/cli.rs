@@ -1685,6 +1685,10 @@ fn generate_dashboard_command(parsed: &Parsed) -> Outcome {
 /// Go's `generate-report` `PreRunE`: every flag is sent, `--all` and
 /// `--all-campaigns` feed one argument. Same `--output` shadowing as
 /// `generate-dashboard`.
+///
+/// Post-cutover change #1366: text mode prints the report when no file was
+/// named, or the written path, instead of Go's bare `success` (which dropped
+/// the report). As in Go, the tool runs before the format is validated.
 fn generate_report_command(parsed: &Parsed) -> Outcome {
     let mut arguments = Map::new();
     arguments.insert(
@@ -1703,13 +1707,17 @@ fn generate_report_command(parsed: &Parsed) -> Outcome {
         "all_campaigns".to_owned(),
         json!(bool_flag(parsed, "all-campaigns") || bool_flag(parsed, "all")),
     );
-    match contract_result_with_format("generate_report", &arguments, persistent_format(parsed)) {
+    let result = match contract_call("generate_report", &arguments) {
+        Ok(result) => result,
+        Err(outcome) => return outcome,
+    };
+    match persistent_format(parsed) {
         Err(outcome) => outcome,
-        Ok(None) => Outcome::Stdout(b"success\n".to_vec()),
-        Ok(Some(result)) => match json_line(&result) {
+        Ok("json") => match json_line(&result) {
             Ok(bytes) => Outcome::Stdout(bytes),
             Err(error) => Outcome::Stderr(format!("{error}\n").into_bytes()),
         },
+        Ok(_) => Outcome::Stdout(text_render::generated_report(&result).into_bytes()),
     }
 }
 

@@ -260,6 +260,39 @@ fn command_rows(help: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+/// #1366: text-mode `generate-report` prints the report when no file is named
+/// and names the file otherwise; the root `--output json` keeps the payload.
+#[test]
+fn generate_report_prints_the_report_or_names_the_written_file() {
+    let dir = seeded();
+    let report = ["generate-report", "--campaign-id", "pop", "--format", "csv"];
+    let csv = stdout(dir.path(), &report);
+    assert!(csv.contains("acme") && csv.contains("beta"), "{csv}");
+    assert!(csv.ends_with('\n') && !csv.ends_with("\n\n"), "{csv:?}");
+
+    let target = dir.path().join("reports").join("r.csv");
+    let target_text = target.to_str().unwrap();
+    let named = stdout(
+        dir.path(),
+        &[&report[..], &["--output", target_text]].concat(),
+    );
+    assert_eq!(named, format!("wrote {target_text} (csv)\n"));
+    let written = std::fs::read_to_string(&target).expect("report file");
+    assert!(
+        written.contains("acme") && written.contains("beta"),
+        "{written}"
+    );
+
+    let json: Value = serde_json::from_str(&stdout(
+        dir.path(),
+        &[&["--output", "json"][..], &report[..]].concat(),
+    ))
+    .unwrap();
+    assert_eq!(json["success"], true);
+    assert_eq!(json["format"], "csv");
+    assert!(json["report"].as_str().unwrap().contains("acme"));
+}
+
 #[test]
 fn help_lists_a_description_for_every_command() {
     let dir = tempfile::tempdir().unwrap();

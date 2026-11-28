@@ -16,6 +16,8 @@ mod dashboard_compact;
 mod post_cutover_1295;
 #[path = "support/post_cutover_1302.rs"]
 mod post_cutover_1302;
+#[path = "support/post_cutover_1366.rs"]
+mod post_cutover_1366;
 
 #[path = "support/frozen_review_oracle.rs"]
 mod frozen_review_oracle;
@@ -948,6 +950,11 @@ fn frozen_command_surface_matches_phase_two_contract() {
             "help-plan" => post_cutover_1295::plan_help_with_delete(&decode_base64(
                 case["stdout_base64"].as_str().unwrap(),
             )),
+            // Post-cutover contract change #1366: text-mode `generate-report`
+            // without a file prints the (empty-store) report.
+            "operate-generate-report" => post_cutover_1366::report_text(&decode_base64(
+                case["stdout_base64"].as_str().unwrap(),
+            )),
             _ => decode_base64(case["stdout_base64"].as_str().unwrap()),
         };
         // Post-cutover contract change #1303: the changed command descriptions.
@@ -974,6 +981,8 @@ fn frozen_command_surface_matches_phase_two_contract() {
                 )
             {
                 mask_wall_clock(&output.stdout)
+            } else if id == "operate-generate-report" {
+                post_cutover_1366::mask_generated_at(&output.stdout)
             } else if id == "operate-init-profile" {
                 String::from_utf8_lossy(&output.stdout)
                     .replace(&root.to_string_lossy().to_string(), "<ORACLE_ROOT>")
